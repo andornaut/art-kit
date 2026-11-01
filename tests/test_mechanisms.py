@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from xml.etree import ElementTree as ET
 
 from PIL import Image
 
@@ -41,6 +42,34 @@ class DrawingTests(unittest.TestCase):
 
 
 class FontTests(unittest.TestCase):
+    def test_pack_rejects_oversized_glyph_before_pasting(self):
+        glyphs = {"W": (Image.new("L", (6, 2), 255), 0, 0, 6)}
+        with patch.object(Image.Image, "paste") as paste:
+            with self.assertRaisesRegex(ValueError, "Glyph 'W' width 6 exceeds atlas width 5"):  # noqa: PT027
+                fonts.pack(5, glyphs)
+            paste.assert_not_called()
+
+    def test_pack_accepts_exact_width_and_preserves_row_spacing(self):
+        glyphs = {
+            "W": (Image.new("L", (5, 2), 255), 0, 0, 5),
+            "i": (Image.new("L", (1, 1), 255), 0, 0, 1),
+        }
+        atlas, places = fonts.pack(5, glyphs)
+        assert places == {"W": (0, 1), "i": (0, 4)}
+        assert atlas.size == (5, 8)
+        assert atlas.getpixel((4, 2)) == (255, 255, 255, 255)
+        assert atlas.getpixel((0, 3)) == (0, 0, 0, 0)
+
+    def test_bmfont_page_filename_round_trips_xml_special_characters(self):
+        for key in ("ordinary", "menu&icons<test>\"'"):
+            with self.subTest(key=key):
+                info = fonts.FontInfo(key, "Test", 8, 10, 8)
+                xml = fonts.bmfont_xml(info, (4, 4), {}, {})
+                page = ET.fromstring(xml).find("pages/page")  # noqa: S314 - Parse only generated fixture XML.
+                assert page.attrib["file"] == key + ".png"
+                if key == "ordinary":
+                    assert '<pages><page id="0" file="ordinary.png"/></pages>' in xml
+
     def test_pack_mask_colour_empty_and_metrics(self):
         glyphs = {
             " ": (None, 0, 0, 2),

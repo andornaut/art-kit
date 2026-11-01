@@ -39,6 +39,8 @@ def pack(atlas_width, glyphs):
         if image is None:
             places[char] = (0, 0)
             continue
+        if image.width > atlas_width:
+            raise ValueError(f"Glyph {char!r} width {image.width} exceeds atlas width {atlas_width}")
         if x + image.width + 1 > atlas_width:
             x, y, row_height = 0, y + row_height + 1, 0
         places[char] = (x, y)
@@ -71,7 +73,7 @@ def bmfont_xml(info: FontInfo, atlas_size, places, glyphs, *, kernings=()):
             f'  <common lineHeight="{info.line_height}" base="{info.base}" scaleW="{width}" '
             f'scaleH="{height}" pages="1" packed="0"/>'
         ),
-        f'  <pages><page id="0" file="{info.key}.png"/></pages>',
+        f'  <pages><page id="0" file={quoteattr(info.key + ".png")}/></pages>',
         f'  <chars count="{len(glyphs)}">',
     ]
     for char, (image, ox, oy, advance) in glyphs.items():
