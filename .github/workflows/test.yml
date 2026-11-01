@@ -28,6 +28,21 @@ jobs:
         run: bash scripts/check.sh .claude/dependencies .claude/dependencies/bin/ruff .claude/dependencies
       - name: Build committed release artifacts offline
         run: bash scripts/pack.sh .claude/dependencies .claude/release-output
+      - name: Verify installed wheel offline
+        run: |
+          docker run --rm --read-only --network none --cpus 4 -u "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$PWD/.claude/release-output,target=/release,readonly" \
+            --mount "type=bind,source=$PWD/.claude/dependencies,target=/deps,readonly" \
+            --tmpfs "/tmp:exec,uid=$(id -u),gid=$(id -g)" \
+            -e HOME=/tmp -e EXPECTED_COMMIT="$GITHUB_SHA" -w /tmp python:3.12 bash -ec '
+              cd /release
+              sha256sum --check SHA256SUMS
+              test "$(cat SOURCE_COMMIT)" = "$EXPECTED_COMMIT"
+              python -I -m venv /tmp/venv
+              /tmp/venv/bin/python -I -m pip install --no-index --no-deps /release/art_kit-*.whl
+              printf "/deps\n" > /tmp/venv/lib/python3.12/site-packages/pillow.pth
+              /tmp/venv/bin/python -I -c "import importlib.metadata as m, os, pathlib, sys; import art_kit; from art_kit import aseprite, colour, fonts, frames, grid; import PIL; package = pathlib.Path(art_kit.__file__).resolve().parent; assert package.is_relative_to(pathlib.Path(sys.prefix)); assert (package / '\''SOURCE_COMMIT'\'').read_text().strip() == os.environ['\''EXPECTED_COMMIT'\'']; assert m.version('\''art-kit'\'') == '\''0.0.1'\''; assert PIL.__version__ == '\''13.0.0'\''"
+            '
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: art-kit-${{ github.sha }}
