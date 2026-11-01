@@ -11,9 +11,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from PIL import ImageFont
+from PIL import Image, ImageFont
 
-from art_kit import aseprite, fonts, frames
+from art_kit import aseprite, colour, composition, fonts, frames
 from art_kit.grid import Grid
 
 
@@ -107,6 +107,28 @@ def compare(root):
                 old_xml = (output / f"{key}.fnt").read_text()
             require_equal(actual_xml, old_xml, f"{key} BMFont bytes")
             glyph_count += len(glyphs)
+        preview_sprites = [
+            ("first", [("idle", [frame, list(reversed(frame))], [80, 120])]),
+            ("second", [("idle", [[["ffffff", None, "000000"]]], 60)]),
+        ]
+        grounds = ["181425", "ffffff"]
+        original_preview = output / "preview-old.png"
+        shared_preview = output / "preview-new.png"
+        pixel.preview(preview_sprites, original_preview, grounds=grounds, scale=3, gap=2)
+        resolver = colour.rgb if dog else pixel.rgb
+        composition.contact_sheet(resolver, (24, 20, 37), grounds, preview_sprites, scale=3, gap=2).save(shared_preview)
+        require_equal(shared_preview.read_bytes(), original_preview.read_bytes(), "preview PNG bytes")
+        if not dog:
+            items = [
+                ("red", Image.new("RGBA", (2, 2), (255, 0, 0, 255))),
+                ("clear", Image.new("RGBA", (2, 2), (0, 0, 0, 0))),
+                ("blue", Image.new("RGBA", (2, 2), (0, 0, 255, 255))),
+            ]
+            pixel.TILESETS = str(output)
+            pixel.write_tileset("tiles", items, size=2, columns=2)
+            shared_tiles = output / "tiles-new.png"
+            composition.tileset(2, 2, [tile for _, tile in items]).save(shared_tiles)
+            require_equal(shared_tiles.read_bytes(), (output / "tiles.png").read_bytes(), "tileset PNG bytes")
         tags = [("idle", [frame, list(reversed(frame))], [80, 120])]
         colours = pixel.PALETTE
         old_lua = pixel._lua(tags, "sprite.aseprite") if dog else pixel._lua(tags, "sprite.aseprite", "sprite")  # noqa: SLF001 - Compare the existing serialization boundary.
@@ -119,6 +141,8 @@ def compare(root):
         "fontAtlases": len(original_fonts.FONTS),
         "bmfontBytes": "equal",
         "lua": "equal",
+        "previewPNG": "equal",
+        "tilesetPNG": "not used" if dog else "equal",
     }
     print(json.dumps(result, sort_keys=True))
 

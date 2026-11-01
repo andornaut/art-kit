@@ -7,6 +7,7 @@ Shared Python mechanisms for scripted pixel art. One root package, one `src/art_
 | Module | Owns | Client supplies |
 | --- | --- | --- |
 | `aseprite` | Frame/tag Lua and PNG/JSON export | Executable, palette, tags, paths, optional slice |
+| `composition` | Contact sheets and row-major tile image composition | Colour resolver, background, grounds, scale, tile size and images |
 | `colour` | Hex RGB and WCAG contrast | Resolved hex colours |
 | `fonts` | Glyph rasterization, atlas packing, BMFont XML | Font path, characters, glyph overrides, metrics, kerning |
 | `frames` | Opaque extents, reflection, RGBA conversion | Pixel frames |
@@ -22,6 +23,8 @@ grid = Grid(palette, 16, 16, edge=lambda colour: "000000")
 grid.ell(8, 8, 4, 4, "fill")
 frame = grid.outlined()
 ```
+
+`composition.contact_sheet(rgb_of, background_rgb, grounds, sprites, scale=..., gap=4)` returns the RGB preview image; callers retain output paths and saving. `composition.tileset(tile_size, columns, tiles)` returns the RGBA sheet. Item naming, pieces, hitboxes and manifest entries remain local.
 
 A client can subclass `Grid` to retain its existing constructor and outline signature. Keep mutable `px`, `w`, `h`, `edge` and `close` semantics when adapting existing drawing scripts. `fonts.pack(width, glyphs)` preserves glyph insertion order, one-pixel spacing and power-of-two atlas height; it supports monochrome masks and coloured RGBA glyphs. Font overrides and baseline adjustments remain local. `fonts.bmfont_xml` returns text, without writing a manifest.
 
@@ -39,4 +42,4 @@ For isolated Python (`python -I`), an explicit client bootstrap must add the res
 
 ## Version and licence
 
-Version 0.1.0. Exact Git revision identifies each payload. Preserve public functions and keyword semantics within a minor version; document additive changes and explicitly coordinate breaking changes before client migration. Generated assets and client code retain their existing licences. Extracted helper code in this repository is MIT licensed.
+Version 0.2.0. Exact Git revision identifies each payload. Preserve public functions and keyword semantics within a minor version; document additive changes and explicitly coordinate breaking changes before client migration. Generated assets and client code retain their existing licences. Extracted helper code in this repository is MIT licensed.

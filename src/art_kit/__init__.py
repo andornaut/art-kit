@@ -1,4 +1,4 @@
 """Pixel-art mechanisms with explicit client context.
 
-Import the owning module: colour, grid, frames, aseprite or fonts.
+Import the owning module: aseprite, colour, composition, fonts, frames or grid.
 """
