@@ -2,7 +2,10 @@
 
 from PIL import Image
 
+from art_kit._composition import contact_sheet, tile_sheet
 from art_kit.colour import rgb
+
+__all__ = ["contact_sheet", "flipped", "opaque_cols", "opaque_rows", "tile_sheet", "to_image"]
 
 
 def opaque_rows(frames):

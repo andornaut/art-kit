@@ -1,0 +1,39 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Prepare pinned tools in an isolated container
+        run: |
+          mkdir -p .claude/dependencies
+          docker run --rm --cpus 4 -u "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$PWD/.claude/dependencies,target=/deps" \
+            --tmpfs "/tmp:uid=$(id -u),gid=$(id -g)" \
+            -e HOME=/tmp python:3.12 python -I -m pip install --no-cache-dir --target /deps \
+            Pillow==13.0.0 ruff==0.17.2 setuptools==84.2.1 wheel==0.48.0
+      - name: Check offline in an isolated container
+        run: bash scripts/check.sh .claude/dependencies .claude/dependencies/bin/ruff .claude/dependencies
+      - name: Build committed release artifacts offline
+        run: bash scripts/pack.sh .claude/dependencies .claude/release-output
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: art-kit-${{ github.sha }}
+          path: |
+            .claude/release-output/art_kit-*.whl
+            .claude/release-output/SHA256SUMS
+            .claude/release-output/SOURCE_COMMIT
+          if-no-files-found: error
+          include-hidden-files: true

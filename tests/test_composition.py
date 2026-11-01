@@ -3,7 +3,7 @@ import unittest
 from PIL import Image
 
 from art_kit.colour import rgb
-from art_kit.composition import contact_sheet, tileset
+from art_kit.frames import contact_sheet, tile_sheet
 
 
 class CompositionTests(unittest.TestCase):
@@ -11,7 +11,7 @@ class CompositionTests(unittest.TestCase):
         red = [["ff0000", None]]
         blue = [[None, "0000ff"]]
         sprites = [("two", [("idle", [red], 80), ("tap", [blue], 60)]), ("one", [("idle", [[["ffffff"]]], 80)])]
-        image = contact_sheet(rgb, (24, 20, 37), ["000000", "ffffff"], sprites, scale=2, gap=1)
+        image = contact_sheet(rgb, sprites, ["000000", "ffffff"], background=(24, 20, 37), scale=2, gap=1)
         assert image.size == (12, 16)
         assert image.getpixel((0, 0)) == (255, 0, 0)
         assert image.getpixel((2, 0)) == (0, 0, 0)
@@ -24,7 +24,7 @@ class CompositionTests(unittest.TestCase):
         red = Image.new("RGBA", (2, 2), (255, 0, 0, 255))
         clear = Image.new("RGBA", (2, 2), (0, 0, 0, 0))
         blue = Image.new("RGBA", (2, 2), (0, 0, 255, 255))
-        image = tileset(2, 2, [red, clear, blue])
+        image = tile_sheet(2, 2, [red, clear, blue])
         assert image.size == (4, 4)
         assert image.getpixel((0, 0)) == (255, 0, 0, 255)
         assert image.getpixel((2, 0)) == (0, 0, 0, 0)

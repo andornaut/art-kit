@@ -13,7 +13,7 @@ from pathlib import Path
 
 from PIL import Image, ImageFont
 
-from art_kit import aseprite, colour, composition, fonts, frames
+from art_kit import aseprite, colour, fonts, frames
 from art_kit.grid import Grid
 
 
@@ -116,7 +116,9 @@ def compare(root):
         shared_preview = output / "preview-new.png"
         pixel.preview(preview_sprites, original_preview, grounds=grounds, scale=3, gap=2)
         resolver = colour.rgb if dog else pixel.rgb
-        composition.contact_sheet(resolver, (24, 20, 37), grounds, preview_sprites, scale=3, gap=2).save(shared_preview)
+        frames.contact_sheet(resolver, preview_sprites, grounds, background=(24, 20, 37), scale=3, gap=2).save(
+            shared_preview
+        )
         require_equal(shared_preview.read_bytes(), original_preview.read_bytes(), "preview PNG bytes")
         if not dog:
             items = [
@@ -127,7 +129,7 @@ def compare(root):
             pixel.TILESETS = str(output)
             pixel.write_tileset("tiles", items, size=2, columns=2)
             shared_tiles = output / "tiles-new.png"
-            composition.tileset(2, 2, [tile for _, tile in items]).save(shared_tiles)
+            frames.tile_sheet(2, 2, [tile for _, tile in items]).save(shared_tiles)
             require_equal(shared_tiles.read_bytes(), (output / "tiles.png").read_bytes(), "tileset PNG bytes")
         tags = [("idle", [frame, list(reversed(frame))], [80, 120])]
         colours = pixel.PALETTE
