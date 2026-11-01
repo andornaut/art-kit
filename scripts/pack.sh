@@ -23,6 +23,23 @@ docker run --rm --read-only --network none --cpus 4 -u "$(id -u):$(id -g)" \
   --mount "type=bind,source=$output,target=/out" \
   --tmpfs "/tmp:exec,uid=$(id -u),gid=$(id -g)" \
   -e HOME=/tmp -e "SOURCE_DATE_EPOCH=$source_epoch" -w /package python:3.12 bash -ec '
+    python -I -c '\''import importlib.metadata as metadata
+import re
+import tomllib
+from pathlib import Path
+
+normalise = lambda name: re.sub(r"[-_.]+", "-", name).lower()
+installed = {normalise(dist.metadata["Name"]): dist.version for dist in metadata.distributions(path=["/build-deps"])}
+requirements = tomllib.loads(Path("pyproject.toml").read_text())["build-system"]["requires"]
+for requirement in requirements:
+    pin = re.fullmatch(r"([A-Za-z0-9_.-]+)==([^*<>=!~;\s]+)", requirement)
+    if pin is None:
+        raise SystemExit(f"Build dependency must use an exact version pin: {requirement}")
+    name, expected = pin.groups()
+    actual = installed.get(normalise(name), "missing")
+    if actual != expected:
+        raise SystemExit(f"Build dependency {name}: expected {expected}, actual {actual} in /build-deps")
+'\''
     python -I -m pip wheel --no-build-isolation --no-deps --no-index /package --wheel-dir /out
     cp src/art_kit/SOURCE_COMMIT /out/SOURCE_COMMIT
     cd /out
