@@ -33,12 +33,6 @@ Python 3.12 or newer, Pillow 13.0.0 and optional Aseprite for exports. Ruff is p
 
 Run `scripts/check.sh` with explicit read-only Pillow, Ruff binary and build-dependency paths as documented by its usage. Checks run offline inside `python:3.12`, with four CPUs, a read-only source checkout and writable scratch only. The standard gate runs library tests and builds the wheel. Separate `scripts/compare_client.py` and `scripts/compare_exports.py` checks accept explicit game source snapshots for source development; they are not part of this gate. Game projects assume library contracts are correct and test their own adapters and authored output. No game build or generation is part of the package gate.
 
-## Legacy source-development sync
-
-For legacy source-development checks only, `bash scripts/sync-into.sh <consumer>` copies the committed package payload into `vendor/art-kit`. `bash scripts/sync-into.sh --check <consumer>` checks every payload file and rejects extra files. `ART_KIT_COMMIT` pins the exact canonical revision. Sync changes only the vendor directory; client adapters are reviewed separately. This is not the released consumer installation contract.
-
-Released clients use `.venv-art/bin/python -I` and the wheel installed into that virtual environment. Do not retain a vendor, `PYTHONPATH` or editable-install runtime fallback. Direct source snapshots are only for explicit development checks.
-
 ## Version and licence
 
 The package version is declared in `pyproject.toml`. Compatible fixes increment the patch version; additive public features increment the minor version. Incompatible public API changes require an explicitly coordinated compatibility bump and release notes before consumer migration: increment the minor version before 1.0.0 and the major version thereafter. Never introduce an incompatible change in a patch release. Exact Git revision identifies each payload. Generated assets, fonts and client code retain their existing licences. Extracted helper code in this repository is MIT licensed.
@@ -48,7 +42,7 @@ The package version is declared in `pyproject.toml`. Compatible fixes increment 
 
 The public source repository is [andornaut/art-kit](https://github.com/andornaut/art-kit). For the version declared in `pyproject.toml`, the release artifact URL is `https://github.com/andornaut/art-kit/releases/download/v<version>/art_kit-<version>-py3-none-any.whl`. After publication, consumers pin the resolved URL with `#sha256=` and the wheel's exact published hash from `SHA256SUMS` in `requirements-art.txt`, alongside `Pillow==13.0.0`. Do not commit placeholder hashes or fetch unpublished URLs. Install into the explicit `.venv-art` virtual environment; no PyPI or other registry publication is used. Install the wheel without resolving additional packages when Pillow 13.0.0 is supplied separately.
 
-Python isolated mode (`-I`) retains the interpreter's installed site packages. Released scripts use installed site packages only, without a vendor bootstrap, `PYTHONPATH` or editable fallback. Existing vendor sync is an isolated source-development facility rather than the released dependency route.
+Released clients use `.venv-art/bin/python -I` and the wheel installed into that virtual environment. Direct source snapshots are only for explicit development checks. Python isolated mode (`-I`) retains the interpreter's installed site packages. Released scripts use installed site packages only, without a vendor bootstrap, `PYTHONPATH` or editable fallback.
 
 `bash scripts/pack.sh <build-dependency-directory> <output-directory>` builds the committed revision offline in a four-CPU container. Supply an empty output directory and the pinned build dependencies declared in `pyproject.toml`. It emits the wheel, `SHA256SUMS` (covering the wheel and `SOURCE_COMMIT`) and `SOURCE_COMMIT`. The wheel includes `art_kit/SOURCE_COMMIT`, generated from that exact source revision. No fonts, Aseprite application data, game assets or local tooling are included. Source CI checks the package, verifies isolated installed-wheel imports and source identity, and uploads artifacts for review.
 

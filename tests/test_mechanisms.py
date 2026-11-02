@@ -1,4 +1,3 @@
-import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
@@ -110,24 +109,3 @@ class ExportTests(unittest.TestCase):
             )
             assert run.call_count == 2
             assert run.call_args.args[0][-3:] == ["--format", "json-hash", "--list-tags"]
-
-
-class VendorTests(unittest.TestCase):
-    def test_exact_sync_rejects_extra_files_and_symlinks(self):
-        spec = importlib.util.spec_from_file_location("vendor", Path(__file__).parents[1] / "scripts/vendor.py")
-        vendor = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(vendor)
-        with tempfile.TemporaryDirectory() as directory:
-            source, target = Path(directory) / "source", Path(directory) / "target"
-            source.mkdir()
-            (source / "ART_KIT_COMMIT").write_text("revision\n")
-            vendor.sync(False, source, target)
-            vendor.sync(True, source, target)
-            (target / "extra").write_text("extra")
-            with self.assertRaises(ValueError):  # noqa: PT027 - Keep the test runner in the standard library.
-                vendor.sync(True, source, target)
-
-            alias = Path(directory) / "alias"
-            alias.symlink_to(source, target_is_directory=True)
-            with self.assertRaises(ValueError):  # noqa: PT027 - Keep the test runner in the standard library.
-                vendor.sync(False, source, alias)
