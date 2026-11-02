@@ -1,0 +1,10 @@
+// PNG decoding for Node build tools.
+import { PNG } from "pngjs";
+
+import type { RgbaImage } from "./rgbaImage.js";
+
+// A PNG's pixels, whatever its colour type, as 8-bit RGBA.
+export function decodePng(bytes: Uint8Array): RgbaImage {
+  const { data, height, width } = PNG.sync.read(Buffer.from(bytes));
+  return { data: new Uint8Array(data), height, width };
+}
