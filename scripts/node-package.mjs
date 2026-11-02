@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, 
 import { join } from 'node:path';
 
 const [mode, revision] = process.argv.slice(2);
+if (!['check', 'pack'].includes(mode)) throw new Error('Expected check or pack mode');
 const root = '/work/source';
 const descriptor = JSON.parse(readFileSync(`${root}/node/package.json`, 'utf8'));
 for (const [name, expected] of Object.entries({ ...descriptor.devDependencies, ...descriptor.peerDependencies })) {
@@ -12,6 +13,14 @@ for (const [name, expected] of Object.entries({ ...descriptor.devDependencies, .
 }
 const version = readFileSync(`${root}/pyproject.toml`, 'utf8').match(/^version = "([^"]+)"$/m)?.[1];
 if (!version) throw new Error('Missing project version');
+if (mode === 'pack') {
+  const identity = '/out/SOURCE_COMMIT';
+  if (!existsSync(identity) || readFileSync(identity, 'utf8') !== `${revision}\n`) throw new Error('Existing SOURCE_COMMIT must match the release revision');
+  const expectedWheel = `art_kit-${version}-py3-none-any.whl`;
+  const existing = readdirSync('/out');
+  if (!existing.includes(expectedWheel)) throw new Error(`Missing expected wheel: ${expectedWheel}`);
+  if (existing.some(name => name.endsWith('.whl') && name !== expectedWheel) || existing.some(name => name.endsWith('.tgz'))) throw new Error('Unexpected or stale release artifact');
+}
 symlinkSync('/deps', `${root}/node/node_modules`);
 execFileSync('node', ['/deps/typescript/bin/tsc', '-p', `${root}/node/tsconfig.json`], { stdio: 'inherit' });
 const packageDir = '/work/package';

@@ -2,7 +2,7 @@
   "name": "@andornaut/art-kit",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=24" },
+  "engines": { "node": ">=24.21.0" },
   "exports": {
     "./atlasLayout": { "types": "./dist/atlasLayout.d.ts", "import": "./dist/atlasLayout.js" },
     "./atlasBuild": { "types": "./dist/atlasBuild.d.ts", "import": "./dist/atlasBuild.js" },
