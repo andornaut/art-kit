@@ -29,6 +29,8 @@ frame = grid.outlined()
 
 A client can subclass `Grid` to retain its existing constructor and outline signature. Keep mutable `px`, `w`, `h`, `edge` and `close` semantics when adapting existing drawing scripts. `fonts.pack(width, glyphs)` preserves glyph insertion order, one-pixel spacing and power-of-two atlas height; it supports monochrome masks and coloured RGBA glyphs. A glyph image wider than the atlas raises `ValueError`, identifying the character, actual width and atlas limit. Font overrides and baseline adjustments remain local. `fonts.bmfont_xml` returns text, without writing a manifest.
 
+`aseprite.export(executable, palette, tags, source, sheet, data, *, key=None, margins=None, columns=None)` accepts an optional positive integer `columns` to set the exported sheet column count. For example, `columns=6` arranges twelve frames in six columns and two rows. Omit it to retain the default sheet layout; source frames, tags, durations and slices are unchanged.
+
 ### Node
 
 The compiled ESM package `@andornaut/art-kit` includes TypeScript declarations and these public subpaths:

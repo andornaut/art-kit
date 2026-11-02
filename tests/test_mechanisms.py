@@ -1,3 +1,4 @@
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -96,16 +97,65 @@ class ExportTests(unittest.TestCase):
         with self.assertRaises(ValueError):  # noqa: PT027 - Keep the test runner in the standard library.
             aseprite.lua([], [("bad", tags[0][1], [10])], "out")
 
-    def test_export_uses_explicit_paths_and_no_shell(self):
-        with tempfile.TemporaryDirectory() as directory, patch("art_kit.aseprite.subprocess.run") as run:
-            root = Path(directory)
-            aseprite.export(
-                "/tool/aseprite",
-                ["ffffff"],
-                [("idle", [[["ffffff"]]], 80)],
-                root / "a.aseprite",
-                root / "a.png",
-                root / "a.json",
-            )
-            assert run.call_count == 2
-            assert run.call_args.args[0][-3:] == ["--format", "json-hash", "--list-tags"]
+    def test_export_preserves_default_command_and_adds_columns_only_to_sheet(self):
+        palette = ["ffffff"]
+        tags = [("idle", [[["ffffff"]]], 80)]
+        for columns in (None, 6):
+            for margins in (None, (0, 0, 0, 0)):
+                with self.subTest(columns=columns, margins=margins), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source, sheet, data = (root / name for name in ("a.aseprite", "a.png", "a.json"))
+                    scripts = []
+
+                    def capture(command, scripts=scripts, **kwargs):
+                        if "--script" in command:
+                            assert command[:3] == ["/tool/aseprite", "-b", "--script"]
+                            assert len(command) == 4
+                            assert kwargs == {"check": True}
+                            scripts.append(Path(command[3]).read_text())
+
+                    with patch("art_kit.aseprite.subprocess.run", side_effect=capture) as run:
+                        options = {} if columns is None else {"columns": columns}
+                        aseprite.export(
+                            "/tool/aseprite",
+                            palette,
+                            tags,
+                            source,
+                            sheet,
+                            data,
+                            key="card",
+                            margins=margins,
+                            **options,
+                        )
+                    expected = [
+                        "/tool/aseprite",
+                        "-b",
+                        str(source),
+                        "--sheet",
+                        str(sheet),
+                        "--data",
+                        str(data),
+                        "--format",
+                        "json-hash",
+                        "--list-tags",
+                    ]
+                    if margins:
+                        expected.append("--list-slices")
+                    if columns is not None:
+                        expected.extend(["--sheet-columns", "6"])
+                    assert run.call_count == 2
+                    assert run.call_args.args == (expected,)
+                    assert run.call_args.kwargs == {"check": True, "stdout": subprocess.DEVNULL}
+                    assert scripts == [aseprite.lua(palette, tags, source, key="card", margins=margins)]
+
+    def test_export_rejects_invalid_columns_before_side_effects(self):
+        for columns in (0, -1, True, 1.5, "6"):
+            with (
+                self.subTest(columns=columns),
+                patch.object(Path, "mkdir") as mkdir,
+                patch("art_kit.aseprite.subprocess.run") as run,
+            ):
+                with self.assertRaisesRegex(ValueError, "columns must be a positive integer"):  # noqa: PT027
+                    aseprite.export("/tool/aseprite", [], [], "a", "b", "c", columns=columns)
+                mkdir.assert_not_called()
+                run.assert_not_called()

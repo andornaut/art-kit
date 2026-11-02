@@ -74,8 +74,10 @@ def lua(palette, tags, output, *, key=None, margins=None):
     )
 
 
-def export(executable, palette, tags, source, sheet, data, *, key=None, margins=None):
+def export(executable, palette, tags, source, sheet, data, *, key=None, margins=None, columns=None):
     """Write one source, sheet and JSON. The caller owns paths and manifest updates."""
+    if columns is not None and (type(columns) is not int or columns <= 0):
+        raise ValueError("columns must be a positive integer")
     source, sheet, data = Path(source), Path(sheet), Path(data)
     for path in (source, sheet, data):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -98,4 +100,6 @@ def export(executable, palette, tags, source, sheet, data, *, key=None, margins=
     ]
     if margins:
         command.append("--list-slices")
+    if columns is not None:
+        command.extend(["--sheet-columns", str(columns)])
     subprocess.run(command, check=True, stdout=subprocess.DEVNULL)  # noqa: S603
