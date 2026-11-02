@@ -1,8 +1,10 @@
 # art-kit
 
-Shared Python mechanisms for scripted pixel art. One root package, one `src/art_kit` tree, no registry publication.
+Shared Python and Node mechanisms for scripted pixel art and atlas builds. Python source lives in `src/art_kit`; Node source lives in `node/src`. Both artifacts share one canonical version, with no registry publication.
 
 ## Boundaries
+
+### Python
 
 | Module | Owns | Client supplies |
 | --- | --- | --- |
@@ -27,11 +29,29 @@ frame = grid.outlined()
 
 A client can subclass `Grid` to retain its existing constructor and outline signature. Keep mutable `px`, `w`, `h`, `edge` and `close` semantics when adapting existing drawing scripts. `fonts.pack(width, glyphs)` preserves glyph insertion order, one-pixel spacing and power-of-two atlas height; it supports monochrome masks and coloured RGBA glyphs. A glyph image wider than the atlas raises `ValueError`, identifying the character, actual width and atlas limit. Font overrides and baseline adjustments remain local. `fonts.bmfont_xml` returns text, without writing a manifest.
 
+### Node
+
+The compiled ESM package `@andornaut/art-kit` includes TypeScript declarations and these public subpaths:
+
+| Subpath | Owns | Client supplies |
+| --- | --- | --- |
+| `atlasBuild` | Atlas drawing and encoded page assembly | Read/decode/encode functions, blits, extrusion and metadata |
+| `atlasLayout` | Shelf packing and candidate selection | Items, grouping, order comparator, candidate widths and size limits |
+| `png` | PNG decoding to RGBA | Encoded bytes |
+| `rgbaImage` | RGBA allocation and extruded blitting | Image dimensions, pixels, rectangles and bounds |
+| `webp` | Lossless WebP encoding, decoding and RGBA comparison | Images or encoded bytes |
+
+Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geometry and RGBA interfaces are local structural types; the package has no `game-kit` dependency. Callers own manifests, tile sizes, frame tags, grouping, ordering policy, paths, filenames and Vite asset emission. Node helpers run without a Python subprocess.
+
 ## Runtime and checks
 
 Python 3.12 or newer, Pillow 13.0.0 and optional Aseprite for exports. Ruff is pinned to 0.17.2. Colour and grid do not import Pillow; image and font facilities do. The source fonts and their licences remain in the client repositories.
 
+Node requires 24.21.0 or newer and exact peer dependencies `pngjs@7.0.0` and `@jsquash/webp@1.5.0`. WebP uses the non-SIMD WASM codecs supplied by that peer package.
+
 Run `scripts/check.sh` with explicit read-only Pillow, Ruff binary and build-dependency paths as documented by its usage. Checks run offline inside `python:3.12`, with four CPUs, a read-only source checkout and writable scratch only. The standard gate runs library tests and builds the wheel. Game projects assume library contracts are correct and test their own adapters and authored output. No game build or generation is part of the package gate.
+
+`bash scripts/check-node.sh <readonly-node_modules>` compiles the current tree in scratch, packs and installs the compiled tarball into scratch `node_modules/@andornaut/art-kit`, then runs the Node tests against that installed package with `node:test`. Supply the pinned dependencies required by the script.
 
 ## Version and licence
 
@@ -46,4 +66,8 @@ Released clients use `.venv-art/bin/python -I` and the wheel installed into that
 
 `bash scripts/pack.sh <build-dependency-directory> <output-directory>` builds the committed revision offline in a four-CPU container. Supply an empty output directory and the pinned build dependencies declared in `pyproject.toml`. It emits the wheel, `SHA256SUMS` (covering the wheel and `SOURCE_COMMIT`) and `SOURCE_COMMIT`. The wheel includes `art_kit/SOURCE_COMMIT`, generated from that exact source revision. No fonts, Aseprite application data, game assets or local tooling are included. Source CI checks the package, verifies isolated installed-wheel imports and source identity, and uploads artifacts for review.
 
-Before creating the immutable `v<version>` tag for the version declared in `pyproject.toml`, verify that every required CI workflow has completed successfully on the exact release commit on `main`. Publish that commit's checked wheel, `SHA256SUMS` and `SOURCE_COMMIT` as GitHub release assets; do not substitute an earlier artifact. Consumers adopt the published URL and checksum through their own integration process.
+The Node release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`, using the same version from `pyproject.toml`. Consumers pin the published tarball and exact peers through their own dependency integration, without registry publication or a source fallback. The tarball contains compiled ESM and `.d.ts` files, not source TypeScript as runtime code.
+
+After building the wheel, run `bash scripts/pack-node.sh <readonly-node_modules> <output-directory>` with the same output directory. It archives exact `HEAD`, requires the existing `SOURCE_COMMIT` to match that commit, adds `art-kit-<version>.tgz` and recomputes the combined `SHA256SUMS`. Both artifacts share the same source identity.
+
+Before creating the immutable `v<version>` tag for the version declared in `pyproject.toml`, verify that every required CI workflow has completed successfully on the exact release commit on `main`. Publish that commit's checked wheel, Node tarball, `SHA256SUMS` and `SOURCE_COMMIT` as GitHub release assets; do not substitute an earlier artifact. Consumers adopt the published URL and checksum through their own integration process.
