@@ -37,6 +37,9 @@ if (installedManifest.version !== version || existsSync(`${install}/node_modules
 for (const subpath of Object.keys(descriptor.exports)) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath.slice(2)}`)})`], { cwd: install, stdio: 'inherit' });
 }
+const contractFile = `${install}/contracts.mts`;
+writeFileSync(contractFile, Object.keys(descriptor.exports).map(path => `import * as ${path.slice(2)} from '@andornaut/art-kit/${path.slice(2)}';`).join('\n'));
+execFileSync('node', ['/deps/typescript/bin/tsc', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2023', '--strict', '--skipLibCheck', '--noEmit', '--types', 'node', '--typeRoots', '/deps/@types', contractFile], { cwd: install, stdio: 'inherit' });
 if (mode === 'check') {
   const tests = [];
   function collect(dir) {

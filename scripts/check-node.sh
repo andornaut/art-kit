@@ -24,7 +24,6 @@ cp -R "$root/node" "$root/scripts" "$root/pyproject.toml" "$root/LICENSE" "$scra
 docker run --rm --read-only --network none --cpus 4 -u "$(id -u):$(id -g)" \
   --mount "type=bind,source=$scratch,target=/work" \
   --mount "type=bind,source=$deps,target=/deps,readonly" \
-
   --tmpfs "/tmp:exec,uid=$(id -u),gid=$(id -g)" \
   -e HOME=/tmp -e npm_config_cache=/tmp/npm-cache \
   -w /work node:24.21.0 node /work/source/scripts/node-package.mjs check "$revision"
