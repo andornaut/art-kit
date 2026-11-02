@@ -37,11 +37,16 @@ The compiled ESM package `@andornaut/art-kit` includes TypeScript declarations a
 | --- | --- | --- |
 | `atlasBuild` | Atlas drawing and encoded page assembly | Read/decode/encode functions, blits, extrusion and metadata |
 | `atlasLayout` | Shelf packing and candidate selection | Items, grouping, order comparator, candidate widths and size limits |
-| `png` | PNG decoding to RGBA | Encoded bytes |
-| `rgbaImage` | RGBA allocation and extruded blitting | Image dimensions, pixels, rectangles and bounds |
+| `indexedPng` | Indexed PNG encoding | RGBA image and compression options |
+| `png` | PNG decoding to RGBA and RGBA PNG encoding | Encoded bytes or an RGBA image and compression options |
+| `rgbaImage` | RGBA allocation, alpha bounds and extruded blitting | Image dimensions, pixels, rectangles and bounds |
 | `webp` | Lossless WebP encoding, decoding and RGBA comparison | Images or encoded bytes |
 
 Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geometry and RGBA interfaces are local structural types; the package has no `game-kit` dependency. Callers own manifests, tile sizes, frame tags, grouping, ordering policy, paths, filenames and Vite asset emission. Node helpers run without a Python subprocess.
+
+`rgbaImage.opaqueRect(within, image)` returns the alpha bounds within the supplied rectangle, or `undefined` when that region is clear. Callers choose trimming and clear-frame handling.
+
+`indexedPng.encodeIndexedPng({ level, memLevel }, image)` returns encoded bytes, or `undefined` when the image has more than 256 distinct RGBA colours. The subpath also exports `MAX_PALETTE` and `COLOUR_TYPE_INDEXED`. `png.encodeRgbaPng({ deflateLevel, deflateStrategy, filterType }, image)` returns RGBA PNG bytes. Compression context precedes the image; callers choose indexed-first fallback, PNG versus WebP and output metadata.
 
 ## Runtime and checks
 
