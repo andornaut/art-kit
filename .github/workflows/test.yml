@@ -24,10 +24,25 @@ jobs:
             --tmpfs "/tmp:uid=$(id -u),gid=$(id -g)" \
             -e HOME=/tmp python:3.12 python -I -m pip install --no-cache-dir --target /deps \
             Pillow==13.0.0 ruff==0.17.2 setuptools==84.2.1 wheel==0.48.0
+      - name: Prepare pinned Node tools in an isolated container
+        run: |
+          mkdir -p .claude/node-dependencies
+          docker run --rm --cpus 4 -u "$(id -u):$(id -g)" \
+            --mount "type=bind,source=$PWD/node/package.json,target=/descriptor.json,readonly" \
+            --mount "type=bind,source=$PWD/.claude/node-dependencies,target=/tools" \
+            --tmpfs "/tmp:uid=$(id -u),gid=$(id -g)" \
+            -e HOME=/tmp -w /tools node:24.21.0 bash -ec '
+              node --input-type=module -e '\''import {readFileSync,writeFileSync} from "node:fs"; const p=JSON.parse(readFileSync("/descriptor.json")); writeFileSync("package.json", JSON.stringify({private:true,dependencies:{...p.devDependencies,...p.peerDependencies}}))'\''
+              npm install --ignore-scripts --no-audit --no-fund --cache /tmp/npm-cache
+            '
+      - name: Check Node package offline
+        run: bash scripts/check-node.sh .claude/node-dependencies/node_modules
       - name: Check offline in an isolated container
         run: bash scripts/check.sh .claude/dependencies .claude/dependencies/bin/ruff .claude/dependencies
       - name: Build committed release artifacts offline
         run: bash scripts/pack.sh .claude/dependencies .claude/release-output
+      - name: Build committed Node release artifact offline
+        run: bash scripts/pack-node.sh .claude/node-dependencies/node_modules .claude/release-output
       - name: Verify installed wheel offline
         run: |
           docker run --rm --read-only --network none --cpus 4 -u "$(id -u):$(id -g)" \
@@ -50,6 +65,7 @@ jobs:
         with:
           name: art-kit-${{ github.sha }}
           path: |
+            .claude/release-output/art-kit-*.tgz
             .claude/release-output/art_kit-*.whl
             .claude/release-output/SHA256SUMS
             .claude/release-output/SOURCE_COMMIT

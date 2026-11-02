@@ -1,0 +1,16 @@
+{
+  "name": "@andornaut/art-kit",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "exports": {
+    "./atlasLayout": { "types": "./dist/atlasLayout.d.ts", "import": "./dist/atlasLayout.js" },
+    "./atlasBuild": { "types": "./dist/atlasBuild.d.ts", "import": "./dist/atlasBuild.js" },
+    "./rgbaImage": { "types": "./dist/rgbaImage.d.ts", "import": "./dist/rgbaImage.js" },
+    "./png": { "types": "./dist/png.d.ts", "import": "./dist/png.js" },
+    "./webp": { "types": "./dist/webp.d.ts", "import": "./dist/webp.js" }
+  },
+  "files": ["dist", "LICENSE", "SOURCE_COMMIT"],
+  "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0" },
+  "devDependencies": { "@types/node": "24.19.2", "@types/pngjs": "6.0.5", "typescript": "6.0.3" }
+}
