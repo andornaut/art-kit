@@ -151,14 +151,33 @@ test("page build shares decoding, bypasses supplied images and preserves metadat
 });
 
 for (const [name, sizes] of [
-  ["wide strips", [[672, 42], [384, 80], [300, 36], [250, 26]]],
-  ["tall and wide rectangles", [[48, 720], [640, 96], [336, 272], [96, 204]]],
+  [
+    "wide strips",
+    [
+      [672, 42],
+      [384, 80],
+      [300, 36],
+      [250, 26],
+    ],
+  ],
+  [
+    "tall and wide rectangles",
+    [
+      [48, 720],
+      [640, 96],
+      [336, 272],
+      [96, 204],
+    ],
+  ],
 ]) {
   test(`packs ${name} once into bounded nonoverlapping extruded cells`, () => {
     const items = sizes.map((size, index) => item(index, size));
     const extrude = 1;
     const maxSize = 2048;
-    const result = packAtlas({ ...policy, extrude, maxSize, widths: [maxSize] }, items);
+    const result = packAtlas(
+      { ...policy, extrude, maxSize, widths: [maxSize] },
+      items,
+    );
     assert.ok(result);
     const placed = [];
     for (const page of result.pages) {
@@ -172,15 +191,28 @@ for (const [name, sizes] of [
           const top = at[index].y - extrude;
           const right = left + rectangle.width + 2 * extrude;
           const bottom = top + rectangle.height + 2 * extrude;
-          assert.ok(left >= 0 && top >= 0 && right <= page.width && bottom <= page.height);
+          assert.ok(
+            left >= 0 &&
+              top >= 0 &&
+              right <= page.width &&
+              bottom <= page.height,
+          );
           for (const other of cells) {
-            assert.ok(right <= other.left || other.right <= left || bottom <= other.top || other.bottom <= top);
+            assert.ok(
+              right <= other.left ||
+                other.right <= left ||
+                bottom <= other.top ||
+                other.bottom <= top,
+            );
           }
           cells.push({ left, top, right, bottom });
         }
       }
     }
-    assert.deepEqual(placed.sort((a, b) => a - b), items.map(({ value }) => value));
+    assert.deepEqual(
+      placed.sort((a, b) => a - b),
+      items.map(({ value }) => value),
+    );
   });
 }
 
@@ -188,14 +220,24 @@ test("page build propagates synchronous and asynchronous codec failures by ident
   const failure = new Error("codec failure");
   const image = blankImage(1, 1);
   for (const encode of [
-    () => { throw failure; },
-    async () => { throw failure; },
+    () => {
+      throw failure;
+    },
+    async () => {
+      throw failure;
+    },
   ]) {
-    await assert.rejects(buildAtlasPages({
-      read: async () => image.data,
-      decode: () => image,
-      encode,
-      extrude: 0,
-    }, [{ width: 1, height: 1, blits: [], metadata: null }]), error => error === failure);
+    await assert.rejects(
+      buildAtlasPages(
+        {
+          read: async () => image.data,
+          decode: () => image,
+          encode,
+          extrude: 0,
+        },
+        [{ width: 1, height: 1, blits: [], metadata: null }],
+      ),
+      (error) => error === failure,
+    );
   }
 });
