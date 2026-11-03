@@ -34,7 +34,7 @@ jobs:
             -e HOME=/tmp -w /tools node:24.21.0 bash -ec '
               node --input-type=module -e '\''import {readFileSync,writeFileSync} from "node:fs"; const p=JSON.parse(readFileSync("/descriptor.json")); writeFileSync("package.json", JSON.stringify({private:true,dependencies:{...p.devDependencies,...p.peerDependencies}}))'\''
               npm install --ignore-scripts --no-audit --no-fund --cache /tmp/npm-cache
-              (cd node_modules/canvas && node ../prebuild-install/bin.js -r napi)
+              (cd node_modules/skia-canvas && node lib/prebuild.mjs download)
             '
       - name: Check Node package and required native font rendering offline
         run: bash scripts/check-node.sh .claude/node-dependencies/node_modules

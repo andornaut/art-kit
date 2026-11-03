@@ -17,7 +17,7 @@
     "./grid": { "types": "./dist/grid.d.ts", "import": "./dist/grid.js" }
   },
   "files": ["dist", "LICENSE", "SOURCE_COMMIT"],
-  "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0", "canvas": "3.2.3" },
-  "peerDependenciesMeta": { "canvas": { "optional": true } },
+  "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0", "skia-canvas": "4.0.0" },
+  "peerDependenciesMeta": { "skia-canvas": { "optional": true } },
   "devDependencies": { "@types/node": "24.19.2", "@types/pngjs": "6.0.5", "typescript": "6.0.3" }
 }
