@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, mkdir, writeFile, readdir, symlink } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, readdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { test } from "node:test";
@@ -42,7 +42,7 @@ test("invalid paths and invalid fonts leave outputs untouched", async () => {
   const root = await mkdtemp(join(tmpdir(), "font-export-invalid-"));
   const png = join(root, "new", "body.png");
   const fnt = join(root, "new", "body.fnt");
-  for (const output of [{png, fnt: png}, {png: png + ".jpg", fnt},
+  for (const output of [{png, fnt: png}, {png: png + ".jpg", fnt}, {png: png + ".PNG", fnt},
     {png, fnt: font.path}]) {
     await assert.rejects(exportBitmapFont({font, output}), RangeError);
   }
@@ -62,4 +62,15 @@ test("filesystem errors propagate and preserve pre-existing outputs", async () =
   await assert.rejects(exportBitmapFont({font, output: {png, fnt: join(blocked, "body.fnt")}}));
   assert.equal(await readFile(png, "utf8"), "existing PNG");
   assert.equal(await readFile(blocked, "utf8"), "existing file");
+});
+
+
+test("existing output symlink aliases are rejected before writing", async () => {
+  const root = await mkdtemp(join(tmpdir(), "font-export-alias-"));
+  const png = join(root, "body.png");
+  const fnt = join(root, "body.fnt");
+  await writeFile(png, "preserved");
+  await symlink(png, fnt);
+  await assert.rejects(exportBitmapFont({font, output: {png, fnt}}), /distinct/);
+  assert.equal(await readFile(png, "utf8"), "preserved");
 });

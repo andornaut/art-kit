@@ -14,13 +14,16 @@ export async function exportBitmapFont({ font, output }: BitmapFontExportOptions
   if (png === fnt) throw new RangeError("PNG and FNT paths must be distinct");
   if (extname(png) !== ".png") throw new RangeError("PNG output must end in .png");
   const source = await realpath(font.path);
+  const targets: string[] = [];
   for (const path of [png, fnt]) {
     const existing = await realpath(path).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error;
       return path;
     });
+    targets.push(existing);
     if (existing === source) throw new RangeError("Output must not overwrite the font source");
   }
+  if (targets[0] === targets[1]) throw new RangeError("PNG and FNT paths must be distinct");
   const key = relative(dirname(fnt), png).split(sep).join("/").slice(0, -4);
   const built = buildBitmapFont({ ...font, key });
   const bytes = await built.image.toBuffer("png");
