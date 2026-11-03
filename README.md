@@ -29,6 +29,8 @@ frame = grid.outlined()
 
 A client can subclass `Grid` to retain its existing constructor and outline signature. Keep mutable `px`, `w`, `h`, `edge` and `close` semantics when adapting existing drawing scripts. `fonts.pack(width, glyphs)` preserves glyph insertion order, one-pixel spacing and power-of-two atlas height; it supports monochrome masks and coloured RGBA glyphs. A glyph image wider than the atlas raises `ValueError`, identifying the character, actual width and atlas limit. Font overrides and baseline adjustments remain local. `fonts.bmfont_xml` returns text, without writing a manifest.
 
+`fonts.rasterize_glyph(font, char, *, antialias=False)` and `fonts.rasterize(path, size, chars, *, antialias=False)` opt into native grayscale coverage with `antialias=True`, returning white RGBA glyph images with coverage in alpha; empty glyphs retain `None` images. Callers still supply the font path, size and characters. Set `antialias=True` on `fonts.bmfont_xml(..., kernings=(), antialias=False)` to emit `smooth="1"` and `aa="1"`. Omitted arguments preserve binary masks and XML defaults; glyph tuples, `FontInfo` and packing defaults are unchanged. Callers own font/sprite page segregation and texture filtering; atlas assembly uses explicit blits and metadata and does not smooth shared sprite pages.
+
 `aseprite.export(executable, palette, tags, source, sheet, data, *, key=None, margins=None, columns=None)` accepts an optional positive integer `columns` to set the exported sheet column count. For example, `columns=6` arranges twelve frames in six columns and two rows. Omit it to retain the default sheet layout; source frames, tags, durations and slices are unchanged.
 
 ### Node
