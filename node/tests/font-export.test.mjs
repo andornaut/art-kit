@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, readdir, symlink } from "node:fs/promises";
+import { copyFile, link, mkdir, mkdtemp, readFile, writeFile, readdir, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { test } from "node:test";
@@ -73,4 +73,29 @@ test("existing output symlink aliases are rejected before writing", async () => 
   await symlink(png, fnt);
   await assert.rejects(exportBitmapFont({font, output: {png, fnt}}), /distinct/);
   assert.equal(await readFile(png, "utf8"), "preserved");
+});
+
+
+test("hard links and missing destinations under directory aliases are rejected", async () => {
+  const root = await mkdtemp(join(tmpdir(), "font-export-links-"));
+  const source = join(root, "source.ttf");
+  await copyFile(font.path, source);
+  const png = join(root, "source.png");
+  await link(source, png);
+  await assert.rejects(exportBitmapFont({font: {...font, path: source},
+    output: {png, fnt: join(root, "out.fnt")}}), /font source/);
+  assert.deepEqual(await readFile(source), await readFile(font.path));
+  const first = join(root, "first.png");
+  const second = join(root, "second.fnt");
+  await writeFile(first, "existing");
+  await link(first, second);
+  await assert.rejects(exportBitmapFont({font, output: {png: first, fnt: second}}), /distinct/);
+  assert.equal(await readFile(first, "utf8"), "existing");
+  const dir = join(root, "real");
+  await mkdir(dir);
+  const alias = join(root, "alias");
+  await symlink(dir, alias);
+  await assert.rejects(exportBitmapFont({font, output: {
+    png: join(dir, "new", "body.png"), fnt: join(alias, "new", "body.png")}}), /distinct/);
+  assert.deepEqual(await readdir(dir), []);
 });
