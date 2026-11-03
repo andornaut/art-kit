@@ -1,7 +1,7 @@
 import type { BitmapGlyph } from "./fonts.js";
 import { blankImage, blitExtruded, type RgbaImage } from "./rgbaImage.js";
 
-export interface SuppliedGlyph {
+export interface SuppliedBitmapGlyph {
   image: RgbaImage | undefined;
   xoffset: number;
   yoffset: number;
@@ -35,7 +35,7 @@ function quote(value: string) {
   return `"${value.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\t", "&#9;").replaceAll("\n", "&#10;").replaceAll("\r", "&#13;")}"`;
 }
 /** Packs caller-owned glyph pixels and integer metrics without rasterization or blending. */
-export function buildBitmapFontFromGlyphs(options: GlyphAtlasOptions, supplied: ReadonlyMap<string, SuppliedGlyph>) {
+export function buildBitmapFontFromGlyphs(options: GlyphAtlasOptions, supplied: ReadonlyMap<string, SuppliedBitmapGlyph>) {
   const width = integer(options.atlasWidth, "Atlas width", 1, 16384);
   const limit = integer(options.maxHeight ?? 16384, "Maximum height", 1, 16384);
   const padding = integer(options.padding ?? 1, "Padding", 0, 16384);
