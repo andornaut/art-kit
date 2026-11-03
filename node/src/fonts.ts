@@ -1,166 +1,210 @@
-import { createHash } from "node:crypto";
-import { readFileSync, realpathSync } from "node:fs";
-import { createCanvas, registerFont } from "canvas";
-import { blankImage, opaqueRect, type RgbaImage } from "./rgbaImage.js";
+import { realpathSync } from "node:fs";
+import { Canvas, FontLibrary } from "skia-canvas";
 
-export interface FontInfo {
-  key: string;
-  face: string;
-  size: number;
-  lineHeight: number;
-  base: number;
-}
-
-export interface FontOptions {
+export interface BitmapFontOptions {
   path: string;
   size: number;
+  key: string;
+  characters: Iterable<string>;
+  atlasWidth: number;
+  maxHeight?: number;
+  padding?: number;
+  lineHeight?: number;
   antialias?: boolean;
+  hinting?: boolean;
+  kerningPairs?: Iterable<readonly [string, string]>;
 }
 
-export type Glyph = readonly [image: RgbaImage | undefined, xOffset: number, yOffset: number, advance: number];
-export type Kerning = readonly [first: string, second: string, amount: number];
-
-const registered = new Set<string>();
-
-function fontContext(options: FontOptions) {
-  if (!Number.isSafeInteger(options.size) || options.size <= 0) {
-    throw new RangeError("Font size must be a positive integer");
-  }
-  const path = realpathSync(options.path);
-  const identity = createHash("sha256").update(readFileSync(path)).digest("hex");
-  const family = `art_kit_${identity}`;
-  if (!registered.has(identity)) {
-    registerFont(path, { family, style: "normal", weight: "normal" });
-    registered.add(identity);
-  }
-  const context = createCanvas(1, 1).getContext("2d");
-  context.font = `${options.size}px "${family}"`;
-  context.textBaseline = "alphabetic";
-  context.antialias = options.antialias ? "gray" : "none";
-  return context;
+export interface BitmapGlyph {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  xoffset: number;
+  yoffset: number;
+  xadvance: number;
 }
 
-// Python's nearest-integer rule rounds ties to the even integer.
-function roundEven(value: number): number {
-  const floor = Math.floor(value);
-  return value - floor === 0.5 ? (floor % 2 === 0 ? floor : floor + 1) : Math.round(value);
+const families = new Map<string, string>();
+
+function positive(value: number, label: string): number {
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 16384) {
+    throw new RangeError(`${label} must be an integer in 1..16384`);
+  }
+  return value;
 }
 
 function codePoint(char: string): number {
-  if ([...char].length !== 1) throw new RangeError("Expected one Unicode code point");
+  if (
+    [...char].length !== 1 ||
+    /[\u0000-\u001f\u007f-\u009f\ud800-\udfff]/u.test(char)
+  ) {
+    throw new RangeError("Characters must be printable Unicode code points");
+  }
   return char.codePointAt(0)!;
 }
 
-/** Canvas/Pango renders missing characters using its fallback policy; callers supply font coverage. */
-export function rasterizeGlyph(options: FontOptions, char: string): Glyph {
-  return rasterizePrepared(fontContext(options), options, char);
-}
-
-function rasterizePrepared(context: ReturnType<typeof fontContext>, options: FontOptions, char: string): Glyph {
-  codePoint(char);
-  const metrics = context.measureText(char);
-  const advance = roundEven(metrics.width);
-  const ascent = Math.ceil(metrics.emHeightAscent);
-  // Include signed ink extents and padding rather than clipping negative bearings.
-  const left = Math.ceil(metrics.actualBoundingBoxLeft);
-  const above = Math.ceil(metrics.actualBoundingBoxAscent);
-  const width = Math.max(1, left + Math.ceil(metrics.actualBoundingBoxRight) + 4);
-  const height = Math.max(1, above + Math.ceil(metrics.actualBoundingBoxDescent) + 4);
-  const font = context.font;
-  context.canvas.width = width;
-  context.canvas.height = height;
-  context.font = font;
-  context.textBaseline = "alphabetic";
-  context.antialias = options.antialias ? "gray" : "none";
-  context.fillStyle = "white";
-  const originX = left + 2;
-  const baseline = above + 2;
-  context.fillText(char, originX, baseline);
-  const rgba = context.getImageData(0, 0, width, height);
-  const image = { width, height, data: new Uint8Array(rgba.data.buffer, rgba.data.byteOffset, rgba.data.byteLength) };
-  const bounds = opaqueRect({ x: 0, y: 0, width, height }, image);
-  if (!bounds) return [undefined, 0, 0, advance];
-  const cropped = blankImage(bounds.width, bounds.height);
-  for (let y = 0; y < bounds.height; y++) {
-    for (let x = 0; x < bounds.width; x++) {
-      const index = (y * bounds.width + x) * 4;
-      cropped.data.set([255, 255, 255, rgba.data[((y + bounds.y) * width + x + bounds.x) * 4 + 3]], index);
-    }
-  }
-  return [cropped, bounds.x - originX, bounds.y - baseline + ascent, advance];
-}
-
-export function rasterize(options: FontOptions, chars: Iterable<string>): {
-  glyphs: Map<string, Glyph>;
-  ascent: number;
-  descent: number;
-} {
-  const context = fontContext(options);
-  const metrics = context.measureText(" ");
-  const glyphs = new Map<string, Glyph>();
-  for (const char of chars) glyphs.set(char, rasterizePrepared(context, options, char));
-  return { glyphs, ascent: Math.ceil(metrics.emHeightAscent), descent: Math.ceil(metrics.emHeightDescent) };
-}
-
-export function pack(atlasWidth: number, glyphs: ReadonlyMap<string, Glyph>): {
-  image: RgbaImage;
-  places: Map<string, readonly [number, number]>;
-} {
-  if (!Number.isSafeInteger(atlasWidth) || atlasWidth <= 0) throw new RangeError("Atlas width must be a positive integer");
-  let x = 0, y = 0, rowHeight = 0;
-  const places = new Map<string, readonly [number, number]>();
-  for (const [char, [image]] of glyphs) {
-    if (!image) { places.set(char, [0, 0]); continue; }
-    if (image.width > atlasWidth) throw new RangeError(`Glyph ${JSON.stringify(char)} width ${image.width} exceeds atlas width ${atlasWidth}`);
-    if (x + image.width + 1 > atlasWidth) { x = 0; y += rowHeight + 1; rowHeight = 0; }
-    places.set(char, [x, y]);
-    x += image.width + 1;
-    rowHeight = Math.max(rowHeight, image.height);
-  }
-  let height = 1;
-  while (height < y + rowHeight + 1) height *= 2;
-  const atlas = blankImage(atlasWidth, height);
-  for (const [char, [image]] of glyphs) {
-    if (!image) continue;
-    const [px, py] = places.get(char)!;
-    for (let row = 0; row < image.height; row++) {
-      atlas.data.set(image.data.subarray(row * image.width * 4, (row + 1) * image.width * 4), ((py + row) * atlasWidth + px) * 4);
-    }
-  }
-  return { image: atlas, places };
-}
-
 function quote(value: string): string {
-  const escaped = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-    .replaceAll("\t", "&#9;").replaceAll("\n", "&#10;").replaceAll("\r", "&#13;");
-  return escaped.includes('"') && !escaped.includes("'") ? `'${escaped}'` : `"${escaped.replaceAll('"', "&quot;")}"`;
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/u.test(value)) {
+    throw new RangeError("Invalid XML attribute character");
+  }
+  return `"${value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\t", "&#9;")
+    .replaceAll("\n", "&#10;")
+    .replaceAll("\r", "&#13;")}"`;
 }
 
-export function bmfontXml(
-  info: FontInfo,
-  atlasSize: readonly [number, number],
-  places: ReadonlyMap<string, readonly [number, number]>,
-  glyphs: ReadonlyMap<string, Glyph>,
-  options: { kernings?: readonly Kerning[]; antialias?: boolean } = {},
-): string {
-  const [width, height] = atlasSize;
-  const aa = Number(options.antialias ?? false);
-  const lines = ['<?xml version="1.0"?>', '<font>',
-    `  <info face=${quote(info.face)} size="${info.size}" bold="0" italic="0" charset="" unicode="1" stretchH="100" smooth="${aa}" aa="${aa}" padding="0,0,0,0" spacing="1,1"/>`,
-    `  <common lineHeight="${info.lineHeight}" base="${info.base}" scaleW="${width}" scaleH="${height}" pages="1" packed="0"/>`,
-    `  <pages><page id="0" file=${quote(info.key + ".png")}/></pages>`,
-    `  <chars count="${glyphs.size}">`];
-  for (const [char, [image, ox, oy, advance]] of glyphs) {
-    const position = places.get(char);
-    if (!position) throw new Error(`Missing glyph placement: ${char}`);
-    const [x, y] = position;
-    lines.push(`    <char id="${codePoint(char)}" x="${x}" y="${y}" width="${image?.width ?? 0}" height="${image?.height ?? 0}" xoffset="${ox}" yoffset="${oy}" xadvance="${advance}" page="0" chnl="15"/>`);
+/**
+ * CPU Skia bitmap atlas. Metrics use outward-rounded ink bounds and nearest
+ * integer advances/kerning; no shaping across glyph boundaries is represented.
+ * Font files remain immutable after registration. Skia may use system fallback:
+ * callers must supply covered characters when reproducible font selection matters.
+ */
+export function buildBitmapFont(options: BitmapFontOptions) {
+  const size = positive(options.size, "Font size");
+  const width = positive(options.atlasWidth, "Atlas width");
+  const maxHeight = positive(
+    options.maxHeight ?? 16384,
+    "Maximum atlas height",
+  );
+  const padding = options.padding ?? 1;
+  if (!Number.isSafeInteger(padding) || padding < 1 || padding > 16384) {
+    throw new RangeError("Padding must be an integer in 1..16384");
   }
-  lines.push("  </chars>");
-  if (options.kernings?.length) {
-    lines.push(`  <kernings count="${options.kernings.length}">`);
-    for (const [a, b, n] of options.kernings) lines.push(`    <kerning first="${codePoint(a)}" second="${codePoint(b)}" amount="${n}"/>`);
-    lines.push("  </kernings>");
+  const key = quote(options.key + ".png");
+  const path = realpathSync(options.path);
+  let family = families.get(path);
+  if (!family) {
+    family = `art_kit_bitmap_${families.size}`;
+    FontLibrary.use(family, path);
+    families.set(path, family);
   }
-  return [...lines, "</font>", ""].join("\n");
+  const image = new Canvas(width, 1);
+  image.gpu = false;
+  const context = image.getContext("2d");
+  const configure = () => {
+    context.font = `${size}px "${family}"`;
+    context.textBaseline = "alphabetic";
+    context.fontSynthesis = false;
+    context.fontHinting = options.hinting ?? true;
+    context.fontSmoothing = options.antialias ?? true;
+    context.fillStyle = "white";
+  };
+  configure();
+  const metrics = context.measureText(" ");
+  const base = Math.ceil(metrics.fontBoundingBoxAscent);
+  const lineHeight = positive(
+    options.lineHeight ??
+      Math.ceil(metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent),
+    "Line height",
+  );
+  const glyphs = new Map<string, BitmapGlyph>();
+  let x = padding,
+    y = padding,
+    rowHeight = 0;
+  for (const char of options.characters) {
+    const id = codePoint(char);
+    if (glyphs.has(char)) continue;
+    const m = context.measureText(char);
+    const left = Math.floor(-m.actualBoundingBoxLeft);
+    const top = Math.floor(-m.actualBoundingBoxAscent);
+    const w = Math.max(0, Math.ceil(m.actualBoundingBoxRight) - left);
+    const h = Math.max(0, Math.ceil(m.actualBoundingBoxDescent) - top);
+    const hasInk = w > 0 && h > 0;
+    if (hasInk) {
+      if (w + padding * 2 > width)
+        throw new RangeError(`Glyph ${char} exceeds atlas width`);
+      if (x + w + padding > width) {
+        x = padding;
+        y += rowHeight + padding;
+        rowHeight = 0;
+      }
+      if (y + h + padding > maxHeight)
+        throw new RangeError("Font exceeds maximum atlas height");
+    }
+    glyphs.set(char, {
+      id,
+      x: hasInk ? x : 0,
+      y: hasInk ? y : 0,
+      width: hasInk ? w : 0,
+      height: hasInk ? h : 0,
+      xoffset: hasInk ? left : 0,
+      yoffset: hasInk ? base + top : 0,
+      xadvance: Math.round(m.width),
+    });
+    if (hasInk) {
+      x += w + padding;
+      rowHeight = Math.max(rowHeight, h);
+    }
+  }
+  const kernings = [] as { first: number; second: number; amount: number }[];
+  const seen = new Set<string>();
+  for (const [first, second] of options.kerningPairs ?? []) {
+    const a = codePoint(first),
+      b = codePoint(second),
+      pair = `${a},${b}`;
+    if (!glyphs.has(first) || !glyphs.has(second))
+      throw new RangeError("Kerning pair must belong to characters");
+    if (seen.has(pair)) continue;
+    seen.add(pair);
+    const amount = Math.round(
+      context.measureText(first + second).width -
+        context.measureText(first).width -
+        context.measureText(second).width,
+    );
+    kernings.push({ first: a, second: b, amount });
+  }
+  image.height = Math.max(1, y + rowHeight + padding);
+  if (image.height > maxHeight)
+    throw new RangeError("Font exceeds maximum atlas height");
+  configure();
+  for (const [char, glyph] of glyphs) {
+    if (glyph.width && glyph.height)
+      context.fillText(
+        char,
+        glyph.x - glyph.xoffset,
+        glyph.y - glyph.yoffset + base,
+      );
+  }
+  const aa = Number(options.antialias ?? true);
+  const lines = [
+    '<?xml version="1.0"?>',
+    "<font>",
+    `  <info face=${quote(options.key)} size="${size}" bold="0" italic="0" unicode="1" smooth="${aa}" aa="${aa}"/>`,
+    `  <common lineHeight="${lineHeight}" base="${base}" scaleW="${width}" scaleH="${image.height}" pages="1" packed="0"/>`,
+    `  <pages><page id="0" file=${key}/></pages>`,
+    `  <chars count="${glyphs.size}">`,
+  ];
+  for (const glyph of glyphs.values()) {
+    lines.push(
+      `    <char ${Object.entries(glyph)
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(" ")} page="0" chnl="15"/>`,
+    );
+  }
+  lines.push("  </chars>", `  <kernings count="${kernings.length}">`);
+  for (const k of kernings)
+    lines.push(
+      `    <kerning first="${k.first}" second="${k.second}" amount="${k.amount}"/>`,
+    );
+  lines.push("  </kernings>", "</font>", "");
+  return {
+    image,
+    xml: lines.join("\n"),
+    metadata: {
+      glyphs,
+      kernings,
+      size,
+      base,
+      lineHeight,
+      antialias: Boolean(aa),
+      hinting: options.hinting ?? true,
+      fallback: "system" as const,
+    },
+  };
 }

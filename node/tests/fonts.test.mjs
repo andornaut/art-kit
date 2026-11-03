@@ -1,78 +1,127 @@
-import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { bmfontXml, pack, rasterize, rasterizeGlyph } from '@andornaut/art-kit/fonts';
-
-const pixel = { width: 1, height: 1, data: new Uint8Array([255, 255, 255, 96]) };
-
-test('font packing preserves insertion order, alpha, spacing and empty glyphs', () => {
-  const glyphs = new Map([
-    ['j', [pixel, -1, 3, 4]], [' ', [undefined, 0, 0, 5]], ['A', [pixel, 0, 3, 8]],
-  ]);
-  const { image, places } = pack(3, glyphs);
-  assert.equal(image.height, 4);
-  assert.deepEqual([...places], [['j', [0, 0]], [' ', [0, 0]], ['A', [0, 2]]]);
-  assert.deepEqual([...image.data.slice(0, 4)], [255, 255, 255, 96]);
-  assert.deepEqual([...image.data.slice(24, 28)], [255, 255, 255, 96]);
-  assert.throws(() => pack(1, new Map([['W', [{ ...pixel, width: 2 }, 0, 0, 3]]])), /W.*width 2.*width 1/);
-  assert.throws(() => pack(0, glyphs), /positive integer/);
-});
-
-test('BMFont XML preserves signed metrics, Unicode IDs, escaping and caller kerning', () => {
-  const glyphs = new Map([['😀', [pixel, -1, -2, 3]], [' ', [undefined, 0, 0, 5]]]);
-  const { image, places } = pack(16, glyphs);
-  const info = { key: 'a&b', face: 'A "B" & C', size: 16, lineHeight: 20, base: 15 };
-  const xml = bmfontXml(info, [image.width, image.height], places, glyphs, { antialias: true, kernings: [['😀', ' ', -1]] });
-  assert.match(xml, /face='A "B" &amp; C'/);
-  assert.match(xml, /file="a&amp;b.png"/);
-  assert.match(xml, /smooth="1" aa="1"/);
-  assert.match(xml, /id="128512".*xoffset="-1" yoffset="-2" xadvance="3"/);
-  assert.match(xml, /first="128512" second="32" amount="-1"/);
-  assert.match(bmfontXml(info, [16, 2], places, glyphs), /smooth="0" aa="0"/);
-});
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { buildBitmapFont } from "@andornaut/art-kit/fonts";
 
 const fonts = process.env.ART_KIT_TEST_FONTS;
-assert.ok(fonts, 'Required font fixture directory ART_KIT_TEST_FONTS is missing');
-test('native font rasterization retains signed ink, grayscale alpha and space advance', () => {
-  for (const weight of ['Regular', 'Bold']) {
-    const options = { path: `${fonts}/LiberationSans-${weight}.ttf`, size: 16, antialias: true };
-    const { glyphs, ascent, descent } = rasterize(options, 'j_wA ');
-    assert.deepEqual([...glyphs.keys()], [...'j_wA ']);
-    assert.ok(ascent > 0 && descent >= 0);
-    assert.ok(glyphs.get('j')[1] < 0);
-    assert.equal(glyphs.get(' ')[0], undefined);
-    assert.ok(glyphs.get(' ')[3] > 0);
-    const j = glyphs.get('j')[0];
-    assert.ok(j.data.some((alpha, index) => index % 4 === 3 && alpha > 0 && alpha < 255));
-    for (let i = 0; i < j.data.length; i += 4) assert.deepEqual([...j.data.slice(i, i + 3)], [255, 255, 255]);
-    const binary = rasterizeGlyph({ ...options, antialias: false }, 'j')[0];
-    assert.ok(binary.data.every((value, index) => index % 4 !== 3 || value === 0 || value === 255));
-    assert.throws(() => rasterizeGlyph(options, 'ab'), /one Unicode/);
-    assert.throws(() => rasterizeGlyph({ ...options, size: 0 }, 'a'), /positive integer/);
-  }
+assert.ok(fonts, "Required ART_KIT_TEST_FONTS fixture directory");
+const options = (weight = "Regular", size = 16) => ({
+  path: `${fonts}/LiberationSans-${weight}.ttf`,
+  size,
+  key: "font",
+  characters: "j_wAVTo .",
+  atlasWidth: 64,
 });
 
-
-test('BMFont attributes preserve tab, LF and CR as numeric references', () => {
-  const text = 'a\tb\nc\rd & "quoted"';
-  const xml = bmfontXml({ key: text, face: text, size: 16, lineHeight: 20, base: 15 }, [1, 1], new Map(), new Map());
-  assert.match(xml, /a&#9;b&#10;c&#13;d/);
-  assert.ok(!/[\t\r]/.test(xml));
-  // XML parsers normalize literal attribute whitespace, but preserve references.
-  for (const [attribute, expected] of [['face', text], ['file', text + '.png']]) {
-    const value = xml.match(new RegExp(attribute + `=(['"])(.*?)\\1`))[2];
-    const parsed = value.replace(/[\t\r\n]/g, ' ').replace(/&#(\d+);|&(amp|quot|lt|gt);/g,
-      (_, code, entity) => code ? String.fromCodePoint(Number(code)) : ({ amp: '&', quot: '"', lt: '<', gt: '>' })[entity]);
-    assert.equal(parsed, expected);
-  }
+test("native CPU atlas retains signed bearings, spaces, bounds and AA policy", () => {
+  for (const weight of ["Regular", "Bold"])
+    for (const size of [12, 16]) {
+      for (const antialias of [true, false]) {
+        const { image, metadata } = buildBitmapFont({
+          ...options(weight, size),
+          antialias,
+        });
+        assert.equal(image.gpu, false);
+        assert.equal(metadata.hinting, true);
+        assert.equal(metadata.fallback, "system");
+        const j = metadata.glyphs.get("j");
+        assert.ok(j.xoffset < 0);
+        const space = metadata.glyphs.get(" ");
+        assert.equal(space.width * space.height, 0);
+        assert.ok(space.xadvance > 0);
+        const ctx = image.getContext("2d");
+        const pixels = ctx.getImageData(0, 0, image.width, image.height).data;
+        const alphas = pixels.filter((_, i) => i % 4 === 3);
+        assert.ok(alphas.some((a) => a === 255));
+        assert.equal(
+          alphas.some((a) => a > 0 && a < 255),
+          antialias,
+        );
+        // Each rasterized pixel belongs to a measured placement, with clear gutters.
+        for (let y = 0; y < image.height; y++)
+          for (let x = 0; x < image.width; x++) {
+            if (pixels[(y * image.width + x) * 4 + 3]) {
+              assert.ok(
+                [...metadata.glyphs.values()].some(
+                  (g) =>
+                    x >= g.x &&
+                    y >= g.y &&
+                    x < g.x + g.width &&
+                    y < g.y + g.height,
+                ),
+                `escaped ink at ${x},${y}`,
+              );
+            }
+          }
+        assert.ok(
+          ctx
+            .getImageData(j.x, j.y, j.width, j.height)
+            .data.some((a, i) => i % 4 === 3 && a),
+        );
+      }
+    }
 });
 
-test('batch prepares its font once without caching subsequent calls', () => {
-  const options = { path: `${fonts}/LiberationSans-Regular.ttf`, size: 16 };
-  function* chars() {
-    yield 'A';
-    options.path = '/missing-art-kit-test-font.ttf';
-    yield 'j';
+test("metadata/XML preserve caller policy, whitespace and bounded explicit kerning", () => {
+  const key = 'A\tB\nC\rD & "<';
+  const { metadata, xml } = buildBitmapFont({
+    ...options(),
+    key,
+    lineHeight: 23,
+    characters: "AV j😀A",
+    kerningPairs: [
+      ["A", "V"],
+      ["A", "V"],
+    ],
+  });
+  assert.deepEqual([...metadata.glyphs.keys()], [..."AV j😀"]);
+  assert.equal(metadata.lineHeight, 23);
+  assert.equal(metadata.kernings.length, 1);
+  assert.ok(metadata.kernings[0].amount < 0);
+  assert.match(xml, /A&#9;B&#10;C&#13;D &amp; &quot;&lt;/);
+  assert.match(xml, /id="128512"/);
+  assert.match(xml, /lineHeight="23"/);
+  assert.match(xml, /smooth="1" aa="1"/);
+  assert.match(xml, /kernings count="1"/);
+  assert.equal(buildBitmapFont(options()).metadata.kernings.length, 0);
+});
+
+test("builder rejects impossible atlases and invalid input before rendering", () => {
+  const opts = options();
+  for (const field of [
+    "size",
+    "atlasWidth",
+    "lineHeight",
+    "padding",
+    "maxHeight",
+  ]) {
+    assert.throws(() => buildBitmapFont({ ...opts, [field]: 0 }), RangeError);
   }
-  assert.deepEqual([...rasterize(options, chars()).glyphs.keys()], ['A', 'j']);
-  assert.throws(() => rasterize(options, 'A'), /ENOENT/);
+  assert.throws(
+    () => buildBitmapFont({ ...opts, atlasWidth: 2 }),
+    /atlas width/,
+  );
+  assert.throws(
+    () => buildBitmapFont({ ...opts, maxHeight: 2 }),
+    /atlas height/,
+  );
+  assert.throws(
+    () => buildBitmapFont({ ...opts, characters: ["ab"] }),
+    /Unicode/,
+  );
+  assert.throws(
+    () => buildBitmapFont({ ...opts, characters: ["\ud800"] }),
+    /Unicode/,
+  );
+  assert.throws(
+    () => buildBitmapFont({ ...opts, kerningPairs: [["A", "z"]] }),
+    /belong/,
+  );
+  assert.throws(() => buildBitmapFont({ ...opts, key: "\0" }), /XML/);
+  assert.throws(
+    () => buildBitmapFont({ ...opts, path: "/missing-font.ttf" }),
+    /ENOENT/,
+  );
+  const { image, metadata } = buildBitmapFont({ ...opts, characters: " " });
+  assert.ok(image.height > 0);
+  assert.equal(metadata.glyphs.get(" ").width, 0);
 });
