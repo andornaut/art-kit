@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { test } from "node:test";
 import { PNG } from "pngjs";
-import { exportBitmapFont } from "@andornaut/art-kit/generate";
+import { exportBitmapFont, exportBitmapFontFromGlyphs } from "@andornaut/art-kit/generate";
 
 const fixtures = process.env.ART_KIT_TEST_FONTS;
 assert.ok(fixtures, "Required native font fixtures");
@@ -108,4 +108,50 @@ test("dangling output links are rejected before creating their targets", async (
   await symlink(png, fnt);
   await assert.rejects(exportBitmapFont({ font, output: { png, fnt } }), /dangling symbolic link/);
   await assert.rejects(readFile(png), { code: "ENOENT" });
+});
+
+
+const suppliedFont = { face: 'Caller & face', size: 16, base: 15, lineHeight: 20,
+  atlasWidth: 16, kernings: [{first: 65, second: 32, amount: -2}] };
+const suppliedPixels = new Uint8Array([19, 31, 47, 0, 101, 103, 107, 1, 211, 223, 227, 255]);
+const suppliedGlyphs = new Map([
+  ['A', {image: {width: 3, height: 1, data: suppliedPixels}, xoffset: -1, yoffset: 2, xadvance: 4}],
+  [' ', {image: undefined, xoffset: 0, yoffset: 0, xadvance: 3}],
+]);
+
+test("supplied glyph export preserves exact straight RGBA and caller metadata", async () => {
+  const root = await mkdtemp(join(tmpdir(), "glyph-export-"));
+  const output = {png: join(root, 'images', 'caller & page.png'), fnt: join(root, 'xml', 'caller.fnt')};
+  const result = await exportBitmapFontFromGlyphs({font: suppliedFont, glyphs: suppliedGlyphs, output});
+  const decoded = PNG.sync.read(await readFile(output.png));
+  assert.deepEqual(new Uint8Array(decoded.data), result.image.data);
+  const glyph = result.metadata.glyphs.get('A');
+  const offset = (glyph.y * decoded.width + glyph.x) * 4;
+  assert.deepEqual(new Uint8Array(decoded.data.subarray(offset, offset + 12)), suppliedPixels);
+  const xml = await readFile(output.fnt, 'utf8');
+  assert.equal(xml, result.xml);
+  assert.equal(resolve(dirname(output.fnt), pageFile(xml)), output.png);
+  assert.match(xml, /face="Caller &amp; face"/);
+  assert.match(xml, /lineHeight="20" base="15"/);
+  assert.match(xml, /first="65" second="32" amount="-2"/);
+  assert.equal(result.metadata.glyphs.get(' ').width, 0);
+  assert.equal(result.metadata.glyphs.get(' ').xadvance, 3);
+  assert.equal(glyph.xoffset, -1);
+  assert.deepEqual(result.paths, output);
+});
+
+test("supplied glyph export shares output guards without a source font path", async () => {
+  const root = await mkdtemp(join(tmpdir(), "glyph-export-guards-"));
+  const png = join(root, 'caller.png'), fnt = join(root, 'caller.fnt');
+  const run = output => exportBitmapFontFromGlyphs({font: suppliedFont, glyphs: suppliedGlyphs, output});
+  await assert.rejects(run({png, fnt: png}), /distinct/);
+  await assert.rejects(run({png: png + '.jpg', fnt}), /end in/);
+  await symlink(png, fnt);
+  await assert.rejects(run({png, fnt}), /dangling/);
+  await assert.rejects(readFile(png), {code: 'ENOENT'});
+  const original = join(root, 'original.png'), alias = join(root, 'alias.fnt');
+  await writeFile(original, 'preserved');
+  await link(original, alias);
+  await assert.rejects(run({png: original, fnt: alias}), /distinct/);
+  assert.equal(await readFile(original, 'utf8'), 'preserved');
 });
