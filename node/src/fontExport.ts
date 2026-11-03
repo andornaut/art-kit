@@ -1,7 +1,7 @@
 import { lstat, mkdir, realpath, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { buildBitmapFont, type BitmapFontOptions } from "./fonts.js";
-import { buildBitmapFontFromGlyphs, type GlyphAtlasOptions, type SuppliedGlyph as SuppliedBitmapGlyph } from "./glyphAtlas.js";
+import { buildBitmapFontFromGlyphs, type GlyphAtlasOptions, type SuppliedBitmapGlyph } from "./glyphAtlas.js";
 import { encodeRgbaPng } from "./png.js";
 
 export interface BitmapFontExportOptions {

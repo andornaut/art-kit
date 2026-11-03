@@ -9,13 +9,11 @@ Both implementations remain available. Prefer the Skia TypeScript generation API
 | Colour | 109 | 123 |
 | Grid | 113 | 185 |
 | Frames and composition | 71 | 183 |
-| Font rasterization | 109 | 253 |
-| Strict file coverage | 0 | 42 |
-| Supplied-glyph atlas | 0 | 89 |
+| Fonts, packing and coverage | 109 | 384 |
 | Aseprite | 105 | 109 |
 | Total | 507 | 984 |
 
-These counts describe the assembled candidate sources before final integration formatting. They are physical lines including types, comments and whitespace, excluding tests, existing Node atlas/codecs and packaging. The consolidated generation entry and one-call font export add another 114 lines outside this primitive comparison. Formatting differs; the numbers are not a complexity score. The redesign does not establish a smaller source implementation. It removes custom alpha arithmetic, manually scaled pixel writes, intermediate glyph RGBA buffers and Pillow-specific rounding. TypeScript still owns typed options, input/bounds validation, packing and XML. Font construction adds native pair-kerning derivation and structured metadata.
+These are physical lines including types, comments and whitespace, excluding tests, existing Node atlas/codecs and packaging. The TypeScript fonts total includes rasterization (253), strict coverage (42) and supplied-glyph assembly (89); the Python font module includes rasterization, packing and XML. The consolidated generation entry and one-call font export add another 114 lines outside this primitive comparison. Formatting differs; the numbers are not a complexity score. The redesign does not establish a smaller source implementation. It removes custom alpha arithmetic, manually scaled pixel writes, intermediate glyph RGBA buffers and Pillow-specific rounding from the rendering path. TypeScript still owns typed options, input/bounds validation, packing and XML. Font construction adds native pair-kerning derivation and structured metadata.
 
 Generation exposes renderFrame, composeSheet and renderContactSheet returning CPU Canvas objects. Keep those surfaces through composition and encode at the boundary. buildBitmapFont replaces separate rasterize/pack/XML calls with one font-and-atlas operation. Existing exact-copy buffer utilities and codecs remain separate and unchanged. This reduces caller assembly and renderer-specific buffer handling, rather than the total source-line count.
 
@@ -35,4 +33,4 @@ Version 0.8 deliberately replaces the 0.7 TypeScript generation interfaces and C
 
 ## Verification
 
-The released 0.9 baseline passed 19 Python and 43 Node tests with zero skips, plus lint, declarations, installed-package imports and builds. Integrated validation for the additive font contracts remains pending. The Node gate requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.
+The isolated local gates pass 19 Python and 51 Node tests with zero skips, plus lint, declarations, installed-package imports and builds. The Node gate requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.
