@@ -15,20 +15,27 @@ class FontInfo:
     base: int
 
 
-def rasterize_glyph(font, char):
+def rasterize_glyph(font, char, *, antialias=False):
     ascent, descent = font.getmetrics()
     canvas = Image.new("L", (font.size * 3, ascent + descent + 2), 0)
     draw = ImageDraw.Draw(canvas)
-    draw.fontmode = "1"
+    draw.fontmode = "L" if antialias else "1"
     draw.text((0, 0), char, font=font, fill=255)
     box = canvas.getbbox()
     advance = round(font.getlength(char))
-    return (canvas.crop(box), box[0], box[1], advance) if box else (None, 0, 0, advance)
+    if not box:
+        return None, 0, 0, advance
+    image = canvas.crop(box)
+    if antialias:
+        coverage = image
+        image = Image.new("RGBA", coverage.size, (255, 255, 255, 255))
+        image.putalpha(coverage)
+    return image, box[0], box[1], advance
 
 
-def rasterize(path, size, chars):
+def rasterize(path, size, chars, *, antialias=False):
     font = ImageFont.truetype(path, size)
-    return {char: rasterize_glyph(font, char) for char in chars}, *font.getmetrics()
+    return {char: rasterize_glyph(font, char, antialias=antialias) for char in chars}, *font.getmetrics()
 
 
 def pack(atlas_width, glyphs):
@@ -60,14 +67,14 @@ def pack(atlas_width, glyphs):
     return atlas, places
 
 
-def bmfont_xml(info: FontInfo, atlas_size, places, glyphs, *, kernings=()):
+def bmfont_xml(info: FontInfo, atlas_size, places, glyphs, *, kernings=(), antialias=False):
     width, height = atlas_size
     lines = [
         '<?xml version="1.0"?>',
         "<font>",
         (
             f'  <info face={quoteattr(info.face)} size="{info.size}" bold="0" italic="0" charset="" unicode="1" '
-            'stretchH="100" smooth="0" aa="0" padding="0,0,0,0" spacing="1,1"/>'
+            f'stretchH="100" smooth="{int(antialias)}" aa="{int(antialias)}" padding="0,0,0,0" spacing="1,1"/>'
         ),
         (
             f'  <common lineHeight="{info.line_height}" base="{info.base}" scaleW="{width}" '
