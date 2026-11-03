@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const [mode, revision] = process.argv.slice(2);
@@ -43,6 +43,12 @@ for (const name of Object.keys(descriptor.peerDependencies)) {
 const installedManifest = JSON.parse(readFileSync(`${install}/node_modules/@andornaut/art-kit/package.json`));
 if (readFileSync(`${install}/node_modules/@andornaut/art-kit/SOURCE_COMMIT`, 'utf8') !== `${revision}\n`) throw new Error('Installed source identity differs');
 if (installedManifest.version !== version || existsSync(`${install}/node_modules/@andornaut/art-kit/src`)) throw new Error('Invalid compiled package');
+// Existing image-codec consumers do not need the optional native renderer.
+unlinkSync(`${install}/node_modules/canvas`);
+for (const subpath of ['atlasBuild', 'atlasLayout', 'indexedPng', 'png', 'rgbaImage', 'webp']) {
+  execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`], { cwd: install, stdio: 'inherit' });
+}
+symlinkSync('/deps/canvas', `${install}/node_modules/canvas`);
 for (const subpath of Object.keys(descriptor.exports)) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath.slice(2)}`)})`], { cwd: install, stdio: 'inherit' });
 }

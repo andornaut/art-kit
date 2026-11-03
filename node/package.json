@@ -9,9 +9,15 @@
     "./rgbaImage": { "types": "./dist/rgbaImage.d.ts", "import": "./dist/rgbaImage.js" },
     "./indexedPng": { "types": "./dist/indexedPng.d.ts", "import": "./dist/indexedPng.js" },
     "./png": { "types": "./dist/png.d.ts", "import": "./dist/png.js" },
-    "./webp": { "types": "./dist/webp.d.ts", "import": "./dist/webp.js" }
+    "./webp": { "types": "./dist/webp.d.ts", "import": "./dist/webp.js" },
+    "./aseprite": { "types": "./dist/aseprite.d.ts", "import": "./dist/aseprite.js" },
+    "./colour": { "types": "./dist/colour.d.ts", "import": "./dist/colour.js" },
+    "./fonts": { "types": "./dist/fonts.d.ts", "import": "./dist/fonts.js" },
+    "./frames": { "types": "./dist/frames.d.ts", "import": "./dist/frames.js" },
+    "./grid": { "types": "./dist/grid.d.ts", "import": "./dist/grid.js" }
   },
   "files": ["dist", "LICENSE", "SOURCE_COMMIT"],
-  "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0" },
+  "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0", "canvas": "3.2.3" },
+  "peerDependenciesMeta": { "canvas": { "optional": true } },
   "devDependencies": { "@types/node": "24.19.2", "@types/pngjs": "6.0.5", "typescript": "6.0.3" }
 }
