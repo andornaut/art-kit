@@ -52,6 +52,20 @@ Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geomet
 
 `indexedPng.encodeIndexedPng({ level, memLevel }, image)` returns encoded bytes, or `undefined` when the image has more than 256 distinct RGBA colours. The subpath also exports `MAX_PALETTE` and `COLOUR_TYPE_INDEXED`. `png.encodeRgbaPng({ deflateLevel, deflateStrategy, filterType }, image)` returns RGBA PNG bytes. Compression context precedes the image; callers choose indexed-first fallback, PNG versus WebP and output metadata.
 
+`colour.srgb_to_oklab(rgb_bytes)` and `srgb_to_oklch(rgb_bytes)` return Oklab and OKLCH triples. `oklab_to_srgb(lab)` clamps linear channels on conversion to bytes. `oklch_to_srgb(lch)` clamps lightness to 0..1, limits chroma to the search bound, wraps hue in degrees and reduces out-of-gamut chroma at fixed lightness and hue before byte quantization. Neutral hue is zero. Node exports the corresponding camelCase functions. Palette targets and perceptual contrast policy remain caller-owned.
+
+## Side-by-side drawing and font implementations
+
+The Node package also exports `aseprite`, `colour`, `fonts`, `frames` and `grid` alongside the Python modules. These are independent TypeScript implementations, not Python subprocess adapters. Existing Python APIs remain unchanged. Install the optional exact peer `canvas@3.2.3` for the Node font module; existing codec-only imports do not require it.
+
+Node frames use the existing structural `RgbaImage` buffer. Drawing and frame helpers retain Python-style names; fonts expose `rasterizeGlyph`, `rasterize`, `pack` and `bmfontXml`. Node Aseprite export is asynchronous and retains explicit executable and output paths.
+
+Canvas/Pango font coverage is not pixel-identical to Pillow. Registered fonts can use system fallback for missing characters; the Canvas API cannot disable that fallback. Native font sizes, signed ink offsets, empty advances and caller-owned kerning are retained, but these implementations are not interchangeable font-output engines. Consumers retain their existing implementation until separately approved adoption.
+
+The fixed-point tile compositor includes Pillow-derived arithmetic. Its copyright, permission and disclaimer are retained in the source and distributed `LICENSE`; helper code otherwise remains MIT licensed. Consumer font and art licences are unchanged.
+
+See [implementation comparison](docs/implementation-comparison.md) for measured differences, scope and the recommendation.
+
 ## Runtime and checks
 
 Python 3.12 or newer, Pillow 13.0.0 and optional Aseprite for exports. Ruff is pinned to 0.17.2. Colour and grid do not import Pillow; image and font facilities do. The source fonts and their licences remain in the client repositories.
