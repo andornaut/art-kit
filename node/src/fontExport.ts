@@ -1,4 +1,4 @@
-import { mkdir, realpath, stat, writeFile } from "node:fs/promises";
+import { lstat, mkdir, realpath, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { buildBitmapFont, type BitmapFontOptions } from "./fonts.js";
 
@@ -31,6 +31,10 @@ export async function exportBitmapFont({ font, output }: BitmapFontExportOptions
       if (error.code !== "ENOENT") throw error;
       return undefined;
     });
+    if (!existing && (await lstat(path).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+      return undefined;
+    }))?.isSymbolicLink()) throw new RangeError("Output must not be a dangling symbolic link");
     identities.push(existing);
     if (existing && existing.dev === source.dev && existing.ino === source.ino)
       throw new RangeError("Output must not overwrite the font source");

@@ -99,3 +99,13 @@ test("hard links and missing destinations under directory aliases are rejected",
     png: join(dir, "new", "body.png"), fnt: join(alias, "new", "body.png")}}), /distinct/);
   assert.deepEqual(await readdir(dir), []);
 });
+
+
+test("dangling output links are rejected before creating their targets", async () => {
+  const root = await mkdtemp(join(tmpdir(), "font-export-dangling-"));
+  const png = join(root, "body.png");
+  const fnt = join(root, "body.fnt");
+  await symlink(png, fnt);
+  await assert.rejects(exportBitmapFont({ font, output: { png, fnt } }), /dangling symbolic link/);
+  await assert.rejects(readFile(png), { code: "ENOENT" });
+});

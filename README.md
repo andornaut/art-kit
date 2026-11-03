@@ -74,6 +74,22 @@ await font.image.saveAs('body.png');
 await writeFile('body.fnt', font.xml);
 ```
 
+Use the consolidated Node-only import when a generator needs several facilities:
+
+```ts
+import { Grid, renderFrame, composeSheet, exportBitmapFont } from '@andornaut/art-kit/generate';
+
+await exportBitmapFont({
+  font: {
+    path: 'body.ttf', size: 16,
+    characters: ' ABCDEFGHIJKLMNOPQRSTUVWXYZ', atlasWidth: 256,
+  },
+  output: { png: 'public/fonts/body.png', fnt: 'public/fonts/body.fnt' },
+});
+```
+
+The helper creates parent directories and returns the built image, XML, metadata and resolved output paths. The XML page reference is relative to the FNT directory, so outputs may live in different directories. PNG output requires the exact `.png` extension. Build/encoding failures precede writes, but the two files are not an atomic transaction. This entry requires the optional Skia peer and belongs in Node art/build scripts, not browser bundles. Existing subpath imports remain available. Aseprite exports are named `exportAseprite` and `asepriteLua` in this consolidated entry.
+
 Version 0.8 replaces the 0.7 Node frame conversion/composition and low-level font APIs without compatibility aliases. Python and existing Node atlas/codec consumers need no API changes. See [implementation comparison](docs/implementation-comparison.md) for measured size, output quality and the recommendation. No consumer assets, font choices or dependency pins change automatically.
 
 ## Runtime and checks
