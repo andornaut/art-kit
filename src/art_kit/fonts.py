@@ -16,20 +16,30 @@ class FontInfo:
 
 
 def rasterize_glyph(font, char, *, antialias=False):
+    if antialias:
+        mask, offset = font.getmask2(char, mode="L")
+        advance = round(font.getlength(char))
+        if not all(mask.size):
+            return None, 0, 0, advance
+        coverage = Image.frombytes("L", mask.size, bytes(mask))
+        box = coverage.getbbox()
+        if not box:
+            return None, 0, 0, advance
+        coverage = coverage.crop(box)
+        image = Image.new("RGBA", coverage.size, (255, 255, 255, 255))
+        image.putalpha(coverage)
+        return image, offset[0] + box[0], offset[1] + box[1], advance
+
     ascent, descent = font.getmetrics()
     canvas = Image.new("L", (font.size * 3, ascent + descent + 2), 0)
     draw = ImageDraw.Draw(canvas)
-    draw.fontmode = "L" if antialias else "1"
+    draw.fontmode = "1"
     draw.text((0, 0), char, font=font, fill=255)
     box = canvas.getbbox()
     advance = round(font.getlength(char))
     if not box:
         return None, 0, 0, advance
     image = canvas.crop(box)
-    if antialias:
-        coverage = image
-        image = Image.new("RGBA", coverage.size, (255, 255, 255, 255))
-        image.putalpha(coverage)
     return image, box[0], box[1], advance
 
 
