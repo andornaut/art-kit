@@ -53,8 +53,11 @@ function codePoint(char: string): number {
 
 /** Canvas/Pango renders missing characters using its fallback policy; callers supply font coverage. */
 export function rasterizeGlyph(options: FontOptions, char: string): Glyph {
+  return rasterizePrepared(fontContext(options), options, char);
+}
+
+function rasterizePrepared(context: ReturnType<typeof fontContext>, options: FontOptions, char: string): Glyph {
   codePoint(char);
-  const context = fontContext(options);
   const metrics = context.measureText(char);
   const advance = roundEven(metrics.width);
   const ascent = Math.ceil(metrics.emHeightAscent);
@@ -92,9 +95,10 @@ export function rasterize(options: FontOptions, chars: Iterable<string>): {
   ascent: number;
   descent: number;
 } {
-  const metrics = fontContext(options).measureText(" ");
+  const context = fontContext(options);
+  const metrics = context.measureText(" ");
   const glyphs = new Map<string, Glyph>();
-  for (const char of chars) glyphs.set(char, rasterizeGlyph(options, char));
+  for (const char of chars) glyphs.set(char, rasterizePrepared(context, options, char));
   return { glyphs, ascent: Math.ceil(metrics.emHeightAscent), descent: Math.ceil(metrics.emHeightDescent) };
 }
 
@@ -127,7 +131,8 @@ export function pack(atlasWidth: number, glyphs: ReadonlyMap<string, Glyph>): {
 }
 
 function quote(value: string): string {
-  const escaped = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  const escaped = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+    .replaceAll("\t", "&#9;").replaceAll("\n", "&#10;").replaceAll("\r", "&#13;");
   return escaped.includes('"') && !escaped.includes("'") ? `'${escaped}'` : `"${escaped.replaceAll('"', "&quot;")}"`;
 }
 

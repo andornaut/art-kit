@@ -36,7 +36,7 @@ jobs:
               npm install --ignore-scripts --no-audit --no-fund --cache /tmp/npm-cache
               (cd node_modules/canvas && node ../prebuild-install/bin.js -r napi)
             '
-      - name: Check Node package offline
+      - name: Check Node package and required native font rendering offline
         run: bash scripts/check-node.sh .claude/node-dependencies/node_modules
       - name: Check offline in an isolated container
         run: bash scripts/check.sh .claude/dependencies .claude/dependencies/bin/ruff .claude/dependencies

@@ -31,7 +31,8 @@ test('BMFont XML preserves signed metrics, Unicode IDs, escaping and caller kern
 });
 
 const fonts = process.env.ART_KIT_TEST_FONTS;
-test('native font rasterization retains signed ink, grayscale alpha and space advance', { skip: !fonts }, () => {
+assert.ok(fonts, 'Required font fixture directory ART_KIT_TEST_FONTS is missing');
+test('native font rasterization retains signed ink, grayscale alpha and space advance', () => {
   for (const weight of ['Regular', 'Bold']) {
     const options = { path: `${fonts}/LiberationSans-${weight}.ttf`, size: 16, antialias: true };
     const { glyphs, ascent, descent } = rasterize(options, 'j_wA ');
@@ -48,4 +49,30 @@ test('native font rasterization retains signed ink, grayscale alpha and space ad
     assert.throws(() => rasterizeGlyph(options, 'ab'), /one Unicode/);
     assert.throws(() => rasterizeGlyph({ ...options, size: 0 }, 'a'), /positive integer/);
   }
+});
+
+
+test('BMFont attributes preserve tab, LF and CR as numeric references', () => {
+  const text = 'a\tb\nc\rd & "quoted"';
+  const xml = bmfontXml({ key: text, face: text, size: 16, lineHeight: 20, base: 15 }, [1, 1], new Map(), new Map());
+  assert.match(xml, /a&#9;b&#10;c&#13;d/);
+  assert.ok(!/[\t\r]/.test(xml));
+  // XML parsers normalize literal attribute whitespace, but preserve references.
+  for (const [attribute, expected] of [['face', text], ['file', text + '.png']]) {
+    const value = xml.match(new RegExp(attribute + `=(['"])(.*?)\\1`))[2];
+    const parsed = value.replace(/[\t\r\n]/g, ' ').replace(/&#(\d+);|&(amp|quot|lt|gt);/g,
+      (_, code, entity) => code ? String.fromCodePoint(Number(code)) : ({ amp: '&', quot: '"', lt: '<', gt: '>' })[entity]);
+    assert.equal(parsed, expected);
+  }
+});
+
+test('batch prepares its font once without caching subsequent calls', () => {
+  const options = { path: `${fonts}/LiberationSans-Regular.ttf`, size: 16 };
+  function* chars() {
+    yield 'A';
+    options.path = '/missing-art-kit-test-font.ttf';
+    yield 'j';
+  }
+  assert.deepEqual([...rasterize(options, chars()).glyphs.keys()], ['A', 'j']);
+  assert.throws(() => rasterize(options, 'A'), /ENOENT/);
 });

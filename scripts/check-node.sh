@@ -26,5 +26,6 @@ docker run --rm --read-only --network none --cpus 4 -u "$(id -u):$(id -g)" \
   --mount "type=bind,source=$deps,target=/deps,readonly" \
   --tmpfs "/tmp:exec,uid=$(id -u),gid=$(id -g)" \
   -e HOME=/tmp -e npm_config_cache=/tmp/npm-cache \
+  -e ART_KIT_TEST_FONTS=/work/source/node/tests/fixtures \
   -w /work node:24.21.0 node /work/source/scripts/node-package.mjs check "$revision"
 echo "Node evidence: $scratch"
