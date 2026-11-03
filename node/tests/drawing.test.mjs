@@ -104,3 +104,9 @@ test("hex channels and WCAG contrast", () => {
   assert.deepEqual(rgb("01aBff"), [1, 171, 255]);
   assert.equal(contrast("000000", "ffffff"), 21);
 });
+
+test("opaque extents handle a large solid frame without argument spreading", () => {
+  const frame = Array.from({ length: 512 }, () => Array(512).fill("ffffff"));
+  assert.deepEqual(opaque_rows([frame]), [0, 511]);
+  assert.deepEqual(opaque_cols([frame]), [0, 511]);
+});

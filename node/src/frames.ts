@@ -34,16 +34,32 @@ import type { Colour, Frame } from "./grid.js";
 import { blankImage, type RgbaImage } from "./rgbaImage.js";
 
 export function opaque_rows(frames: readonly Frame[]): [number, number] | null {
-  const rows = frames.flatMap((frame) =>
-    frame.flatMap((row, y) => (row.some(Boolean) ? [y] : [])),
-  );
-  return rows.length ? [Math.min(...rows), Math.max(...rows)] : null;
+  let min = Infinity;
+  let max = -1;
+  for (const frame of frames) {
+    for (let y = 0; y < frame.length; y++) {
+      if (frame[y].some(Boolean)) {
+        min = Math.min(min, y);
+        max = Math.max(max, y);
+      }
+    }
+  }
+  return max < 0 ? null : [min, max];
 }
 export function opaque_cols(frames: readonly Frame[]): [number, number] | null {
-  const cols = frames.flatMap((frame) =>
-    frame.flatMap((row) => row.flatMap((c, x) => (c ? [x] : []))),
-  );
-  return cols.length ? [Math.min(...cols), Math.max(...cols)] : null;
+  let min = Infinity;
+  let max = -1;
+  for (const frame of frames) {
+    for (const row of frame) {
+      for (let x = 0; x < row.length; x++) {
+        if (row[x]) {
+          min = Math.min(min, x);
+          max = Math.max(max, x);
+        }
+      }
+    }
+  }
+  return max < 0 ? null : [min, max];
 }
 export function flipped(frame: Frame): Frame {
   return frame.map((row) => [...row].reverse());
