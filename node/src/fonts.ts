@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs";
+import { requireFontCoverage } from "./fontCoverage.js";
 import { Canvas, FontLibrary } from "skia-canvas";
 
 export interface BitmapFontOptions {
@@ -10,6 +11,10 @@ export interface BitmapFontOptions {
   maxHeight?: number;
   padding?: number;
   lineHeight?: number;
+  face?: string;
+  base?: number;
+  coverage?: "system" | "strict";
+  kerning?: "requested" | "all";
   antialias?: boolean;
   hinting?: boolean;
   kerningPairs?: Iterable<readonly [string, string]>;
@@ -63,7 +68,8 @@ function quote(value: string): string {
  * CPU Skia bitmap atlas. Metrics use outward-rounded ink bounds and nearest
  * integer advances/kerning; no shaping across glyph boundaries is represented.
  * Font files remain immutable after registration. Skia may use system fallback:
- * callers must supply covered characters when reproducible font selection matters.
+ * strict coverage preflights the selected file but cannot disable internal fallback.
+ * All-pair kerning is limited to 256 unique characters and retains nonzero amounts.
  */
 export function buildBitmapFont(options: BitmapFontOptions) {
   const size = positive(options.size, "Font size");
@@ -77,7 +83,30 @@ export function buildBitmapFont(options: BitmapFontOptions) {
     throw new RangeError("Padding must be an integer in 1..16384");
   }
   const key = quote(options.key + ".png");
+  const face = options.face ?? options.key;
+  quote(face);
+  const coverage = options.coverage ?? "system";
+  const kerning = options.kerning ?? "requested";
+  if (coverage !== "system" && coverage !== "strict")
+    throw new RangeError("Coverage must be system or strict");
+  if (kerning !== "requested" && kerning !== "all")
+    throw new RangeError("Kerning must be requested or all");
+  const characters = [...new Set(options.characters)];
+  characters.forEach(codePoint);
+  if (kerning === "all") {
+    if (options.kerningPairs !== undefined)
+      throw new RangeError("All kerning cannot be combined with kerningPairs");
+    if (characters.length > 256)
+      throw new RangeError("All kerning supports at most 256 unique characters");
+  }
+  if (
+    options.base !== undefined &&
+    (!Number.isSafeInteger(options.base) || options.base < 0 || options.base > 16384)
+  )
+    throw new RangeError("Base must be an integer in 0..16384");
   const path = realpathSync(options.path);
+  if (coverage === "strict") requireFontCoverage(path, characters);
+
   let family = families.get(path);
   if (!family) {
     family = `art_kit_bitmap_${families.size}`;
@@ -100,20 +129,22 @@ export function buildBitmapFont(options: BitmapFontOptions) {
   };
   configure();
   const metrics = context.measureText(" ");
-  const base = Math.ceil(metrics.fontBoundingBoxAscent);
+  const base = options.base ?? Math.ceil(metrics.fontBoundingBoxAscent);
   const lineHeight = positive(
     options.lineHeight ??
       Math.ceil(metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent),
     "Line height",
   );
   const glyphs = new Map<string, BitmapGlyph>();
+  const advances = new Map<string, number>();
   let x = padding,
     y = padding,
     rowHeight = 0;
-  for (const char of options.characters) {
+  for (const char of characters) {
     const id = codePoint(char);
     if (glyphs.has(char)) continue;
     const m = context.measureText(char);
+    advances.set(char, m.width);
     const left = Math.floor(-m.actualBoundingBoxLeft);
     const top = Math.floor(-m.actualBoundingBoxAscent);
     const w = Math.max(0, Math.ceil(m.actualBoundingBoxRight) - left);
@@ -147,7 +178,12 @@ export function buildBitmapFont(options: BitmapFontOptions) {
   }
   const kernings = [] as { first: number; second: number; amount: number }[];
   const seen = new Set<string>();
-  for (const [first, second] of options.kerningPairs ?? []) {
+  function* allPairs(): Generator<readonly [string, string]> {
+    for (const first of characters)
+      for (const second of characters) yield [first, second];
+  }
+  const pairs = kerning === "all" ? allPairs() : options.kerningPairs ?? [];
+  for (const [first, second] of pairs) {
     const a = codePoint(first),
       b = codePoint(second),
       pair = `${a},${b}`;
@@ -157,10 +193,11 @@ export function buildBitmapFont(options: BitmapFontOptions) {
     seen.add(pair);
     const amount = Math.round(
       context.measureText(first + second).width -
-        context.measureText(first).width -
-        context.measureText(second).width,
+        advances.get(first)! -
+        advances.get(second)!,
     );
-    kernings.push({ first: a, second: b, amount });
+    if (kerning === "requested" || amount !== 0)
+      kernings.push({ first: a, second: b, amount });
   }
   image.height = Math.max(1, y + rowHeight + padding);
   if (image.height > maxHeight)
@@ -178,7 +215,7 @@ export function buildBitmapFont(options: BitmapFontOptions) {
   const lines = [
     '<?xml version="1.0"?>',
     "<font>",
-    `  <info face=${quote(options.key)} size="${size}" bold="0" italic="0" unicode="1" smooth="${aa}" aa="${aa}"/>`,
+    `  <info face=${quote(face)} size="${size}" bold="0" italic="0" unicode="1" smooth="${aa}" aa="${aa}"/>`,
     `  <common lineHeight="${lineHeight}" base="${base}" scaleW="${width}" scaleH="${image.height}" pages="1" packed="0"/>`,
     `  <pages><page id="0" file=${key}/></pages>`,
     `  <chars count="${glyphs.size}">`,
@@ -203,6 +240,9 @@ export function buildBitmapFont(options: BitmapFontOptions) {
       glyphs,
       kernings,
       size,
+      face,
+      coverage,
+      kerning,
       base,
       lineHeight,
       antialias: Boolean(aa),

@@ -143,3 +143,51 @@ test("pair kerning uses separate glyph positioning without ligature substitution
   const { metadata } = buildBitmapFont({ ...options(), characters: "fiAV", kerningPairs: pairs });
   assert.deepEqual(metadata.kernings.map(k => k.amount), pairs.map(([a, b]) => Math.round(context.measureText(a + b).width - context.measureText(a).width - context.measureText(b).width)));
 });
+
+test("strict coverage validates actual font characters including astral code points", () => {
+  for (const weight of ["Regular", "Bold"]) {
+    const font = buildBitmapFont({ ...options(weight), coverage: "strict" });
+    assert.equal(font.metadata.coverage, "strict");
+    assert.ok(font.metadata.glyphs.get("j").xoffset < 0);
+    assert.throws(() => buildBitmapFont({
+      ...options(weight), coverage: "strict", characters: "A😀\u{10ffff}",
+    }), error => error instanceof RangeError && /U\+1F600/.test(error.message) && /U\+10FFFF/.test(error.message));
+  }
+});
+
+test("explicit face and baseline change metadata without moving atlas ink", () => {
+  const original = buildBitmapFont(options());
+  const font = buildBitmapFont({ ...options(), face: 'Regular & "face"', base: 19 });
+  assert.equal(font.metadata.face, 'Regular & "face"');
+  assert.equal(font.metadata.base, 19);
+  assert.match(font.xml, /face="Regular &amp; &quot;face&quot;"/);
+  assert.match(font.xml, /base="19"/);
+  assert.match(font.xml, /file="font.png"/);
+  const delta = 19 - original.metadata.base;
+  for (const [char, glyph] of font.metadata.glyphs) {
+    const old = original.metadata.glyphs.get(char);
+    assert.equal(glyph.yoffset, glyph.height ? old.yoffset + delta : 0);
+  }
+  const pixels = f => f.image.getContext("2d").getImageData(0, 0, f.image.width, f.image.height).data;
+  assert.deepEqual(pixels(font), pixels(original));
+  for (const base of [-1, 1.5, NaN, 16385])
+    assert.throws(() => buildBitmapFont({ ...options(), base }), /Base/);
+});
+
+test("all kerning equals complete explicit ordered pairs with zero adjustments removed", () => {
+  const characters = "AVTofi jAV";
+  const unique = [...new Set(characters)];
+  const pairs = unique.flatMap(a => unique.map(b => [a, b]));
+  for (const weight of ["Regular", "Bold"]) {
+    const requested = buildBitmapFont({ ...options(weight), characters, kerningPairs: pairs });
+    const all = buildBitmapFont({ ...options(weight), characters, kerning: "all" });
+    assert.deepEqual(all.metadata.kernings, requested.metadata.kernings.filter(k => k.amount !== 0));
+    assert.ok(all.metadata.kernings.length > 0);
+    assert.equal(all.metadata.kerning, "all");
+  }
+  assert.throws(() => buildBitmapFont({ ...options(), kerning: "all", kerningPairs: [] }), /combined/);
+  const tooMany = Array.from({ length: 257 }, (_, i) => String.fromCodePoint(0x100 + i));
+  assert.throws(() => buildBitmapFont({ ...options(), kerning: "all", characters: tooMany }), /256/);
+  assert.throws(() => buildBitmapFont({ ...options(), coverage: "unknown" }), /Coverage/);
+  assert.throws(() => buildBitmapFont({ ...options(), kerning: "unknown" }), /Kerning/);
+});
