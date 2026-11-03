@@ -16,8 +16,8 @@ class AntialiasTests(unittest.TestCase):
         glyph = fonts.rasterize_glyph(self.font, "A", antialias=True)
         image, ox, oy, advance = glyph
         assert image.mode == "RGBA"
-        assert any(0 < a < 255 for a in image.getchannel("A").getdata())
-        assert all(pixel[:3] == (255, 255, 255) for pixel in image.getdata())
+        assert any(0 < a < 255 for a in image.getchannel("A").get_flattened_data())
+        assert all(pixel[:3] == (255, 255, 255) for pixel in image.get_flattened_data())
         atlas, places = fonts.pack(64, {"A": glyph})
         x, y = places["A"]
         assert atlas.crop((x, y, x + image.width, y + image.height)).tobytes() == image.tobytes()
@@ -34,7 +34,7 @@ class AntialiasTests(unittest.TestCase):
         image, *metrics = fonts.rasterize_glyph(self.font, "A")
         assert image.mode == "L"
         assert image.tobytes() == canvas.crop(box).tobytes()
-        assert set(image.getdata()) <= {0, 255}
+        assert set(image.get_flattened_data()) <= {0, 255}
         assert metrics == [box[0], box[1], round(self.font.getlength("A"))]
         with patch.object(fonts.ImageFont, "truetype", return_value=self.font):
             glyphs, *font_metrics = fonts.rasterize("caller.ttf", 16, "A ", antialias=True)
