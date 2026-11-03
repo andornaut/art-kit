@@ -3,7 +3,7 @@ import { chmod, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { lua, export as exportSprite } from '../dist/aseprite.js';
+import { lua, export as exportSprite } from '@andornaut/art-kit/aseprite';
 
 const frame = [[null, 'ff0000'], ['00ff00', null]];
 const tags = [['walké', [frame, frame], [100, 200]], ['idle', [frame], 1000]];
