@@ -1,3 +1,4 @@
+import { Canvas } from "skia-canvas";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Grid, outline } from "@andornaut/art-kit/grid";
@@ -6,9 +7,9 @@ import {
   flipped,
   opaque_rows,
   opaque_cols,
-  to_image,
-  tile_sheet,
-  contact_sheet,
+  renderFrame,
+  composeSheet,
+  renderContactSheet,
 } from "@andornaut/art-kit/frames";
 
 test("grid truncates coordinates, resolves own palette keys and keeps Bresenham ties", () => {
@@ -53,7 +54,7 @@ test("pixel-centred shapes and triangle boundaries remain explicit", () => {
     ["f", null],
   ]);
 });
-test("frame extents, reflection and RGBA conversion retain transparent pixels", () => {
+test("frame extents, reflection and Canvas rendering retain transparent pixels", () => {
   const f = [
     [null, "ff0000"],
     [null, null],
@@ -66,39 +67,75 @@ test("frame extents, reflection and RGBA conversion retain transparent pixels", 
     [null, null],
   ]);
   assert.deepEqual(
-    [...to_image(f).data],
+    pixels(renderFrame({}, f)),
     [0, 0, 0, 0, 255, 0, 0, 255, 0, 0, 0, 0, 0, 0, 0, 0],
   );
 });
-test("tile sheet source-over blends overlapping tiles instead of overwriting", () => {
-  const tiles = [
-    {
-      width: 2,
-      height: 1,
-      data: Uint8Array.from([255, 0, 0, 255, 255, 0, 0, 128]),
-    },
-    { width: 1, height: 1, data: Uint8Array.from([0, 0, 255, 128]) },
-  ];
+test("sheet places and clips cells in order, leaving unused cells transparent", () => {
+  const wide = renderFrame({}, [["ff0000", "ff0000"]]);
+  const blue = renderFrame({}, [["0000ff"]]);
+  const sheet = composeSheet({ columns: 2, cellWidth: 1, cellHeight: 1 }, [
+    wide,
+    blue,
+    blue,
+  ]);
   assert.deepEqual(
-    [...tile_sheet(1, 2, tiles).data],
-    [255, 0, 0, 255, 85, 0, 170, 192],
+    pixels(sheet),
+    [255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0],
   );
+  assert.equal(sheet.gpu, false);
 });
-test("contact sheet preserves ground rows, frame order, nearest scaling and gaps", () => {
-  const image = contact_sheet(
-    (c) => rgb(c),
-    [["sprite", [["tag", [[[null, "ff0000"]]], 100]]]],
+test("contact sheet preserves ground rows, tag order, nearest scaling and gaps", () => {
+  const image = renderContactSheet(
+    { resolveRgb: rgb, background: [9, 8, 7], scale: 2, gap: 1 },
+    [
+      [
+        "sprite",
+        [
+          ["one", [[[null, "ff0000"]]], 100],
+          ["two", [[["ffffff", null]]], 100],
+        ],
+      ],
+    ],
     ["00ff00", "0000ff"],
-    { background: [9, 8, 7], scale: 2, gap: 1 },
   );
-  assert.equal(image.width, 6);
+  assert.equal(image.width, 12);
   assert.equal(image.height, 8);
-  assert.deepEqual([...image.data.slice(0, 4)], [0, 255, 0, 255]);
+  const pixel = (x, y) =>
+    pixels(image).slice(
+      (y * image.width + x) * 4,
+      (y * image.width + x) * 4 + 4,
+    );
+  assert.deepEqual(pixel(0, 0), [0, 255, 0, 255]);
+  assert.deepEqual(pixel(1, 1), [0, 255, 0, 255]);
+  assert.deepEqual(pixel(0, 4), [0, 0, 255, 255]);
+  assert.deepEqual(pixel(4, 0), [9, 8, 7, 255]);
+  assert.deepEqual(pixel(6, 0), [255, 255, 255, 255]);
+});
+test("renderFrame resolves palette or callback without mutating authored frames", () => {
+  const frame = [["fill", null]];
   assert.deepEqual(
-    [...image.data.slice(4 * 6 * 4, 4 * 6 * 4 + 4)],
-    [0, 0, 255, 255],
+    pixels(renderFrame({ fill: "123456" }, frame)),
+    [18, 52, 86, 255, 0, 0, 0, 0],
   );
-  assert.deepEqual([...image.data.slice(4 * 4, 4 * 5)], [9, 8, 7, 255]);
+  assert.deepEqual(
+    pixels(renderFrame({ resolveRgb: () => [1, 2, 3] }, frame)),
+    [1, 2, 3, 255, 0, 0, 0, 0],
+  );
+  assert.deepEqual(frame, [["fill", null]]);
+});
+test("invalid layouts and ragged frames fail explicitly", () => {
+  assert.throws(() => renderFrame({}, []), RangeError);
+  assert.throws(() => renderFrame({}, [[null], []]), RangeError);
+  assert.throws(
+    () => composeSheet({ columns: 0, cellWidth: 1, cellHeight: 1 }, []),
+    RangeError,
+  );
+  assert.throws(
+    () =>
+      renderContactSheet({ resolveRgb: rgb, background: [0, 0, 0] }, [], []),
+    RangeError,
+  );
 });
 test("hex channels and WCAG contrast", () => {
   assert.deepEqual(rgb("01aBff"), [1, 171, 255]);
@@ -109,4 +146,25 @@ test("opaque extents handle a large solid frame without argument spreading", () 
   const frame = Array.from({ length: 512 }, () => Array(512).fill("ffffff"));
   assert.deepEqual(opaque_rows([frame]), [0, 511]);
   assert.deepEqual(opaque_cols([frame]), [0, 511]);
+});
+
+function pixels(canvas) {
+  return [
+    ...canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height)
+      .data,
+  ];
+}
+test("sheet uses native Skia source-over semantics for translucent inputs", () => {
+  const image = new Canvas(1, 1);
+  image.gpu = false;
+  const ctx = image.getContext("2d");
+  ctx.fillStyle = "rgba(255,0,0,0.5)";
+  ctx.fillRect(0, 0, 1, 1);
+  ctx.fillStyle = "rgba(0,0,255,0.5)";
+  ctx.fillRect(0, 0, 1, 1);
+  const sheet = composeSheet({ columns: 1, cellWidth: 1, cellHeight: 1 }, [
+    image,
+  ]);
+  assert.deepEqual(pixels(sheet), pixels(image));
+  assert.ok(pixels(sheet)[3] > 128 && pixels(sheet)[3] < 255);
 });

@@ -1,37 +1,6 @@
-/*
- * The fixed-point source-over calculation in tile_sheet follows Pillow.
- * https://github.com/python-pillow/Pillow/blob/13.0.0/src/libImaging/AlphaComposite.c
- *
- * The Python Imaging Library (PIL) is
- * Copyright © 1997-2011 by Secret Labs AB
- * Copyright © 1995-2011 by Fredrik Lundh and contributors
- * Pillow is the friendly PIL fork. It is
- * Copyright © 2010 by Jeffrey 'Alex' Clark and contributors
- * Like PIL, Pillow is licensed under the open source MIT-CMU License:
- *
- * By obtaining, using, and/or copying this software and/or its associated
- * documentation, you agree that you have read, understood, and will comply
- * with the following terms and conditions:
- *
- * Permission to use, copy, modify and distribute this software and its
- * documentation for any purpose and without fee is hereby granted,
- * provided that the above copyright notice appears in all copies, and that
- * both that copyright notice and this permission notice appear in supporting
- * documentation, and that the name of Secret Labs AB or the author not be
- * used in advertising or publicity pertaining to distribution of the software
- * without specific, written prior permission.
- *
- * SECRET LABS AB AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS
- * SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
- * IN NO EVENT SHALL SECRET LABS AB OR THE AUTHOR BE LIABLE FOR ANY SPECIAL,
- * INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
- * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
- * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
- * PERFORMANCE OF THIS SOFTWARE.
- */
+import { Canvas } from "skia-canvas";
 import { rgb } from "./colour.js";
-import type { Colour, Frame } from "./grid.js";
-import { blankImage, type RgbaImage } from "./rgbaImage.js";
+import type { Frame } from "./grid.js";
 
 export function opaque_rows(frames: readonly Frame[]): [number, number] | null {
   let min = Infinity;
@@ -64,119 +33,151 @@ export function opaque_cols(frames: readonly Frame[]): [number, number] | null {
 export function flipped(frame: Frame): Frame {
   return frame.map((row) => [...row].reverse());
 }
-export function to_image(frame: Frame): RgbaImage {
-  const image = blankImage(frame[0].length, frame.length);
-  frame.forEach((row, y) =>
-    row.forEach((colour, x) => {
-      if (colour)
-        image.data.set([...rgb(colour), 255], (y * image.width + x) * 4);
-    }),
-  );
-  return image;
-}
 export type Rgb = readonly [number, number, number];
+export type ColourContext =
+  | Readonly<Record<string, string>>
+  | {
+      resolveRgb: (colour: string) => Rgb;
+    };
 export type Tag = readonly [
   name: string,
   frames: readonly Frame[],
   duration: unknown,
 ];
 export type Sprite = readonly [name: string, tags: readonly Tag[]];
-export interface ContactSheetOptions {
-  background: Rgb;
-  scale?: number;
-  gap?: number;
+
+function positive(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0;
+}
+function surface(width: number, height: number): Canvas {
+  if (!positive(width) || !positive(height))
+    throw new RangeError("Canvas dimensions must be positive safe integers");
+  const canvas = new Canvas(width, height);
+  canvas.gpu = false;
+  canvas.getContext("2d").imageSmoothingEnabled = false;
+  return canvas;
+}
+function css([r, g, b]: Rgb): string {
+  return `rgb(${r},${g},${b})`;
 }
 
-/** Returns opaque RGBA pixels; names and durations do not affect preview order. */
-export function contact_sheet(
-  resolve_rgb: (colour: string) => Rgb,
+/** Returns a CPU Canvas with transparent empty cells and opaque resolved colours. */
+export function renderFrame(context: ColourContext, frame: Frame): Canvas {
+  const width = frame[0]?.length ?? 0;
+  if (frame.some((row) => row.length !== width))
+    throw new RangeError("Frame rows must have equal widths");
+  const canvas = surface(width, frame.length),
+    ctx = canvas.getContext("2d");
+  const resolve =
+    typeof context.resolveRgb === "function"
+      ? context.resolveRgb
+      : (colour: string) =>
+          rgb(
+            Object.hasOwn(context, colour)
+              ? (context as Readonly<Record<string, string>>)[colour]
+              : colour,
+          );
+  frame.forEach((row, y) =>
+    row.forEach((colour, x) => {
+      if (colour) {
+        ctx.fillStyle = css(resolve(colour));
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }),
+  );
+  return canvas;
+}
+
+/** Places images in row order without scaling; each image is clipped to its cell. */
+export function composeSheet(
+  {
+    columns,
+    cellWidth,
+    cellHeight,
+  }: { columns: number; cellWidth: number; cellHeight: number },
+  images: readonly Canvas[],
+): Canvas {
+  if (![columns, cellWidth, cellHeight].every(positive) || !images.length)
+    throw new RangeError(
+      "Sheet requires positive integer dimensions and images",
+    );
+  const canvas = surface(
+    columns * cellWidth,
+    Math.ceil(images.length / columns) * cellHeight,
+  );
+  const ctx = canvas.getContext("2d");
+  images.forEach((image, i) => {
+    const x = (i % columns) * cellWidth,
+      y = Math.floor(i / columns) * cellHeight;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x, y, cellWidth, cellHeight);
+    ctx.clip();
+    ctx.drawImage(image, x, y);
+    ctx.restore();
+  });
+  return canvas;
+}
+
+/** Returns an opaque preview Canvas; tags flatten in order, one row per ground. */
+export function renderContactSheet(
+  {
+    resolveRgb,
+    background,
+    scale = 3,
+    gap = 4,
+  }: {
+    resolveRgb: (colour: string) => Rgb;
+    background: Rgb;
+    scale?: number;
+    gap?: number;
+  },
   sprites: readonly Sprite[],
   grounds: readonly string[],
-  { background, scale = 3, gap = 4 }: ContactSheetOptions,
-): RgbaImage {
-  if (
-    !Number.isInteger(scale) ||
-    scale < 1 ||
-    !Number.isInteger(gap) ||
-    gap < 0
-  )
-    throw new RangeError("Invalid preview scale or gap");
+): Canvas {
+  if (!positive(scale) || !Number.isSafeInteger(gap) || gap < 0)
+    throw new RangeError(
+      "Preview scale must be positive and gap nonnegative integers",
+    );
   const rows = sprites.flatMap(([, tags]) => {
     const frames = tags.flatMap(([, frames]) => frames);
     return grounds.map((ground) => ({ frames, ground }));
   });
   if (!rows.length || rows.some(({ frames }) => !frames.length))
     throw new RangeError("Contact sheet requires frames and grounds");
-  const cellWidth =
-    Math.max(...rows.map(({ frames }) => frames[0][0].length)) + gap;
-  const heights = rows.map(({ frames }) => frames[0].length + gap);
-  const width =
-    Math.max(...rows.map(({ frames }) => frames.length)) * cellWidth * scale;
-  const image = blankImage(width, heights.reduce((a, b) => a + b, 0) * scale);
-  for (let i = 0; i < image.data.length; i += 4)
-    image.data.set([...background, 255], i);
-  let y0 = 0;
-  rows.forEach(({ frames, ground }, r) => {
-    frames.forEach((frame, i) =>
-      frame.forEach((row, y) =>
-        row.forEach((colour, x) => {
-          const pixel = [...resolve_rgb(colour || ground), 255];
-          for (let sy = 0; sy < scale; sy++)
-            for (let sx = 0; sx < scale; sx++) {
-              const xx = (i * cellWidth + x) * scale + sx,
-                yy = (y0 + y) * scale + sy;
-              if (xx >= 0 && xx < width && yy >= 0 && yy < image.height)
-                image.data.set(pixel, (yy * width + xx) * 4);
-            }
-        }),
-      ),
-    );
-    y0 += heights[r];
+  let cellWidth = 0,
+    columns = 0,
+    height = 0;
+  const heights = rows.map(({ frames }) => {
+    let rowHeight = 0;
+    for (const frame of frames) {
+      cellWidth = Math.max(cellWidth, frame[0]?.length ?? 0);
+      rowHeight = Math.max(rowHeight, frame.length);
+    }
+    columns = Math.max(columns, frames.length);
+    height += rowHeight + gap;
+    return rowHeight;
   });
-  return image;
-}
-
-/** Pillow's integer source-over arithmetic avoids Canvas premultiplication loss. */
-export function tile_sheet(
-  tile_size: number,
-  columns: number,
-  tiles: readonly RgbaImage[],
-): RgbaImage {
-  if (
-    !Number.isInteger(tile_size) ||
-    tile_size < 1 ||
-    !Number.isInteger(columns) ||
-    columns < 1
-  )
-    throw new RangeError("Tile size and columns must be positive integers");
-  const image = blankImage(
-    columns * tile_size,
-    Math.ceil(tiles.length / columns) * tile_size,
-  );
-  const shift = (a: number): number =>
-    Math.floor((Math.floor(a / 256) + a) / 256);
-  tiles.forEach((tile, i) => {
-    const left = (i % columns) * tile_size,
-      top = Math.floor(i / columns) * tile_size;
-    for (let y = 0; y < tile.height && top + y < image.height; y++)
-      for (let x = 0; x < tile.width && left + x < image.width; x++) {
-        const src = (y * tile.width + x) * 4,
-          dst = ((top + y) * image.width + left + x) * 4;
-        const sa = tile.data[src + 3],
-          da = image.data[dst + 3];
-        if (!sa) continue;
-        const blend = da * (255 - sa),
-          alpha = sa * 255 + blend;
-        const c1 = Math.floor((sa * 255 * 255 * 128) / alpha),
-          c2 = 255 * 128 - c1;
-        for (let c = 0; c < 3; c++)
-          image.data[dst + c] = Math.floor(
-            shift(
-              tile.data[src + c] * c1 + image.data[dst + c] * c2 + 128 * 128,
-            ) / 128,
-          );
-        image.data[dst + 3] = shift(alpha + 128);
-      }
+  const canvas = surface(columns * (cellWidth + gap) * scale, height * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = css(background);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  let top = 0;
+  rows.forEach(({ frames, ground }, row) => {
+    frames.forEach((frame, column) => {
+      const image = renderFrame({ resolveRgb }, frame);
+      const x = column * (cellWidth + gap) * scale;
+      ctx.fillStyle = css(resolveRgb(ground));
+      ctx.fillRect(x, top * scale, image.width * scale, image.height * scale);
+      ctx.drawImage(
+        image,
+        x,
+        top * scale,
+        image.width * scale,
+        image.height * scale,
+      );
+    });
+    top += heights[row] + gap;
   });
-  return image;
+  return canvas;
 }
