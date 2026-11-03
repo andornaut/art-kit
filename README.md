@@ -56,15 +56,25 @@ Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geomet
 
 ## Side-by-side drawing and font implementations
 
-The Node package also exports `aseprite`, `colour`, `fonts`, `frames` and `grid` alongside the Python modules. These are independent TypeScript implementations, not Python subprocess adapters. Existing Python APIs remain unchanged. Install the optional exact peer `canvas@3.2.3` for the Node font module; existing codec-only imports do not require it.
+Python remains available alongside the Node `aseprite`, `colour`, `fonts`, `frames` and `grid` modules. Existing Python APIs and Node atlas/codecs remain unchanged. TypeScript generation uses CPU Skia canvases, not Python subprocesses or Pillow emulation. Install the optional exact peer `skia-canvas@4.0.0` for `frames` and `fonts`; codec-only imports do not require it.
 
-Node frames use the existing structural `RgbaImage` buffer. Drawing and frame helpers retain Python-style names; fonts expose `rasterizeGlyph`, `rasterize`, `pack` and `bmfontXml`. Node Aseprite export is asynchronous and retains explicit executable and output paths.
+`frames.renderFrame(paletteOrResolver, frame)`, `composeSheet({columns, cellWidth, cellHeight}, images)` and `renderContactSheet(options, sprites, grounds)` return Canvas objects. Keep those objects through composition and use their `saveAs` or `toBuffer` methods at the output boundary. Composition uses Skia source-over and nearest-neighbour image scaling, without promising preservation of arbitrary invisible RGB or Pillow rounding. Exact RGBA copy/extrusion remains in the separate buffer APIs.
 
-Canvas/Pango font coverage is not pixel-identical to Pillow. Registered fonts can use system fallback for missing characters; the Canvas API cannot disable that fallback. Native font sizes, signed ink offsets, empty advances and caller-owned kerning are retained, but these implementations are not interchangeable font-output engines. Consumers retain their existing implementation until separately approved adoption.
+`fonts.buildBitmapFont({path, size, key, characters, atlasWidth, ...})` returns `{image, xml, metadata}`. It measures and renders directly into the final CPU atlas. Antialiasing and hinting default to true; synthesis and cross-glyph ligature/contextual substitutions are disabled. Callers may specify padding, maximum height, line height and the pairs for which kerning is derived. Font files remain immutable after registration. System fallback remains possible; callers provide covered characters when file-only selection matters.
 
-The fixed-point tile compositor includes Pillow-derived arithmetic. Its copyright, permission and disclaimer are retained in the source and distributed `LICENSE`; helper code otherwise remains MIT licensed. Consumer font and art licences are unchanged.
+```ts
+import { buildBitmapFont } from '@andornaut/art-kit/fonts';
+import { writeFile } from 'node:fs/promises';
 
-See [implementation comparison](docs/implementation-comparison.md) for measured differences, scope and the recommendation.
+const font = buildBitmapFont({
+  path: 'body.ttf', size: 16, key: 'body',
+  characters: ' ABCDEFGHIJKLMNOPQRSTUVWXYZ', atlasWidth: 256,
+});
+await font.image.saveAs('body.png');
+await writeFile('body.fnt', font.xml);
+```
+
+Version 0.8 replaces the 0.7 Node frame conversion/composition and low-level font APIs without compatibility aliases. Python and existing Node atlas/codec consumers need no API changes. See [implementation comparison](docs/implementation-comparison.md) for measured size, output quality and the recommendation. No consumer assets, font choices or dependency pins change automatically.
 
 ## Runtime and checks
 

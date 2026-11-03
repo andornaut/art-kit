@@ -1,29 +1,36 @@
-# Python and TypeScript implementations
+# Python and Skia TypeScript implementations
 
-Both implementations remain supported side by side. Python is the recommended default for existing production art generators. Existing Node atlas and codec consumers remain appropriate Node clients.
+Both implementations remain available. Prefer the Skia TypeScript generation API when a cohesive Node-native workflow is the priority and its rendering is acceptable. Retain Python/Pillow for existing generators whose smaller implementation or established output matters. Neither language has a demonstrated universal font-quality advantage. Adoption and Python retirement are separate decisions.
+
+## Maintained code and API
 
 | Area | Python source lines | TypeScript source lines |
 | --- | ---: | ---: |
-| Colour, including colour-space conversions | 109 | 123 |
+| Colour | 109 | 123 |
 | Grid | 113 | 185 |
-| Frames and composition | 71 | 182 |
-| Fonts | 109 | 166 |
+| Frames and composition | 71 | 183 |
+| Fonts | 109 | 213 |
 | Aseprite | 105 | 109 |
-| Total | 507 | 765 |
+| Total | 507 | 813 |
 
-Physical source lines include types, whitespace, comments and a 31-line third-party notice in TypeScript frames. Tests, existing Node atlas/codecs and tooling are excluded. Formatting differs; these figures describe source volume, not a precise complexity metric. The additional TypeScript implementation work includes image indexing, compositing, canvas bounds/readback and font registration.
+These are physical lines including types, comments and whitespace, excluding tests, existing Node atlas/codecs and packaging. Formatting differs; the numbers are not a complexity score. The redesign does not establish a smaller source implementation. It removes custom alpha arithmetic, manually scaled pixel writes, intermediate glyph RGBA buffers and Pillow-specific rounding. TypeScript still owns typed options, input/bounds validation, packing and XML. Font construction adds native pair-kerning derivation and structured metadata.
 
-## Behaviour and dependencies
+Generation exposes renderFrame, composeSheet and renderContactSheet returning CPU Canvas objects. Keep those surfaces through composition and encode at the boundary. buildBitmapFont replaces separate rasterize/pack/XML calls with one font-and-atlas operation. Existing exact-copy buffer utilities and codecs remain separate and unchanged. This reduces caller assembly and renderer-specific buffer handling, rather than the total source-line count.
 
-- Grid and Aseprite are close algorithmic ports. Aseprite uses asynchronous Node processes with explicit paths and arguments; its tests exercise a fake executable rather than regenerate consumer assets.
-- Frames return structural RGBA buffers. Python contact sheets are RGB images; Node sheets have opaque alpha. Tile composition retains explicit Pillow-derived integer arithmetic to avoid Canvas premultiplication loss. This is additional maintained code and carries the notice in LICENSE.
-- Fonts use optional canvas 3.2.3 with Cairo/Pango. The comparison fixture covers eleven glyphs in Liberation Sans Regular/Bold at size 16, in both rendering modes. Advances and ascent/descent match that fixture; grayscale ink coverage differs for every tested ink glyph, and bold period bounds differ. Binary coverage and some widths differ as well. This does not establish parity for other fonts or sizes.
-- Font registration uses an explicit file identity, but Pango may select system fallback for missing characters. The public Canvas API does not enforce file-only coverage. Adoption therefore requires explicit review of authored font outputs and coverage policy.
-- Both implementations retain ordered packing, signed metadata and caller-provided kerning. Node XML preserves attribute whitespace; font batches prepare their context once. These are separate implementations, not shared engines.
-- Existing codec-only imports work without canvas. Node font clients need the native optional peer. Licensed test fonts are excluded from both release payloads.
+## Font output
 
-## Validation and recommendation
+The bounded comparison uses Liberation Sans Regular/Bold at native 12, 16 and 24 px on light/dark backgrounds, including shaped text and separate glyph strips. Pillow, node-canvas and hinted Skia are visually credible. Hinted Skia looks firmer at 12 px; the renderers are close at 16 px. Unhinted Skia looks softer there. Binary node-canvas glyphs are less even in the small-text sample. These are visual assessments, not objective readability scores or a universal font ranking.
 
-The assembled isolated gate passes 19 Python tests and 34 Node tests, with no skipped Node tests, plus lint, declarations, installed-package imports and package builds. Required native font tests run with licensed fixtures. Large-frame extent regression, XML whitespace and batch context reuse cover the independent review findings. These gates validate mechanisms, not every consumer asset or every cross-runtime pixel.
+The new builder was separately checked by reconstructing regular/bold text from its actual atlas rectangles, offsets and advances at 16 px. The inspected samples are readable without visible clipping. Native tests cover bearings, spaces, atlas containment, AA/binary policy, kerning, bounds and XML. Whole-text engine shaping is not equivalent to a code-point bitmap atlas; the builder disables cross-glyph substitutions and only derives requested kerning pairs.
 
-Prefer Python/Pillow for existing art generation: it has less adapter/image code, preserves existing font output and already provides the required facilities. Prefer the existing Node atlas/codecs for build integration. The side-by-side TypeScript generator APIs remain available for an explicitly approved Node-native generator whose integration benefit justifies the extra code and different rendering. No Python retirement or consumer migration follows from this comparison.
+Skia defaults to CPU rendering, hinting and grayscale antialiasing, with synthesis disabled. Its metrics and rounding define the output, not Pillow compatibility. Missing characters may use system fallback. Files remain immutable after registration. Other fonts, scripts, browser/device scaling and game layouts are outside this fixture.
+
+## Dependencies and compatibility
+
+Skia Canvas 4.0.0 is an exact optional peer for generation modules. Codec-only clients do not need it. Both implementations still use native rendering libraries; TypeScript cohesion does not eliminate that dependency. Test fonts retain SIL OFL and are excluded from release artifacts; helper code remains MIT and consumer licences are unchanged.
+
+Version 0.8 deliberately replaces the 0.7 TypeScript generation interfaces and Canvas peer. Python APIs, generic colour spaces and existing Node atlas/RGBA/codec contracts are unchanged. No consumer migration follows automatically.
+
+## Verification
+
+The final isolated local gates pass 19 Python and 36 Node tests with zero skips, plus lint, declarations, installed-package imports and builds. The Node gate requires native licensed-font rendering and confirms old codec imports work without Skia. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.

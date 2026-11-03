@@ -46,7 +46,7 @@ function codePoint(char: string): number {
 }
 
 function quote(value: string): string {
-  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/u.test(value)) {
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(value)) {
     throw new RangeError("Invalid XML attribute character");
   }
   return `"${value
@@ -91,6 +91,9 @@ export function buildBitmapFont(options: BitmapFontOptions) {
     context.font = `${size}px "${family}"`;
     context.textBaseline = "alphabetic";
     context.fontSynthesis = false;
+    context.fontKerning = "normal";
+    // Atlas entries are separate glyphs, so pair widths must not substitute ligatures.
+    context.fontFeatureSettings = { liga: false, clig: false, dlig: false, hlig: false, rlig: false, calt: false, rclt: false };
     context.fontHinting = options.hinting ?? true;
     context.fontSmoothing = options.antialias ?? true;
     context.fillStyle = "white";

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Canvas, FontLibrary } from "skia-canvas";
 import { buildBitmapFont } from "@andornaut/art-kit/fonts";
 
 const fonts = process.env.ART_KIT_TEST_FONTS;
@@ -117,6 +118,7 @@ test("builder rejects impossible atlases and invalid input before rendering", ()
     /belong/,
   );
   assert.throws(() => buildBitmapFont({ ...opts, key: "\0" }), /XML/);
+  assert.throws(() => buildBitmapFont({ ...opts, key: "\ud800" }), /XML/);
   assert.throws(
     () => buildBitmapFont({ ...opts, path: "/missing-font.ttf" }),
     /ENOENT/,
@@ -124,4 +126,20 @@ test("builder rejects impossible atlases and invalid input before rendering", ()
   const { image, metadata } = buildBitmapFont({ ...opts, characters: " " });
   assert.ok(image.height > 0);
   assert.equal(metadata.glyphs.get(" ").width, 0);
+});
+
+
+test("pair kerning uses separate glyph positioning without ligature substitution", () => {
+  const path = `${fonts}/LiberationSans-Regular.ttf`;
+  FontLibrary.use("kerning_reference", path);
+  const context = new Canvas(1, 1).getContext("2d");
+  context.font = '16px "kerning_reference"';
+  context.fontSynthesis = false;
+  context.fontHinting = true;
+  context.fontSmoothing = true;
+  context.fontKerning = "normal";
+  context.fontFeatureSettings = { liga: false, clig: false, dlig: false, hlig: false, rlig: false, calt: false, rclt: false };
+  const pairs = [["f", "i"], ["A", "V"]];
+  const { metadata } = buildBitmapFont({ ...options(), characters: "fiAV", kerningPairs: pairs });
+  assert.deepEqual(metadata.kernings.map(k => k.amount), pairs.map(([a, b]) => Math.round(context.measureText(a + b).width - context.measureText(a).width - context.measureText(b).width)));
 });
