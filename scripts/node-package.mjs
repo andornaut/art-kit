@@ -5,6 +5,8 @@ import { join } from 'node:path';
 
 const [mode, revision] = process.argv.slice(2);
 if (!['check', 'pack'].includes(mode)) throw new Error('Expected check or pack mode');
+// Dependencies are mounted outside a conventional node_modules directory.
+process.env.NODE_PATH = '/deps';
 const root = '/work/source';
 const descriptor = JSON.parse(readFileSync(`${root}/node/package.json`, 'utf8'));
 for (const [name, expected] of Object.entries({ ...descriptor.devDependencies, ...descriptor.peerDependencies })) {
@@ -44,12 +46,12 @@ const installedManifest = JSON.parse(readFileSync(`${install}/node_modules/@ando
 if (readFileSync(`${install}/node_modules/@andornaut/art-kit/SOURCE_COMMIT`, 'utf8') !== `${revision}\n`) throw new Error('Installed source identity differs');
 if (readdirSync(`${install}/node_modules/@andornaut/art-kit`, { recursive: true }).some(path => /(?:^|\/)fixtures(?:\/|$)|\.(?:ttf|otf|woff2?)$/i.test(path))) throw new Error('Font fixtures must not be published');
 if (installedManifest.version !== version || existsSync(`${install}/node_modules/@andornaut/art-kit/src`)) throw new Error('Invalid compiled package');
-// Existing image-codec consumers do not need the optional native renderer.
-unlinkSync(`${install}/node_modules/skia-canvas`);
+// Existing image-codec consumers do not need optional rendering or font parsing.
+for (const name of ['skia-canvas', 'fontkit']) unlinkSync(`${install}/node_modules/${name}`);
 for (const subpath of ['atlasBuild', 'atlasLayout', 'indexedPng', 'png', 'rgbaImage', 'webp']) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`], { cwd: install, stdio: 'inherit' });
 }
-symlinkSync('/deps/skia-canvas', `${install}/node_modules/skia-canvas`);
+for (const name of ['skia-canvas', 'fontkit']) symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);
 for (const subpath of Object.keys(descriptor.exports)) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath.slice(2)}`)})`], { cwd: install, stdio: 'inherit' });
 }
