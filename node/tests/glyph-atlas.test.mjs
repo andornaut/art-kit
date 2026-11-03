@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { buildBitmapFontFromGlyphs as build } from '../dist/glyphAtlas.js';
+import { buildBitmapFontFromGlyphs as build } from '@andornaut/art-kit/glyphAtlas';
 const options = { key: 'a&"\n', face: 'Body\tRegular', size: 16, base: 15, lineHeight: 20, atlasWidth: 6 };
 const pixels = new Uint8Array([17, 31, 79, 0, 255, 7, 61, 1]);
 const glyph = { image: { width: 2, height: 1, data: pixels }, xoffset: -1, yoffset: -2, xadvance: 3 };
