@@ -15,15 +15,17 @@ export interface Plane {
 }
 export type Rgb = readonly [number, number, number];
 export type Rgba = readonly [number, number, number, number];
-// Structural copies of the frames types, so this subpath needs no Skia declarations.
+/** A palette of names to hex colours (other names are hex colours), or a resolver to RGB. */
 export type ColourContext =
   | Readonly<Record<string, string>>
   | { resolveRgb: (colour: string) => Rgb };
+/** A tag's name, frames and duration in milliseconds: one for every frame, or one each. */
 export type Tag = readonly [
   name: string,
   frames: readonly Frame[],
-  duration: unknown,
+  milliseconds: number | readonly number[],
 ];
+/** A sprite's name and its tags in order. */
 export type Sprite = readonly [name: string, tags: readonly Tag[]];
 export interface ContactSheetOptions {
   resolveRgb: (colour: string) => Rgb;
@@ -113,22 +115,21 @@ export function filledImage(rgba: Rgba, width: number, height: number): RgbaImag
   return { data, height, width };
 }
 
-/** Resolves frame colours as frames.renderFrame does: null cells are (0,0,0,0), others opaque. */
+/** The RGB of a frame colour name: the resolver's, or the palette entry's (else the name's) hex. */
+export function colourResolver(context: ColourContext): (colour: string) => Rgb {
+  if (typeof context.resolveRgb === "function") return context.resolveRgb as (colour: string) => Rgb;
+  const palette = context as Readonly<Record<string, string>>;
+  return (name) => rgb(Object.hasOwn(palette, name) ? palette[name] : name);
+}
+
+/** The frame as an image: null cells are (0,0,0,0), others their resolved colour, opaque. */
 export function frameToRgba(context: ColourContext, frame: Frame): RgbaImage {
   const width = frame[0]?.length ?? 0;
   if (frame.some((row) => row.length !== width))
     throw new RangeError("Frame rows must have equal widths");
   positive(width, "Frame width");
   positive(frame.length, "Frame height");
-  const resolve =
-    typeof context.resolveRgb === "function"
-      ? (context.resolveRgb as (colour: string) => Rgb)
-      : (name: string) =>
-          rgb(
-            Object.hasOwn(context, name)
-              ? (context as Readonly<Record<string, string>>)[name]
-              : name,
-          );
+  const resolve = colourResolver(context);
   const out = { data: new Uint8Array(width * frame.length * 4), height: frame.length, width };
   frame.forEach((row, y) =>
     row.forEach((name, x) => {

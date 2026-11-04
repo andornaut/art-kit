@@ -1,12 +1,10 @@
 import { Canvas } from "skia-canvas";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Grid } from "@andornaut/art-kit/grid";
+import { Grid, opaqueCols, opaqueRows } from "@andornaut/art-kit/grid";
 import { rgb, contrast } from "@andornaut/art-kit/colour";
 import {
   flipped,
-  opaque_rows,
-  opaque_cols,
   renderFrame,
   composeSheet,
   renderContactSheet,
@@ -67,9 +65,9 @@ test("frame extents, reflection and Canvas rendering retain transparent pixels",
     [null, "ff0000"],
     [null, null],
   ];
-  assert.deepEqual(opaque_rows([f]), [0, 0]);
-  assert.deepEqual(opaque_cols([f]), [1, 1]);
-  assert.equal(opaque_rows([[[null]]]), null);
+  assert.deepEqual(opaqueRows([f]), [0, 0]);
+  assert.deepEqual(opaqueCols([f]), [1, 1]);
+  assert.equal(opaqueRows([[[null]]]), null);
   assert.deepEqual(flipped(f), [
     ["ff0000", null],
     [null, null],
@@ -154,8 +152,8 @@ test("hex channels and WCAG contrast", () => {
 
 test("opaque extents handle a large solid frame without argument spreading", () => {
   const frame = Array.from({ length: 512 }, () => Array(512).fill("ffffff"));
-  assert.deepEqual(opaque_rows([frame]), [0, 511]);
-  assert.deepEqual(opaque_cols([frame]), [0, 511]);
+  assert.deepEqual(opaqueRows([frame]), [0, 511]);
+  assert.deepEqual(opaqueCols([frame]), [0, 511]);
 });
 
 function pixels(canvas) {

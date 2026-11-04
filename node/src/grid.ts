@@ -43,6 +43,38 @@ function outline(
   return out;
 }
 
+/** The first and last rows holding any colour across frames, or null when every frame is clear. */
+export function opaqueRows(frames: readonly Frame[]): [number, number] | null {
+  let min = Infinity;
+  let max = -1;
+  for (const frame of frames) {
+    for (let y = 0; y < frame.length; y++) {
+      if (frame[y].some(Boolean)) {
+        min = Math.min(min, y);
+        max = Math.max(max, y);
+      }
+    }
+  }
+  return max < 0 ? null : [min, max];
+}
+
+/** The first and last columns holding any colour across frames, or null when every frame is clear. */
+export function opaqueCols(frames: readonly Frame[]): [number, number] | null {
+  let min = Infinity;
+  let max = -1;
+  for (const frame of frames) {
+    for (const row of frame) {
+      for (let x = 0; x < row.length; x++) {
+        if (row[x]) {
+          min = Math.min(min, x);
+          max = Math.max(max, x);
+        }
+      }
+    }
+  }
+  return max < 0 ? null : [min, max];
+}
+
 export class Grid {
   px: Frame;
   close = false;

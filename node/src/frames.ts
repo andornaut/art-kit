@@ -1,51 +1,12 @@
 import { Canvas } from "skia-canvas";
-import { rgb } from "./colour.js";
 import type { Frame } from "./grid.js";
+import { colourResolver, type ColourContext, type Rgb, type Sprite } from "./raster.js";
 
-export function opaque_rows(frames: readonly Frame[]): [number, number] | null {
-  let min = Infinity;
-  let max = -1;
-  for (const frame of frames) {
-    for (let y = 0; y < frame.length; y++) {
-      if (frame[y].some(Boolean)) {
-        min = Math.min(min, y);
-        max = Math.max(max, y);
-      }
-    }
-  }
-  return max < 0 ? null : [min, max];
-}
-export function opaque_cols(frames: readonly Frame[]): [number, number] | null {
-  let min = Infinity;
-  let max = -1;
-  for (const frame of frames) {
-    for (const row of frame) {
-      for (let x = 0; x < row.length; x++) {
-        if (row[x]) {
-          min = Math.min(min, x);
-          max = Math.max(max, x);
-        }
-      }
-    }
-  }
-  return max < 0 ? null : [min, max];
-}
+export type { ColourContext, Rgb, Sprite, Tag } from "./raster.js";
+
 export function flipped(frame: Frame): Frame {
   return frame.map((row) => [...row].reverse());
 }
-export type Rgb = readonly [number, number, number];
-export type ColourContext =
-  | Readonly<Record<string, string>>
-  | {
-      resolveRgb: (colour: string) => Rgb;
-    };
-export type Tag = readonly [
-  name: string,
-  frames: readonly Frame[],
-  duration: unknown,
-];
-export type Sprite = readonly [name: string, tags: readonly Tag[]];
-
 function positive(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0;
 }
@@ -68,15 +29,7 @@ export function renderFrame(context: ColourContext, frame: Frame): Canvas {
     throw new RangeError("Frame rows must have equal widths");
   const canvas = surface(width, frame.length),
     ctx = canvas.getContext("2d");
-  const resolve =
-    typeof context.resolveRgb === "function"
-      ? context.resolveRgb
-      : (colour: string) =>
-          rgb(
-            Object.hasOwn(context, colour)
-              ? (context as Readonly<Record<string, string>>)[colour]
-              : colour,
-          );
+  const resolve = colourResolver(context);
   frame.forEach((row, y) =>
     row.forEach((colour, x) => {
       if (colour) {

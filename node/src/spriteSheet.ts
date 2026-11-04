@@ -8,10 +8,10 @@ import { rgb } from "./colour.js";
 import { deflateChunks } from "./deflate.js";
 import type { Frame } from "./grid.js";
 import { pngFile } from "./pngChunks.js";
+import type { Tag } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
-// A tag's name, frames and duration in milliseconds: one for every frame, or one each.
-export type Tag = readonly [name: string, frames: readonly Frame[], milliseconds: number | readonly number[]];
+export type { Tag } from "./raster.js";
 // Nine-slice margins in pixels from each frame edge.
 export type Margins = readonly [left: number, top: number, right: number, bottom: number];
 
