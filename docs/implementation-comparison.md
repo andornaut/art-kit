@@ -4,12 +4,12 @@
 
 ## Maintained code and API
 
-| Area | TypeScript source lines |
-| --- | ---: |
-| Colour | 115 |
-| Grid | 223 |
-| Fonts and packing | 294 |
-| Total | 632 |
+| Area              | TypeScript source lines |
+| ----------------- | ----------------------: |
+| Colour            |                     115 |
+| Grid              |                     223 |
+| Fonts and packing |                     294 |
+| Total             |                     632 |
 
 These are physical lines including types, comments and whitespace, excluding tests, `raster`, the atlas/codec modules and packaging. The fonts total includes rasterization (160) and supplied-glyph assembly (134). The numbers are not a complexity score. Glyph rasterization has no custom alpha arithmetic or Pillow-specific rounding. TypeScript owns typed options, input validation, packing and XML.
 

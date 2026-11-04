@@ -13,14 +13,8 @@ const FILTER_NONE = 0;
 // Each pixel's palette index and the palette as RGBA values (R in the high byte), or undefined
 // when image has more than MAX_PALETTE distinct RGBA values. Entries that are not fully opaque
 // come first, so tRNS can end at the last of them, then the most used.
-function paletteOf(
-  image: RgbaImage,
-): { indices: Uint8Array; palette: number[] } | undefined {
-  const view = new DataView(
-    image.data.buffer,
-    image.data.byteOffset,
-    image.data.byteLength,
-  );
+function paletteOf(image: RgbaImage): { indices: Uint8Array; palette: number[] } | undefined {
+  const view = new DataView(image.data.buffer, image.data.byteOffset, image.data.byteLength);
   const pixels = new Uint32Array(image.width * image.height);
   const counts = new Map<number, number>();
   for (let i = 0; i < pixels.length; i++) {
@@ -33,10 +27,7 @@ function paletteOf(
   }
   const opaque = (rgba: number) => Number((rgba & 0xff) === 0xff);
   const palette = [...counts.keys()].sort(
-    (a, b) =>
-      opaque(a) - opaque(b) ||
-      (counts.get(b) ?? 0) - (counts.get(a) ?? 0) ||
-      a - b,
+    (a, b) => opaque(a) - opaque(b) || (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a - b,
   );
   const indexOf = new Map(palette.map((rgba, index) => [rgba, index]));
   const indices = new Uint8Array(pixels.length);
@@ -73,11 +64,7 @@ export function encodeIndexedPng(
   headerView.setUint32(4, height);
   header.set([8, COLOUR_TYPE_INDEXED, 0, 0, 0], 8);
   const plte = new Uint8Array(
-    palette.flatMap((rgba) => [
-      rgba >>> 24,
-      (rgba >>> 16) & 0xff,
-      (rgba >>> 8) & 0xff,
-    ]),
+    palette.flatMap((rgba) => [rgba >>> 24, (rgba >>> 16) & 0xff, (rgba >>> 8) & 0xff]),
   );
   const trns = new Uint8Array(
     palette.filter((rgba) => (rgba & 0xff) !== 0xff).map((rgba) => rgba & 0xff),

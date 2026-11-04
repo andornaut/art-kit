@@ -52,17 +52,13 @@ export async function buildAtlasPages<M>(
         const image = decoded?.get(source);
         sources.set(
           source,
-          image === undefined
-            ? read(source).then(decode)
-            : Promise.resolve(image),
+          image === undefined ? read(source).then(decode) : Promise.resolve(image),
         );
       }
     }
   }
   const images = new Map(
-    await Promise.all(
-      [...sources].map(async ([key, image]) => [key, await image] as const),
-    ),
+    await Promise.all([...sources].map(async ([key, image]) => [key, await image] as const)),
   );
   return Promise.all(
     pages.map(async (page) => {

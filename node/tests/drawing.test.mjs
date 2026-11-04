@@ -74,15 +74,8 @@ test("frame extents, reflection and RGBA rendering retain transparent pixels", (
 test("sheet places and clips cells in order, leaving unused cells transparent", () => {
   const wide = frameToRgba({}, [["ff0000", "ff0000"]]);
   const blue = frameToRgba({}, [["0000ff"]]);
-  const sheet = composeSheet({ columns: 2, cellWidth: 1, cellHeight: 1 }, [
-    wide,
-    blue,
-    blue,
-  ]);
-  assert.deepEqual(
-    [...sheet.data],
-    [255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0],
-  );
+  const sheet = composeSheet({ columns: 2, cellWidth: 1, cellHeight: 1 }, [wide, blue, blue]);
+  assert.deepEqual([...sheet.data], [255, 0, 0, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 0, 0]);
 });
 test("sheet copies RGBA exactly, including partial alpha and RGB under clear alpha", () => {
   const image = { width: 2, height: 1, data: Uint8Array.of(10, 20, 30, 128, 40, 50, 60, 0) };
@@ -107,7 +100,9 @@ test("contact sheet preserves ground rows, tag order, nearest scaling and gaps",
   );
   assert.equal(image.width, 12);
   assert.equal(image.height, 8);
-  const pixel = (x, y) => [...image.data.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 4)];
+  const pixel = (x, y) => [
+    ...image.data.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 4),
+  ];
   assert.deepEqual(pixel(0, 0), [0, 255, 0, 255]);
   assert.deepEqual(pixel(1, 1), [0, 255, 0, 255]);
   assert.deepEqual(pixel(0, 4), [0, 0, 255, 255]);
@@ -117,16 +112,28 @@ test("contact sheet preserves ground rows, tag order, nearest scaling and gaps",
 test("frameToRgba resolves palette or callback without mutating authored frames", () => {
   const frame = [["fill", null]];
   assert.deepEqual([...frameToRgba({ fill: "123456" }, frame).data], [18, 52, 86, 255, 0, 0, 0, 0]);
-  assert.deepEqual([...frameToRgba({ resolveRgb: () => [1, 2, 3] }, frame).data], [1, 2, 3, 255, 0, 0, 0, 0]);
+  assert.deepEqual(
+    [...frameToRgba({ resolveRgb: () => [1, 2, 3] }, frame).data],
+    [1, 2, 3, 255, 0, 0, 0, 0],
+  );
   assert.deepEqual(frame, [["fill", null]]);
 });
 test("invalid layouts and ragged frames fail explicitly", () => {
   assert.throws(() => frameToRgba({}, []), RangeError);
   assert.throws(() => frameToRgba({}, [[null], []]), RangeError);
-  assert.throws(() => composeSheet({ columns: 0, cellWidth: 1, cellHeight: 1 }, [frameToRgba({}, [["000000"]])]), RangeError);
+  assert.throws(
+    () =>
+      composeSheet({ columns: 0, cellWidth: 1, cellHeight: 1 }, [frameToRgba({}, [["000000"]])]),
+    RangeError,
+  );
   assert.throws(() => composeSheet({ columns: 1, cellWidth: 1, cellHeight: 1 }, []), RangeError);
   assert.throws(
-    () => composeContactSheet({ resolveRgb: rgb, background: [0, 0, 0], cellSize: "largest-frame" }, [], []),
+    () =>
+      composeContactSheet(
+        { resolveRgb: rgb, background: [0, 0, 0], cellSize: "largest-frame" },
+        [],
+        [],
+      ),
     RangeError,
   );
 });

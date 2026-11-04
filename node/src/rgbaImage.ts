@@ -33,13 +33,9 @@ export function blitExtruded(
   target: RgbaImage,
 ): void {
   for (let dy = -extrude; dy < from.height + extrude; dy++) {
-    const sourceY =
-      bounds.y +
-      Math.min(bounds.height - 1, Math.max(0, from.y - bounds.y + dy));
+    const sourceY = bounds.y + Math.min(bounds.height - 1, Math.max(0, from.y - bounds.y + dy));
     for (let dx = -extrude; dx < from.width + extrude; dx++) {
-      const sourceX =
-        bounds.x +
-        Math.min(bounds.width - 1, Math.max(0, from.x - bounds.x + dx));
+      const sourceX = bounds.x + Math.min(bounds.width - 1, Math.max(0, from.x - bounds.x + dx));
       const read = (sourceY * source.width + sourceX) * 4;
       const write = ((at.y + dy) * target.width + at.x + dx) * 4;
       target.data.set(source.data.subarray(read, read + 4), write);

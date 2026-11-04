@@ -114,7 +114,12 @@ function render(columns: number, layout: Layout): RgbaImage {
   return { data, height: sheetHeight, width: sheetWidth };
 }
 
-function json(options: SpriteSheetOptions, columns: number, layout: Layout, size: RgbaImage): string {
+function json(
+  options: SpriteSheetOptions,
+  columns: number,
+  layout: Layout,
+  size: RgbaImage,
+): string {
   const { image, key, margins } = options;
   const { durations, frames, height, ranges, width } = layout;
   const single = frames.length === 1;

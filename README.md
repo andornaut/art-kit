@@ -6,33 +6,33 @@ Shared TypeScript mechanisms for scripted pixel art and atlas builds. Source liv
 
 The compiled package includes TypeScript declarations and these public subpaths:
 
-| Subpath | Owns | Client supplies |
-| --- | --- | --- |
-| `atlasBuild` | Atlas drawing and encoded page assembly | Read/decode/encode functions, blits, extrusion and metadata |
-| `atlasLayout` | Shelf packing and candidate selection | Items, grouping, order comparator, candidate widths and size limits |
-| `build` | Sequential art build runs in dependency order, downstream selection, a byte-snapshot `--check` and a `[--check] [SET...]` command wrapper | Named build steps, their needs and the check paths |
-| `colour` | Six-digit hex RGB, WCAG contrast, sRGB to Oklab and OKLCH, and OKLCH to sRGB | Resolved hex colours, sRGB triples and OKLCH triples |
-| `draw` | Polygon, ellipse, line, arc, point, rectangle and rounded-rectangle drawing into RGBA buffers, pixel-exact with Pillow 13.0.0 | Colours, points, bounds, widths and the target image |
-| `fonts` | Skia glyph rasterization, line metrics and pair kerning | Font path, size, characters, antialiasing, hinting and kerning policy |
-| `gif` | Animated GIF encoding with exact palettes and binary alpha | Frames, durations, loop and disposal |
-| `glyphAtlas` | Atlas packing and BMFont XML for supplied RGBA glyphs | Glyph images, offsets, advances and font metrics |
-| `grid` | Shape drawing, outline traversal, opaque extents and reflection of pixel frames | Palette, colour names and edge colour rule |
-| `ico` | ICO encoding with PNG entries | One pre-sized RGBA image per entry |
-| `indexedPng` | Indexed PNG encoding | RGBA image and compression options |
-| `png` | PNG decoding to RGBA, RGBA PNG encoding and opaque RGB PNG encoding | Encoded bytes or an RGBA image and compression options |
-| `quantise` | Deterministic median-cut reduction to one shared palette | Frames and the colour limit |
-| `raster` | Straight-alpha RGBA fill, paste, compositing, crop, nearest resize and rotation, channel extraction and mapping, frame rendering, sheets and contact sheets, and the frame, tag and sprite types | Images, planes, colours, frames, colour resolver, positions, rectangles, sizes, angles and channel tables |
-| `rgbaImage` | RGBA allocation, alpha bounds and extruded blitting | Image dimensions, pixels, rectangles and bounds |
-| `spriteSheet` | Sprite sheet PNG and json-hash data byte-identical to Aseprite 1.2.30's export, without Aseprite | Key, image name, tags, optional columns and slice margins, and paths for the writer |
-| `webp` | Lossless WebP encoding | RGBA images |
+| Subpath       | Owns                                                                                                                                                                                             | Client supplies                                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `atlasBuild`  | Atlas drawing and encoded page assembly                                                                                                                                                          | Read/decode/encode functions, blits, extrusion and metadata                                               |
+| `atlasLayout` | Shelf packing and candidate selection                                                                                                                                                            | Items, grouping, order comparator, candidate widths and size limits                                       |
+| `build`       | Sequential art build runs in dependency order, downstream selection, a byte-snapshot `--check` and a `[--check] [SET...]` command wrapper                                                        | Named build steps, their needs and the check paths                                                        |
+| `colour`      | Six-digit hex RGB, WCAG contrast, sRGB to Oklab and OKLCH, and OKLCH to sRGB                                                                                                                     | Resolved hex colours, sRGB triples and OKLCH triples                                                      |
+| `draw`        | Polygon, ellipse, line, arc, point, rectangle and rounded-rectangle drawing into RGBA buffers, pixel-exact with Pillow 13.0.0                                                                    | Colours, points, bounds, widths and the target image                                                      |
+| `fonts`       | Skia glyph rasterization, line metrics and pair kerning                                                                                                                                          | Font path, size, characters, antialiasing, hinting and kerning policy                                     |
+| `gif`         | Animated GIF encoding with exact palettes and binary alpha                                                                                                                                       | Frames, durations, loop and disposal                                                                      |
+| `glyphAtlas`  | Atlas packing and BMFont XML for supplied RGBA glyphs                                                                                                                                            | Glyph images, offsets, advances and font metrics                                                          |
+| `grid`        | Shape drawing, outline traversal, opaque extents and reflection of pixel frames                                                                                                                  | Palette, colour names and edge colour rule                                                                |
+| `ico`         | ICO encoding with PNG entries                                                                                                                                                                    | One pre-sized RGBA image per entry                                                                        |
+| `indexedPng`  | Indexed PNG encoding                                                                                                                                                                             | RGBA image and compression options                                                                        |
+| `png`         | PNG decoding to RGBA, RGBA PNG encoding and opaque RGB PNG encoding                                                                                                                              | Encoded bytes or an RGBA image and compression options                                                    |
+| `quantise`    | Deterministic median-cut reduction to one shared palette                                                                                                                                         | Frames and the colour limit                                                                               |
+| `raster`      | Straight-alpha RGBA fill, paste, compositing, crop, nearest resize and rotation, channel extraction and mapping, frame rendering, sheets and contact sheets, and the frame, tag and sprite types | Images, planes, colours, frames, colour resolver, positions, rectangles, sizes, angles and channel tables |
+| `rgbaImage`   | RGBA allocation, alpha bounds and extruded blitting                                                                                                                                              | Image dimensions, pixels, rectangles and bounds                                                           |
+| `spriteSheet` | Sprite sheet PNG and json-hash data byte-identical to Aseprite 1.2.30's export, without Aseprite                                                                                                 | Key, image name, tags, optional columns and slice margins, and paths for the writer                       |
+| `webp`        | Lossless WebP encoding                                                                                                                                                                           | RGBA images                                                                                               |
 
 Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geometry and RGBA interfaces are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera/depth geometry, manifests, tile sizes, frame tags, grouping, ordering policy, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory.
 
 ```ts
-import { Grid } from '@andornaut/art-kit/grid';
+import { Grid } from "@andornaut/art-kit/grid";
 
-const grid = new Grid({ fill: 'ffffff' }, 16, 16, { edge: () => '000000' });
-grid.ell(8, 8, 4, 4, 'fill');
+const grid = new Grid({ fill: "ffffff" }, 16, 16, { edge: () => "000000" });
+grid.ell(8, 8, 4, 4, "fill");
 const frame = grid.outlined();
 ```
 
@@ -61,16 +61,19 @@ The check compares the tree before and after the rebuild, without Git, so it wor
 `buildCommand({ sets, check?, usage?, log?, error? }, argv)` handles `[--check] [SET...]` and resolves to an exit status: 0 on success; 1 for a failing build (the cause's stack, then `<set> build failed: <message>`), check differences (`A`, `D` or `M`, a tab and the path, sorted by path, then a summary) or invalid sets; and 2 for a usage error (an unknown option or set, or `--check` without check paths), followed by `usage`. `log` and `error` default to `console.log` and `console.error`. The module uses only Node built-ins and spawns nothing; a step that runs another program spawns it itself.
 
 ```ts
-import { buildCommand } from '@andornaut/art-kit/build';
+import { buildCommand } from "@andornaut/art-kit/build";
 
-process.exitCode = await buildCommand({
-  sets: {
-    sprites: { build: sprites.build },
-    silhouettes: { build: silhouettes.build, needs: ['sprites'] },
+process.exitCode = await buildCommand(
+  {
+    sets: {
+      sprites: { build: sprites.build },
+      silhouettes: { build: silhouettes.build, needs: ["sprites"] },
+    },
+    check: { paths: ["public/art"] },
+    usage: "Usage: node art/tools/build.ts [--check] [SET...]",
   },
-  check: { paths: ['public/art'] },
-  usage: 'Usage: node art/tools/build.ts [--check] [SET...]',
-}, process.argv.slice(2));
+  process.argv.slice(2),
+);
 ```
 
 ## Fonts
@@ -80,19 +83,26 @@ process.exitCode = await buildCommand({
 `fonts.rasteriseGlyphs({path, size, characters, antialias, hinting, kerning})` returns `{glyphs, base, lineHeight, ascent, descent, kernings}`. `glyphs` maps each unique character, in order, to a `glyphAtlas` `SuppliedBitmapGlyph`: the glyph drawn alone in white and trimmed to the pixels Skia covers, whose RGB is white and alpha the coverage, every other pixel (0,0,0,0), or `undefined` without ink, with integer `xoffset` from the pen, `yoffset` from the line's top and rounded `xadvance`. `base` is the face's ascent rounded up, which `yoffset` counts from, and `lineHeight` the ascent plus descent rounded up; `ascent` and `descent` are Skia's unrounded font-box values for callers with their own line policy. Antialiasing and hinting default to true; synthesis and cross-glyph ligature/contextual substitutions are disabled. Font files remain immutable after registration, and Skia may substitute a system fallback font for characters the file lacks. `kerning: "all"` evaluates all ordered pairs for at most 256 unique characters and returns nonzero integer adjustments as `GlyphKerning` values; the default `"none"` returns none.
 
 ```ts
-import { rasteriseGlyphs } from '@andornaut/art-kit/fonts';
-import { buildBitmapFontFromGlyphs } from '@andornaut/art-kit/glyphAtlas';
-import { encodeRgbaPng } from '@andornaut/art-kit/png';
-import { writeFile } from 'node:fs/promises';
+import { rasteriseGlyphs } from "@andornaut/art-kit/fonts";
+import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/glyphAtlas";
+import { encodeRgbaPng } from "@andornaut/art-kit/png";
+import { writeFile } from "node:fs/promises";
 
 const { glyphs, base, lineHeight, kernings } = rasteriseGlyphs({
-  path: 'body.ttf', size: 16, characters: ' ABCDEFGHIJKLMNOPQRSTUVWXYZ', kerning: 'all',
+  path: "body.ttf",
+  size: 16,
+  characters: " ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+  kerning: "all",
 });
 const font = buildBitmapFontFromGlyphs(
-  { key: 'body', face: 'Body', size: 16, base, lineHeight, atlasWidth: 256, kernings }, glyphs,
+  { key: "body", face: "Body", size: 16, base, lineHeight, atlasWidth: 256, kernings },
+  glyphs,
 );
-await writeFile('body.png', encodeRgbaPng({ deflateLevel: 9, deflateStrategy: 3, filterType: -1 }, font.image));
-await writeFile('body.fnt', font.xml);
+await writeFile(
+  "body.png",
+  encodeRgbaPng({ deflateLevel: 9, deflateStrategy: 3, filterType: -1 }, font.image),
+);
+await writeFile("body.fnt", font.xml);
 ```
 
 The Node tests run both games' font pipelines (rasterize, adjust and pack) over the fixture fonts and compare them byte for byte with frozen references in `node/tests/fixtures/fonts`.
@@ -107,11 +117,11 @@ Node 24.21.0 or newer with exact peer dependencies `pngjs@7.0.0` and `@jsquash/w
 
 The `scripts/*.sh` wrappers check their arguments and run `scripts/container.mts` with host Node 24.21.0 or newer, which runs TypeScript through type stripping. The module only orchestrates Docker and copies files on the host. Every check, build and provisioning step runs in a `node:24.21.0` container as the dedicated uid 19001 (`--user 19001:19001 -e HOME=/tmp`), which owns nothing on the host, with four CPUs, a read-only root, no capabilities and no network except while provisioning. Host paths are bind-mounted with `--mount type=bind,...,readonly`, never `-v`, so a missing source fails instead of being created, and must be readable by uid 19001 through their group or world bits; the container receives each mounted path's group. Writable state lives in a per-run named volume at `/tmp`, results are copied out with `docker cp` as the host user, and the container and volume are removed on exit. No host credential store or socket is mounted. Commands start only below one-minute load 24 and discard results when Git status or listed file contents change during the run.
 
-| Command | Effect |
-| --- | --- |
-| `bash scripts/provision.sh <empty-directory>` | Downloads the pinned dependencies from `node/package.json` into `node/node_modules` |
-| `bash scripts/check.sh <node_modules>` | Copies the current tree into the container, compiles it, packs and installs the tarball into `node_modules/@andornaut/art-kit`, checks that every subpath except `fonts` imports without the optional Skia peer, checks the declarations, then runs the Node tests against the installed package with `node:test`; evidence goes to a new directory under `.claude/` |
-| `bash scripts/pack.sh <node_modules> <empty-directory>` | Builds the release artifacts from the committed `HEAD` |
+| Command                                                 | Effect                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bash scripts/provision.sh <empty-directory>`           | Downloads the pinned dependencies from `node/package.json` into `node/node_modules`                                                                                                                                                                                                                                                                                  |
+| `bash scripts/check.sh <node_modules>`                  | Copies the current tree into the container, compiles it, packs and installs the tarball into `node_modules/@andornaut/art-kit`, checks that every subpath except `fonts` imports without the optional Skia peer, checks the declarations, then runs the Node tests against the installed package with `node:test`; evidence goes to a new directory under `.claude/` |
+| `bash scripts/pack.sh <node_modules> <empty-directory>` | Builds the release artifacts from the committed `HEAD`                                                                                                                                                                                                                                                                                                               |
 
 CI runs the same commands. Game projects assume library contracts are correct and test their own adapters and authored output. No game build or generation is part of the package gate.
 

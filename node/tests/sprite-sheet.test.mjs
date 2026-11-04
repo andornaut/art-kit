@@ -18,10 +18,15 @@ const reference = (name) => ({
 });
 
 // A generated case's frames are rows of palette indices, "." for clear.
-const decodeRows = (palette, rows) => rows.map((row) => [...row].map((c) => (c === "." ? null : palette[Number(c)])));
+const decodeRows = (palette, rows) =>
+  rows.map((row) => [...row].map((c) => (c === "." ? null : palette[Number(c)])));
 
 function generatedTags({ palette, tags }) {
-  return tags.map(([name, frames, ms]) => [name, frames.map((rows) => decodeRows(palette, rows)), ms]);
+  return tags.map(([name, frames, ms]) => [
+    name,
+    frames.map((rows) => decodeRows(palette, rows)),
+    ms,
+  ]);
 }
 
 // A game export's tags, read back from its sheet and data.
@@ -35,7 +40,9 @@ function exportedTags({ data, sheet }) {
         const i = ((r.y + y) * image.width + r.x + x) * 4;
         return image.data[i + 3] === 0
           ? null
-          : Array.from(image.data.subarray(i, i + 3), (v) => v.toString(16).padStart(2, "0")).join("");
+          : Array.from(image.data.subarray(i, i + 3), (v) => v.toString(16).padStart(2, "0")).join(
+              "",
+            );
       }),
     ),
   );
@@ -57,8 +64,14 @@ for (const c of cases) {
   });
 }
 
-const frame = [[null, "ff0000"], ["00ff00", null]];
-const tags = [["walk", [frame, frame], [100, 200]], ["idle", [frame], 1000]];
+const frame = [
+  [null, "ff0000"],
+  ["00ff00", null],
+];
+const tags = [
+  ["walk", [frame, frame], [100, 200]],
+  ["idle", [frame], 1000],
+];
 
 test("writeSpriteSheet creates directories and names the sheet file as meta.image", async () => {
   const scratch = await mkdtemp(join(tmpdir(), "sprite-sheet-test-"));
@@ -76,14 +89,28 @@ test("writeSpriteSheet creates directories and names the sheet file as meta.imag
 test("spriteSheet rejects invalid columns, margins, durations and frames", () => {
   const options = { key: "k", image: "k.png" };
   const cases = [
-    ...[0, -1, 1.5, true, NaN].map((columns) => [{ ...options, columns }, tags, /positive integer/]),
-    ...[[0, 0, 2, 0], [0, 1, 0, 1], [-1, 0, 0, 0], [0.5, 0, 0, 0]].map((margins) => [
-      { ...options, margins }, tags, /leave a centre/,
+    ...[0, -1, 1.5, true, NaN].map((columns) => [
+      { ...options, columns },
+      tags,
+      /positive integer/,
     ]),
+    ...[
+      [0, 0, 2, 0],
+      [0, 1, 0, 1],
+      [-1, 0, 0, 0],
+      [0.5, 0, 0, 0],
+    ].map((margins) => [{ ...options, margins }, tags, /leave a centre/]),
     [options, [["t", [frame, frame], [100]]], /one duration/],
     [options, [["t", [frame], NaN]], /finite/],
     [options, [["t", [frame, [["ff0000"]]], 100]], /2x2/],
-    [options, [["t", [frame], 100], ["empty", [], 100]], /no frames/],
+    [
+      options,
+      [
+        ["t", [frame], 100],
+        ["empty", [], 100],
+      ],
+      /no frames/,
+    ],
     [options, [], /must have pixels/],
   ];
   for (const [opts, t, error] of cases) {

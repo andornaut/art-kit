@@ -37,8 +37,7 @@ function outline(
     }
   if (close)
     for (let x = 0; x < width; x++) {
-      if (frame[height - 1][x])
-        out[height - 1][x] = edge(frame[height - 1][x]!);
+      if (frame[height - 1][x]) out[height - 1][x] = edge(frame[height - 1][x]!);
     }
   return out;
 }
@@ -97,15 +96,10 @@ export class Grid {
     x = Math.trunc(x);
     y = Math.trunc(y);
     if (x >= 0 && x < this.w && y >= 0 && y < this.h)
-      this.px[y][x] = c
-        ? Object.hasOwn(this.palette, c)
-          ? this.palette[c]
-          : c
-        : null;
+      this.px[y][x] = c ? (Object.hasOwn(this.palette, c) ? this.palette[c] : c) : null;
   }
   rect(x: number, y: number, w: number, h: number, c: Colour): void {
-    for (let j = 0; j < h; j++)
-      for (let i = 0; i < w; i++) this.p(x + i, y + j, c);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.p(x + i, y + j, c);
   }
   line(x0: number, y0: number, x1: number, y1: number, c: Colour): void {
     if (![x0, y0, x1, y1].every(Number.isInteger))
@@ -191,11 +185,7 @@ export class Grid {
         this.p(
           x,
           y,
-          sh && !inside(x, y, -shadeW)
-            ? sh
-            : li && lit && !inside(x, y, lightW)
-              ? li
-              : c,
+          sh && !inside(x, y, -shadeW) ? sh : li && lit && !inside(x, y, lightW) ? li : c,
         );
       }
   }
@@ -209,8 +199,7 @@ export class Grid {
           side(x + 0.5, y + 0.5, b, c),
           side(x + 0.5, y + 0.5, c, a),
         ];
-        if (!(ds.some((d) => d < 0) && ds.some((d) => d > 0)))
-          this.p(x, y, col);
+        if (!(ds.some((d) => d < 0) && ds.some((d) => d > 0))) this.p(x, y, col);
       }
   }
   outlined({

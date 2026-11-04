@@ -10,7 +10,12 @@ function chunkLength(pieces: readonly Uint8Array[]): number {
 }
 
 // Writes the chunk of type holding pieces in order at out[at] and returns the offset after it.
-function writeChunk(at: number, type: string, pieces: readonly Uint8Array[], out: Uint8Array): number {
+function writeChunk(
+  at: number,
+  type: string,
+  pieces: readonly Uint8Array[],
+  out: Uint8Array,
+): number {
   const view = new DataView(out.buffer, out.byteOffset, out.byteLength);
   let end = at + 8;
   for (const piece of pieces) {
@@ -24,8 +29,12 @@ function writeChunk(at: number, type: string, pieces: readonly Uint8Array[], out
 }
 
 // The signature followed by each [type, pieces] chunk in order.
-export function pngFile(chunks: readonly (readonly [type: string, pieces: readonly Uint8Array[]])[]): Uint8Array {
-  const out = new Uint8Array(chunks.reduce((total, [, pieces]) => total + chunkLength(pieces), PNG_SIGNATURE.length));
+export function pngFile(
+  chunks: readonly (readonly [type: string, pieces: readonly Uint8Array[]])[],
+): Uint8Array {
+  const out = new Uint8Array(
+    chunks.reduce((total, [, pieces]) => total + chunkLength(pieces), PNG_SIGNATURE.length),
+  );
   out.set(PNG_SIGNATURE, 0);
   let at = PNG_SIGNATURE.length;
   for (const [type, pieces] of chunks) at = writeChunk(at, type, pieces, out);

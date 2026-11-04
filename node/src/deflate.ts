@@ -48,8 +48,12 @@ const STORED_BLOCK = 0;
 const STATIC_TREES = 1;
 const DYN_TREES = 2;
 
-const EXTRA_LBITS = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
-const EXTRA_DBITS = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
+const EXTRA_LBITS = [
+  0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0,
+];
+const EXTRA_DBITS = [
+  0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13,
+];
 const EXTRA_BLBITS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7];
 const BL_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
 
@@ -88,7 +92,12 @@ interface StaticDescription {
   readonly maxLength: number;
 }
 
-function generateCodes(lens: Uint16Array, codes: Uint16Array, maxCode: number, counts: Uint16Array): void {
+function generateCodes(
+  lens: Uint16Array,
+  codes: Uint16Array,
+  maxCode: number,
+  counts: Uint16Array,
+): void {
   const next = new Uint16Array(MAX_BITS + 1);
   let code = 0;
   for (let bits = 1; bits <= MAX_BITS; bits++) {
@@ -363,7 +372,10 @@ class Deflater {
         this.window.fill(0, current, current + init);
         this.highWater = current + init;
       } else if (this.highWater < current + WIN_INIT) {
-        const init = Math.min(current + WIN_INIT - this.highWater, this.windowSize - this.highWater);
+        const init = Math.min(
+          current + WIN_INIT - this.highWater,
+          this.windowSize - this.highWater,
+        );
         this.window.fill(0, this.highWater, this.highWater + init);
         this.highWater += init;
       }
@@ -464,7 +476,11 @@ class Deflater {
       this.prevLength = this.matchLength;
       this.prevMatch = this.matchStart;
       this.matchLength = MIN_MATCH - 1;
-      if (hashHead !== 0 && this.prevLength < MAX_LAZY && this.strstart - hashHead <= this.maxDist()) {
+      if (
+        hashHead !== 0 &&
+        this.prevLength < MAX_LAZY &&
+        this.strstart - hashHead <= this.maxDist()
+      ) {
         this.matchLength = this.longestMatch(hashHead);
         // The filtered strategy drops every match of five bytes or fewer.
         if (this.matchLength <= 5) {
@@ -473,7 +489,10 @@ class Deflater {
       }
       if (this.prevLength >= MIN_MATCH && this.matchLength <= this.prevLength) {
         const maxInsert = this.strstart + this.lookahead - MIN_MATCH;
-        const flushNow = this.tally(this.strstart - 1 - this.prevMatch, this.prevLength - MIN_MATCH);
+        const flushNow = this.tally(
+          this.strstart - 1 - this.prevMatch,
+          this.prevLength - MIN_MATCH,
+        );
         this.lookahead -= this.prevLength - 1;
         this.prevLength -= 2;
         do {
@@ -837,7 +856,7 @@ function adler32(chunks: readonly Uint8Array[]): number {
   let a = 1;
   let b = 0;
   for (const chunk of chunks) {
-    for (let i = 0; i < chunk.length; ) {
+    for (let i = 0; i < chunk.length;) {
       const end = Math.min(chunk.length, i + 3800);
       for (; i < end; i++) {
         a += chunk[i];

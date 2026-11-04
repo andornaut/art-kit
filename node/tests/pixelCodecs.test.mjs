@@ -11,8 +11,7 @@ const image = {
   width: 3,
   height: 2,
   data: Uint8Array.from([
-    7, 8, 9, 0, 10, 20, 30, 128, 40, 50, 60, 255, 40, 50, 60, 255, 10, 20, 30,
-    128, 1, 2, 3, 0,
+    7, 8, 9, 0, 10, 20, 30, 128, 40, 50, 60, 255, 40, 50, 60, 255, 10, 20, 30, 128, 1, 2, 3, 0,
   ]),
 };
 // An 8-bit indexed PNG holds at most 256 palette entries; IHDR byte 25 is its colour type.
@@ -31,10 +30,7 @@ test("opaque bounds respect the window and include partial alpha", () => {
     width: 2,
     height: 2,
   });
-  assert.equal(
-    opaqueRect({ x: 0, y: 3, width: 5, height: 1 }, pixels),
-    undefined,
-  );
+  assert.equal(opaqueRect({ x: 0, y: 3, width: 5, height: 1 }, pixels), undefined);
 });
 
 test("indexed encoding accepts 256 distinct RGBA colours and declines 257", () => {

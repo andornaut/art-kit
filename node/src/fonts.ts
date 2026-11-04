@@ -41,10 +41,7 @@ function positive(value: number, label: string): number {
 }
 
 function codePoint(char: string): number {
-  if (
-    [...char].length !== 1 ||
-    /[\u0000-\u001f\u007f-\u009f\ud800-\udfff]/u.test(char)
-  ) {
+  if ([...char].length !== 1 || /[\u0000-\u001f\u007f-\u009f\ud800-\udfff]/u.test(char)) {
     throw new RangeError("Characters must be printable Unicode code points");
   }
   return char.codePointAt(0)!;
@@ -61,8 +58,7 @@ function codePoint(char: string): number {
 export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
   const size = positive(options.size, "Font size");
   const kerning = options.kerning ?? "none";
-  if (kerning !== "none" && kerning !== "all")
-    throw new RangeError("Kerning must be none or all");
+  if (kerning !== "none" && kerning !== "all") throw new RangeError("Kerning must be none or all");
   const characters = [...new Set(options.characters)];
   characters.forEach(codePoint);
   if (kerning === "all" && characters.length > 256)
@@ -85,7 +81,15 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
     ctx.fontSynthesis = false;
     ctx.fontKerning = "normal";
     // Glyphs are separate, so pair widths must not substitute ligatures.
-    ctx.fontFeatureSettings = { liga: false, clig: false, dlig: false, hlig: false, rlig: false, calt: false, rclt: false };
+    ctx.fontFeatureSettings = {
+      liga: false,
+      clig: false,
+      dlig: false,
+      hlig: false,
+      rlig: false,
+      calt: false,
+      rclt: false,
+    };
     ctx.fontHinting = hinting;
     ctx.fontSmoothing = antialias;
     ctx.fillStyle = "white";
@@ -149,9 +153,7 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
     for (const first of characters)
       for (const second of characters) {
         const amount = Math.round(
-          measure.measureText(first + second).width -
-            advances.get(first)! -
-            advances.get(second)!,
+          measure.measureText(first + second).width - advances.get(first)! - advances.get(second)!,
         );
         if (amount !== 0)
           kernings.push({ first: codePoint(first), second: codePoint(second), amount });

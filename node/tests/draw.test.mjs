@@ -3,7 +3,15 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { arc, ellipse, line, point, polygon, rectangle, roundedRectangle } from "@andornaut/art-kit/draw";
+import {
+  arc,
+  ellipse,
+  line,
+  point,
+  polygon,
+  rectangle,
+  roundedRectangle,
+} from "@andornaut/art-kit/draw";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
@@ -14,7 +22,12 @@ function background(width, height) {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       data.set(
-        [(x * 29 + y * 7) & 255, (x * 11 + y * 31) & 255, (x * 5 + y * 13 + 90) & 255, (x * 3 + y * 17 + 20) & 255],
+        [
+          (x * 29 + y * 7) & 255,
+          (x * 11 + y * 31) & 255,
+          (x * 5 + y * 13 + 90) & 255,
+          (x * 3 + y * 17 + 20) & 255,
+        ],
         (y * width + x) * 4,
       );
     }
@@ -30,7 +43,10 @@ function draw({ op, args }, image) {
   const points = args.points?.map(([x, y]) => ({ x, y }));
   const box = args.box && { x0: args.box[0], y0: args.box[1], x1: args.box[2], y1: args.box[3] };
   const style = Object.fromEntries(
-    Object.entries(rest).map(([key, value]) => [key, key === "fill" || key === "outline" ? fixture.colours[value] : value]),
+    Object.entries(rest).map(([key, value]) => [
+      key,
+      key === "fill" || key === "outline" ? fixture.colours[value] : value,
+    ]),
   );
   if (joint) style.joint = joint;
   switch (op) {
@@ -56,7 +72,15 @@ function draw({ op, args }, image) {
 test("draw fixtures come from Pillow 13.0.0 and cover every operation", () => {
   assert.equal(fixture.pillow, "13.0.0");
   const ops = new Set(fixture.cases.map((c) => c.op));
-  assert.deepEqual([...ops].sort(), ["arc", "ellipse", "line", "point", "polygon", "rectangle", "roundedRectangle"]);
+  assert.deepEqual([...ops].sort(), [
+    "arc",
+    "ellipse",
+    "line",
+    "point",
+    "polygon",
+    "rectangle",
+    "roundedRectangle",
+  ]);
   assert.ok(fixture.cases.some((c) => c.error));
   assert.ok(fixture.cases.some((c) => c.rgba));
 });
@@ -84,7 +108,8 @@ for (const op of new Set(fixture.cases.map((c) => c.op))) {
       }
       const hash = createHash("sha256").update(image.data).digest("hex").slice(0, 16);
       if (threw !== Boolean(c.error) || hash !== c.sha256) failures.push(index);
-      if (c.rgba) assert.deepEqual(Buffer.from(image.data), Buffer.from(c.rgba, "base64"), `case ${index}`);
+      if (c.rgba)
+        assert.deepEqual(Buffer.from(image.data), Buffer.from(c.rgba, "base64"), `case ${index}`);
     }
     assert.deepEqual(failures, []);
   });

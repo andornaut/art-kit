@@ -30,7 +30,10 @@ function lzwDecode(minCodeSize, data) {
   while (bit + codeSize <= data.length * 8) {
     let code = 0;
     for (let i = 0; i < codeSize; i++, bit++) code |= ((data[bit >> 3] >> (bit & 7)) & 1) << i;
-    if (code === clear) { reset(); continue; }
+    if (code === clear) {
+      reset();
+      continue;
+    }
     if (code === clear + 1) return out;
     const entry = table[code] ?? [...table[previous], table[previous][0]];
     out.push(...entry);
@@ -70,7 +73,11 @@ function parseGif(bytes) {
       const label = u8();
       const data = blocks();
       if (label === 0xf9) {
-        control = { disposal: (data[0] >> 2) & 7, duration: (data[1] | (data[2] << 8)) * 10, transparency: data[0] & 1 ? data[3] : undefined };
+        control = {
+          disposal: (data[0] >> 2) & 7,
+          duration: (data[1] | (data[2] << 8)) * 10,
+          transparency: data[0] & 1 ? data[3] : undefined,
+        };
       } else if (label === 0xff) {
         assert.equal(new TextDecoder().decode(data.subarray(0, 11)), "NETSCAPE2.0");
         gif.loop = data[12] | (data[13] << 8);
@@ -85,7 +92,9 @@ function parseGif(bytes) {
     const indices = lzwDecode(u8(), blocks());
     assert.equal(indices.length, width * height);
     const data = new Uint8Array(width * height * 4);
-    indices.forEach((index, i) => data.set([...colours[index], index === control?.transparency ? 0 : 255], i * 4));
+    indices.forEach((index, i) =>
+      data.set([...colours[index], index === control?.transparency ? 0 : 255], i * 4),
+    );
     gif.frames.push({ control, local: Boolean(local & 0x80), image: { width, height, data } });
     control = undefined;
   }
@@ -95,7 +104,8 @@ function merged(durations, frames) {
   const kept = [];
   frames.forEach((frame, i) => {
     const last = kept.at(-1);
-    if (last && Buffer.from(last.image.data).equals(Buffer.from(frame.data))) last.duration += durations[i];
+    if (last && Buffer.from(last.image.data).equals(Buffer.from(frame.data)))
+      last.duration += durations[i];
     else kept.push({ image: frame, duration: durations[i] });
   });
   return kept;
@@ -123,7 +133,10 @@ for (const [name, { options, frames, pillow }] of Object.entries(reference.gif))
 test("GIF frames beyond 256 colours together use local colour tables", () => {
   const { options, frames } = reference.gif.noise;
   const gif = parseGif(encodeGif({ durations: options.duration }, frames.map(image)));
-  assert.deepEqual(gif.frames.map((frame) => frame.local), [true, true]);
+  assert.deepEqual(
+    gif.frames.map((frame) => frame.local),
+    [true, true],
+  );
   const small = parseGif(encodeGif({ durations: 10 }, reference.gif.pigeon.frames.map(image)));
   assert.ok(small.frames.every((frame) => !frame.local));
 });
@@ -137,11 +150,18 @@ test("GIF rejects input it cannot encode exactly", () => {
     [{ durations: 10 }, [image(reference.gif.noise.frames[0]), pixel(1, 1, 1, 255)], /is 1x1/],
     [{ durations: [10] }, [pixel(1, 1, 1, 255), pixel(2, 2, 2, 255)], /Expected 2 durations/],
     [{ durations: 10, disposal: 3 }, [pixel(1, 1, 1, 255)], /disposal/],
-    [{ durations: 10, disposal: 2 }, [pixel(1, 1, 1, 255), pixel(0, 0, 0, 0)], /transparent after an opaque frame/],
+    [
+      { durations: 10, disposal: 2 },
+      [pixel(1, 1, 1, 255), pixel(0, 0, 0, 0)],
+      /transparent after an opaque frame/,
+    ],
     [{ durations: 10 }, [], /at least one frame/],
   ];
   for (const [options, frames, message] of cases) {
-    assert.throws(() => encodeGif(options, frames), (error) => error instanceof RangeError && message.test(error.message));
+    assert.throws(
+      () => encodeGif(options, frames),
+      (error) => error instanceof RangeError && message.test(error.message),
+    );
   }
   const many = { width: 257, height: 1, data: new Uint8Array(257 * 4) };
   for (let i = 0; i < 257; i++) many.data.set([i & 0xff, i >> 8, 0, 255], i * 4);
@@ -162,9 +182,18 @@ test("ICO favicon and large sets hold each supplied size as an exact PNG entry",
       const at = 6 + 16 * i;
       const size = view.getUint32(at + 8, true);
       const offset = view.getUint32(at + 12, true);
-      const header = [bytes[at] || 256, bytes[at + 1] || 256, view.getUint16(at + 4, true), view.getUint16(at + 6, true)];
+      const header = [
+        bytes[at] || 256,
+        bytes[at + 1] || 256,
+        view.getUint16(at + 4, true),
+        view.getUint16(at + 6, true),
+      ];
       assert.deepEqual(header, [...expected.size, 1, 32], `${name} entry ${i} directory`);
-      assert.deepEqual(decodePng(bytes.subarray(offset, offset + size)), image(expected.image), `${name} entry ${i} image`);
+      assert.deepEqual(
+        decodePng(bytes.subarray(offset, offset + size)),
+        image(expected.image),
+        `${name} entry ${i} image`,
+      );
     });
   }
   assert.deepEqual(Object.keys(reference.ico).sort(), ["favicon", "large"]);

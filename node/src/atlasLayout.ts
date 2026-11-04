@@ -92,8 +92,7 @@ export function packAtlas<T>(
       candidate !== undefined &&
       (best === undefined ||
         candidate.pages.length < best.pages.length ||
-        (candidate.pages.length === best.pages.length &&
-          area(candidate) < area(best)))
+        (candidate.pages.length === best.pages.length && area(candidate) < area(best)))
     ) {
       best = candidate;
     }

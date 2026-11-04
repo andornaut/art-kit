@@ -40,10 +40,7 @@ const OPTION_KEYS = new Set(["deflateLevel", "deflateStrategy", "filterType"]);
 // Filtered bytes handed to zlib per call, or one row when a row is longer.
 const BATCH_BYTES = 64 * 1024;
 
-export function encodeRgbaPng(
-  options: RgbaPngOptions,
-  image: RgbaImage,
-): Uint8Array {
+export function encodeRgbaPng(options: RgbaPngOptions, image: RgbaImage): Uint8Array {
   return (
     streamedPng(COLOUR_TYPE_RGBA, options, image) ??
     pngjsPng({ colorType: COLOUR_TYPE_RGBA, ...options }, image)
@@ -52,10 +49,7 @@ export function encodeRgbaPng(
 
 // Opaque RGB PNG (colour type 2) bytes; decoding them yields image. Throws RangeError when any
 // pixel's alpha is not 255, because colour type 2 has no alpha channel.
-export function encodeRgbPng(
-  options: RgbaPngOptions,
-  image: RgbaImage,
-): Uint8Array {
+export function encodeRgbPng(options: RgbaPngOptions, image: RgbaImage): Uint8Array {
   const { data } = image;
   for (let i = 3; i < data.length; i += 4) {
     if (data[i] !== 255) {
@@ -84,9 +78,7 @@ function filterTypesOf(options: RgbaPngOptions): readonly number[] | undefined {
   if (filterType === ADAPTIVE) {
     return FILTER_TYPES;
   }
-  return FILTER_TYPES.find((type) => type === filterType) === undefined
-    ? undefined
-    : [filterType];
+  return FILTER_TYPES.find((type) => type === filterType) === undefined ? undefined : [filterType];
 }
 
 function isDimension(value: number): boolean {
@@ -198,12 +190,7 @@ function filterRow(
   }
 }
 
-function filterSum(
-  type: number,
-  bpp: number,
-  previous: Uint8Array,
-  row: Uint8Array,
-): number {
+function filterSum(type: number, bpp: number, previous: Uint8Array, row: Uint8Array): number {
   let sum = 0;
   for (let x = 0; x < row.length; x++) {
     sum += Math.abs(row[x] - predict(type, bpp, previous, row, x));
@@ -244,11 +231,7 @@ function predict(
 }
 
 // Signature, IHDR, one IDAT holding the whole zlib stream, then IEND.
-function assemble(
-  colourType: number,
-  deflater: SyncDeflater,
-  image: RgbaImage,
-): Uint8Array {
+function assemble(colourType: number, deflater: SyncDeflater, image: RgbaImage): Uint8Array {
   const header = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, BIT_DEPTH, colourType, 0, 0, 0);
   const view = new DataView(header.buffer);
   view.setUint32(0, image.width);
@@ -292,12 +275,7 @@ class SyncDeflater {
   private buffer: Buffer;
   private offset = 0;
 
-  private constructor(
-    engine: Deflate,
-    handle: ZlibHandle,
-    state: Uint32Array,
-    chunkSize: number,
-  ) {
+  private constructor(engine: Deflate, handle: ZlibHandle, state: Uint32Array, chunkSize: number) {
     this.engine = engine;
     this.handle = handle;
     this.state = state;

@@ -63,14 +63,27 @@ function image(content, width, height) {
 const FILTER_TYPES = [-1, 0, 1, 2, 3, 4];
 
 test("small images match pngjs for every level, strategy and filter type", () => {
-  const sizes = [[0, 0], [0, 3], [3, 0], [1, 1], [1, 17], [17, 1], [7, 5], [33, 9]];
+  const sizes = [
+    [0, 0],
+    [0, 3],
+    [3, 0],
+    [1, 1],
+    [1, 17],
+    [17, 1],
+    [7, 5],
+    [33, 9],
+  ];
   for (const [width, height] of sizes) {
     for (const content of Object.keys(CONTENT)) {
       const pixels = image(content, width, height);
       for (const deflateLevel of [-1, 0, 1, 6, 9]) {
         for (const deflateStrategy of [0, 1, 2, 3, 4]) {
           for (const filterType of FILTER_TYPES) {
-            assertMatchesPngjs({ deflateLevel, deflateStrategy, filterType }, pixels, `${content} ${width}x${height}`);
+            assertMatchesPngjs(
+              { deflateLevel, deflateStrategy, filterType },
+              pixels,
+              `${content} ${width}x${height}`,
+            );
           }
         }
       }
@@ -89,9 +102,21 @@ test("multi-batch images match pngjs", () => {
   ];
   for (const [content, width, height] of cases) {
     const pixels = image(content, width, height);
-    for (const [deflateLevel, deflateStrategy] of [[0, 0], [1, 0], [6, 0], [9, 1], [9, 2], [9, 3], [4, 4]]) {
+    for (const [deflateLevel, deflateStrategy] of [
+      [0, 0],
+      [1, 0],
+      [6, 0],
+      [9, 1],
+      [9, 2],
+      [9, 3],
+      [4, 4],
+    ]) {
       for (const filterType of [-1, 0, 4]) {
-        assertMatchesPngjs({ deflateLevel, deflateStrategy, filterType }, pixels, `${content} ${width}x${height}`);
+        assertMatchesPngjs(
+          { deflateLevel, deflateStrategy, filterType },
+          pixels,
+          `${content} ${width}x${height}`,
+        );
       }
     }
   }

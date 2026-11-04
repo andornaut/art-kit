@@ -9,7 +9,11 @@ import { decodePng } from "@andornaut/art-kit/png";
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
 const font = (weight = "Regular") => `${fixtures}/LiberationSans-${weight}.ttf`;
-const options = (weight = "Regular", size = 16) => ({ path: font(weight), size, characters: "j_wAVTo ." });
+const options = (weight = "Regular", size = 16) => ({
+  path: font(weight),
+  size,
+  characters: "j_wAVTo .",
+});
 const CHARS = [...Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)), "·"];
 
 test("glyphs are trimmed white coverage with signed bearings, empty spaces and the AA policy", () => {
@@ -17,7 +21,10 @@ test("glyphs are trimmed white coverage with signed bearings, empty spaces and t
   for (const weight of ["Regular", "Bold"])
     for (const size of [12, 16])
       for (const antialias of [true, false]) {
-        const { glyphs, base, lineHeight, ascent, descent, kernings } = rasteriseGlyphs({ ...options(weight, size), antialias });
+        const { glyphs, base, lineHeight, ascent, descent, kernings } = rasteriseGlyphs({
+          ...options(weight, size),
+          antialias,
+        });
         assert.equal(base, Math.ceil(ascent));
         assert.equal(lineHeight, Math.ceil(ascent + descent));
         assert.deepEqual(kernings, []);
@@ -32,10 +39,22 @@ test("glyphs are trimmed white coverage with signed bearings, empty spaces and t
           const { data, width, height } = image;
           const alpha = (x, y) => data[(y * width + x) * 4 + 3];
           // Trimmed: every edge row and column holds ink.
-          assert.ok([...Array(width).keys()].some((x) => alpha(x, 0)), char);
-          assert.ok([...Array(width).keys()].some((x) => alpha(x, height - 1)), char);
-          assert.ok([...Array(height).keys()].some((y) => alpha(0, y)), char);
-          assert.ok([...Array(height).keys()].some((y) => alpha(width - 1, y)), char);
+          assert.ok(
+            [...Array(width).keys()].some((x) => alpha(x, 0)),
+            char,
+          );
+          assert.ok(
+            [...Array(width).keys()].some((x) => alpha(x, height - 1)),
+            char,
+          );
+          assert.ok(
+            [...Array(height).keys()].some((y) => alpha(0, y)),
+            char,
+          );
+          assert.ok(
+            [...Array(height).keys()].some((y) => alpha(width - 1, y)),
+            char,
+          );
           for (let i = 0; i < data.length; i += 4) {
             const pixel = [...data.subarray(i, i + 4)];
             assert.deepEqual(pixel, pixel[3] ? [255, 255, 255, pixel[3]] : [0, 0, 0, 0]);
@@ -56,12 +75,29 @@ test("pair kerning uses separate glyph positioning without ligature substitution
   context.fontHinting = true;
   context.fontSmoothing = true;
   context.fontKerning = "normal";
-  context.fontFeatureSettings = { liga: false, clig: false, dlig: false, hlig: false, rlig: false, calt: false, rclt: false };
+  context.fontFeatureSettings = {
+    liga: false,
+    clig: false,
+    dlig: false,
+    hlig: false,
+    rlig: false,
+    calt: false,
+    rclt: false,
+  };
   const unique = [..."fiAV"];
-  const expected = unique.flatMap(a => unique.map(b => ({
-    first: a.codePointAt(0), second: b.codePointAt(0),
-    amount: Math.round(context.measureText(a + b).width - context.measureText(a).width - context.measureText(b).width),
-  }))).filter(k => k.amount !== 0);
+  const expected = unique
+    .flatMap((a) =>
+      unique.map((b) => ({
+        first: a.codePointAt(0),
+        second: b.codePointAt(0),
+        amount: Math.round(
+          context.measureText(a + b).width -
+            context.measureText(a).width -
+            context.measureText(b).width,
+        ),
+      })),
+    )
+    .filter((k) => k.amount !== 0);
   const { kernings } = rasteriseGlyphs({ ...options(), characters: "fiAV", kerning: "all" });
   assert.ok(expected.length > 0);
   assert.deepEqual(kernings, expected);
@@ -69,19 +105,27 @@ test("pair kerning uses separate glyph positioning without ligature substitution
 
 test("all kerning emits each nonzero ordered pair once, bounded to 256 characters", () => {
   for (const weight of ["Regular", "Bold"]) {
-    const { kernings } = rasteriseGlyphs({ ...options(weight), characters: "AVTofi jAV", kerning: "all" });
-    const keys = kernings.map(k => `${k.first},${k.second}`);
+    const { kernings } = rasteriseGlyphs({
+      ...options(weight),
+      characters: "AVTofi jAV",
+      kerning: "all",
+    });
+    const keys = kernings.map((k) => `${k.first},${k.second}`);
     assert.equal(new Set(keys).size, keys.length);
     assert.ok(kernings.length > 0);
-    assert.ok(kernings.every(k => k.amount !== 0 && Number.isInteger(k.amount)));
+    assert.ok(kernings.every((k) => k.amount !== 0 && Number.isInteger(k.amount)));
   }
   const tooMany = Array.from({ length: 257 }, (_, i) => String.fromCodePoint(0x100 + i));
-  assert.throws(() => rasteriseGlyphs({ ...options(), kerning: "all", characters: tooMany }), /256/);
+  assert.throws(
+    () => rasteriseGlyphs({ ...options(), kerning: "all", characters: tooMany }),
+    /256/,
+  );
   assert.throws(() => rasteriseGlyphs({ ...options(), kerning: "unknown" }), /Kerning/);
 });
 
 test("rasterization rejects invalid input before rendering", () => {
-  for (const size of [0, 1.5, 16385]) assert.throws(() => rasteriseGlyphs({ ...options(), size }), RangeError);
+  for (const size of [0, 1.5, 16385])
+    assert.throws(() => rasteriseGlyphs({ ...options(), size }), RangeError);
   assert.throws(() => rasteriseGlyphs({ ...options(), characters: ["ab"] }), /Unicode/);
   assert.throws(() => rasteriseGlyphs({ ...options(), characters: ["\ud800"] }), /Unicode/);
   assert.throws(() => rasteriseGlyphs({ ...options(), path: "/missing-font.ttf" }), /ENOENT/);
@@ -93,14 +137,39 @@ function chibiStyle(key, size, weight) {
   for (const { image } of r.glyphs.values())
     if (image) for (let i = 0; i < image.data.length; i += 4) image.data.fill(255, i, i + 3);
   return buildBitmapFontFromGlyphs(
-    { layout: "packed", antialias: true, key, face: key, size, base: r.base, lineHeight: r.base + Math.ceil(r.descent) + 1, atlasWidth: 256, kernings: r.kernings },
+    {
+      layout: "packed",
+      antialias: true,
+      key,
+      face: key,
+      size,
+      base: r.base,
+      lineHeight: r.base + Math.ceil(r.descent) + 1,
+      atlasWidth: 256,
+      kernings: r.kernings,
+    },
     r.glyphs,
   );
 }
 function archieStyle(key, size, weight) {
-  const r = rasteriseGlyphs({ path: font(weight), size, characters: CHARS, antialias: false, hinting: false });
+  const r = rasteriseGlyphs({
+    path: font(weight),
+    size,
+    characters: CHARS,
+    antialias: false,
+    hinting: false,
+  });
   return buildBitmapFontFromGlyphs(
-    { atlasWidth: 256, base: r.base, face: key, kernings: [], key, lineHeight: r.lineHeight + 1, padding: 1, size },
+    {
+      atlasWidth: 256,
+      base: r.base,
+      face: key,
+      kernings: [],
+      key,
+      lineHeight: r.lineHeight + 1,
+      padding: 1,
+      size,
+    },
     r.glyphs,
   );
 }

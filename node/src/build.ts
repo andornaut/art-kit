@@ -1,8 +1,8 @@
 // Sequential art build runner: dependency order, downstream selection and a byte-snapshot check.
 // Node built-ins only; no module here spawns a process or reads Git.
-import { createHash } from 'node:crypto';
-import { lstat, readdir, readFile, readlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { createHash } from "node:crypto";
+import { lstat, readdir, readFile, readlink } from "node:fs/promises";
+import { join } from "node:path";
 
 /** One build set: its build step and the sets whose outputs it reads. */
 export interface BuildSet {
@@ -48,44 +48,49 @@ export interface BuildResult {
 
 /** An unknown set name in a selection or a command line argument. */
 export class UsageError extends Error {
-  override name = 'UsageError';
+  override name = "UsageError";
 }
 
 /** A set's build threw or rejected; `cause` is the original error. */
 export class BuildError extends Error {
-  override name = 'BuildError';
-  constructor(readonly set: string, cause: unknown) {
-    super(`${set} build failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause });
+  override name = "BuildError";
+  constructor(
+    readonly set: string,
+    cause: unknown,
+  ) {
+    super(`${set} build failed: ${cause instanceof Error ? cause.message : String(cause)}`, {
+      cause,
+    });
   }
 }
 
 /** The rebuild changed files under the check paths. */
 export class CheckError extends Error {
-  override name = 'CheckError';
+  override name = "CheckError";
   constructor(readonly changes: Changes) {
     const count = changes.added.length + changes.removed.length + changes.changed.length;
-    super(`the rebuild changed ${count} path${count === 1 ? '' : 's'} under the check paths`);
+    super(`the rebuild changed ${count} path${count === 1 ? "" : "s"} under the check paths`);
   }
 }
 
 const own = (sets: BuildSets, name: string): boolean => Object.hasOwn(sets, name);
 
 function findCycle(sets: BuildSets, remaining: ReadonlySet<string>): string[] {
-  const state = new Map<string, 'open' | 'done'>();
+  const state = new Map<string, "open" | "done">();
   const stack: string[] = [];
   function visit(name: string): string[] | undefined {
-    state.set(name, 'open');
+    state.set(name, "open");
     stack.push(name);
     for (const need of sets[name].needs ?? []) {
       if (!remaining.has(need)) continue;
-      if (state.get(need) === 'open') return [...stack.slice(stack.indexOf(need)), need];
+      if (state.get(need) === "open") return [...stack.slice(stack.indexOf(need)), need];
       if (!state.has(need)) {
         const found = visit(need);
         if (found) return found;
       }
     }
     stack.pop();
-    state.set(name, 'done');
+    state.set(name, "done");
     return undefined;
   }
   for (const name of remaining) {
@@ -105,27 +110,33 @@ function findCycle(sets: BuildSets, remaining: ReadonlySet<string>): string[] {
  */
 export function buildOrder(sets: BuildSets, selected?: readonly string[]): string[] {
   const names = Object.keys(sets);
-  const unknownNeeds = names.flatMap(name => (sets[name].needs ?? []).filter(need => !own(sets, need)).map(need => `${name} needs unknown set ${need}`));
-  if (unknownNeeds.length) throw new RangeError(unknownNeeds.join('; '));
+  const unknownNeeds = names.flatMap((name) =>
+    (sets[name].needs ?? [])
+      .filter((need) => !own(sets, need))
+      .map((need) => `${name} needs unknown set ${need}`),
+  );
+  if (unknownNeeds.length) throw new RangeError(unknownNeeds.join("; "));
   const order: string[] = [];
   const done = new Set<string>();
   while (order.length < names.length) {
-    const next = names.find(name => !done.has(name) && (sets[name].needs ?? []).every(need => done.has(need)));
+    const next = names.find(
+      (name) => !done.has(name) && (sets[name].needs ?? []).every((need) => done.has(need)),
+    );
     if (next === undefined) {
-      const cycle = findCycle(sets, new Set(names.filter(name => !done.has(name))));
-      throw new RangeError(`build sets form a cycle: ${cycle.join(' -> ')}`);
+      const cycle = findCycle(sets, new Set(names.filter((name) => !done.has(name))));
+      throw new RangeError(`build sets form a cycle: ${cycle.join(" -> ")}`);
     }
     order.push(next);
     done.add(next);
   }
   if (!selected?.length) return order;
-  const unknown = [...new Set(selected.filter(name => !own(sets, name)))];
-  if (unknown.length) throw new UsageError(`unknown set ${unknown.join(', ')}`);
+  const unknown = [...new Set(selected.filter((name) => !own(sets, name)))];
+  if (unknown.length) throw new UsageError(`unknown set ${unknown.join(", ")}`);
   const chosen = new Set(selected);
   for (const name of order) {
-    if ((sets[name].needs ?? []).some(need => chosen.has(need))) chosen.add(name);
+    if ((sets[name].needs ?? []).some((need) => chosen.has(need))) chosen.add(name);
   }
-  return order.filter(name => chosen.has(name));
+  return order.filter((name) => chosen.has(name));
 }
 
 type Snapshot = Map<string, string>;
@@ -135,7 +146,7 @@ async function snapshotInto(path: string, into: Snapshot): Promise<void> {
   try {
     stat = await lstat(path);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
     throw error;
   }
   if (stat.isDirectory()) {
@@ -143,7 +154,12 @@ async function snapshotInto(path: string, into: Snapshot): Promise<void> {
   } else if (stat.isSymbolicLink()) {
     into.set(path, `link:${await readlink(path)}`);
   } else if (stat.isFile()) {
-    into.set(path, `file:${createHash('sha256').update(await readFile(path)).digest('hex')}`);
+    into.set(
+      path,
+      `file:${createHash("sha256")
+        .update(await readFile(path))
+        .digest("hex")}`,
+    );
   } else {
     into.set(path, `other:${stat.mode}`);
   }
@@ -160,23 +176,30 @@ export async function snapshot(paths: readonly string[]): Promise<ReadonlyMap<st
 }
 
 /** The paths added, removed and changed from `before` to `after`, each sorted. */
-export function compareSnapshots(before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): Changes {
+export function compareSnapshots(
+  before: ReadonlyMap<string, string>,
+  after: ReadonlyMap<string, string>,
+): Changes {
   const sorted = (list: string[]) => list.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   return {
-    added: sorted([...after.keys()].filter(path => !before.has(path))),
-    removed: sorted([...before.keys()].filter(path => !after.has(path))),
-    changed: sorted([...after.keys()].filter(path => before.has(path) && before.get(path) !== after.get(path))),
+    added: sorted([...after.keys()].filter((path) => !before.has(path))),
+    removed: sorted([...before.keys()].filter((path) => !after.has(path))),
+    changed: sorted(
+      [...after.keys()].filter((path) => before.has(path) && before.get(path) !== after.get(path)),
+    ),
   };
 }
 
 /** Lines `A\tpath`, `D\tpath` and `M\tpath`, sorted by path. */
 export function formatChanges(changes: Changes): string[] {
   const lines = [
-    ...changes.added.map(path => [path, 'A'] as const),
-    ...changes.removed.map(path => [path, 'D'] as const),
-    ...changes.changed.map(path => [path, 'M'] as const),
+    ...changes.added.map((path) => [path, "A"] as const),
+    ...changes.removed.map((path) => [path, "D"] as const),
+    ...changes.changed.map((path) => [path, "M"] as const),
   ];
-  return lines.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([path, status]) => `${status}\t${path}`);
+  return lines
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([path, status]) => `${status}\t${path}`);
 }
 
 /**
@@ -185,7 +208,10 @@ export function formatChanges(changes: Changes): string[] {
  * files under its paths are snapshotted before the first build and after the last, and any
  * difference throws `CheckError`.
  */
-export async function runBuilds(options: BuildOptions, selected?: readonly string[]): Promise<BuildResult> {
+export async function runBuilds(
+  options: BuildOptions,
+  selected?: readonly string[],
+): Promise<BuildResult> {
   const { sets, check, log = console.log } = options;
   const order = buildOrder(sets, selected);
   const before = check && (await snapshot(check.paths));
@@ -198,10 +224,13 @@ export async function runBuilds(options: BuildOptions, selected?: readonly strin
       throw new BuildError(name, error);
     }
   }
-  log(`built ${order.length} set${order.length === 1 ? '' : 's'} in ${((performance.now() - started) / 1000).toFixed(0)}s`);
+  log(
+    `built ${order.length} set${order.length === 1 ? "" : "s"} in ${((performance.now() - started) / 1000).toFixed(0)}s`,
+  );
   if (!check || !before) return { order };
   const changes = compareSnapshots(before, await snapshot(check.paths));
-  if (changes.added.length || changes.removed.length || changes.changed.length) throw new CheckError(changes);
+  if (changes.added.length || changes.removed.length || changes.changed.length)
+    throw new CheckError(changes);
   return { order, changes };
 }
 
@@ -210,14 +239,17 @@ export async function runBuilds(options: BuildOptions, selected?: readonly strin
  * build fails, the check finds differences or the sets are invalid, and 2 on a usage error
  * (an unknown option or set, or `--check` without `check` paths). Other errors propagate.
  */
-export async function buildCommand(options: CommandOptions, argv: readonly string[]): Promise<number> {
+export async function buildCommand(
+  options: CommandOptions,
+  argv: readonly string[],
+): Promise<number> {
   const { usage, error = console.error, check, log = console.log, sets } = options;
-  const checking = argv[0] === '--check';
+  const checking = argv[0] === "--check";
   const named = checking ? argv.slice(1) : argv;
   try {
-    const option = named.find(arg => arg.startsWith('-'));
+    const option = named.find((arg) => arg.startsWith("-"));
     if (option !== undefined) throw new UsageError(`unknown option ${option}`);
-    if (checking && !check) throw new UsageError('--check needs check paths');
+    if (checking && !check) throw new UsageError("--check needs check paths");
     await runBuilds({ sets, log, ...(checking && { check }) }, named);
     return 0;
   } catch (caught) {

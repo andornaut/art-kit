@@ -23,7 +23,8 @@ interface Frame {
 }
 
 function perFrame(durations: number | readonly number[], count: number): number[] {
-  const list = typeof durations === "number" ? Array<number>(count).fill(durations) : [...durations];
+  const list =
+    typeof durations === "number" ? Array<number>(count).fill(durations) : [...durations];
   if (list.length !== count) {
     throw new RangeError(`Expected ${count} durations, received ${list.length}`);
   }
@@ -172,7 +173,9 @@ export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Ui
   const kept: Frame[] = [];
   frames.forEach((image, index) => {
     if (image.width !== width || image.height !== height) {
-      throw new RangeError(`Frame ${index} is ${image.width}x${image.height}, not ${width}x${height}`);
+      throw new RangeError(
+        `Frame ${index} is ${image.width}x${image.height}, not ${width}x${height}`,
+      );
     }
     const frame = frameOf(index, durations[index], image);
     const last = kept.at(-1);
@@ -182,7 +185,12 @@ export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Ui
     }
     // Pillow restores an opaque frame's area to its background colour, an index into a palette
     // order this encoder does not reproduce, so a later transparent pixel would differ.
-    if (last && disposal === 2 && last.transparent === undefined && frame.transparent !== undefined) {
+    if (
+      last &&
+      disposal === 2 &&
+      last.transparent === undefined &&
+      frame.transparent !== undefined
+    ) {
       throw new RangeError(`Frame ${index} is transparent after an opaque frame with disposal 2`);
     }
     kept.push(frame);
@@ -206,7 +214,8 @@ export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Ui
   kept.forEach((frame, position) => {
     const colours = global ?? frame.colours;
     const indexOf = new Map(colours.map((rgba, index) => [rgba, index]));
-    const transparency = frame.transparent === undefined ? undefined : indexOf.get(frame.transparent);
+    const transparency =
+      frame.transparent === undefined ? undefined : indexOf.get(frame.transparent);
     const hundredths = Math.trunc(frame.duration / 10);
     if (hundredths > 0xffff) {
       throw new RangeError(`Merged GIF duration exceeds the format limit: ${frame.duration}`);
@@ -233,7 +242,12 @@ export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Ui
     }
     const minCodeSize = Math.max(2, bits);
     out.u8(minCodeSize);
-    out.subBlocks(lzw(minCodeSize, Uint8Array.from(frame.pixels, (rgba) => indexOf.get(rgba) ?? 0)));
+    out.subBlocks(
+      lzw(
+        minCodeSize,
+        Uint8Array.from(frame.pixels, (rgba) => indexOf.get(rgba) ?? 0),
+      ),
+    );
   });
   out.u8(0x3b);
   return Uint8Array.from(out.bytes);

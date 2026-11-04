@@ -36,18 +36,12 @@ test("atomic multirect placement rolls back and retries on a new page", () => {
 test("layout chooses page count then area then first width and preserves input order", () => {
   const items = [item("b", [2, 2]), item("a", [2, 2])];
   assert.equal(
-    packAtlas({ ...policy, maxSize: 8, widths: [4, 8] }, [
-      ...items,
-      item("c", [2, 2]),
-    ]).width,
+    packAtlas({ ...policy, maxSize: 8, widths: [4, 8] }, [...items, item("c", [2, 2])]).width,
     8,
   );
   assert.equal(packAtlas({ ...policy, widths: [10, 8] }, items).width, 8);
   assert.equal(packAtlas({ ...policy, widths: [8, 4] }, items).width, 8);
-  const result = packAtlas(
-    { ...policy, compare: (a, b) => a.value.localeCompare(b.value) },
-    items,
-  );
+  const result = packAtlas({ ...policy, compare: (a, b) => a.value.localeCompare(b.value) }, items);
   assert.deepEqual(
     result.pages[0].placed.map(({ item }) => item.value),
     ["a", "b"],
@@ -76,16 +70,14 @@ test("extrusion reads original bounds and retains RGB under zero alpha", () => {
     source,
     target,
   );
-  assert.deepEqual(
-    target.data,
-    Uint8Array.from([...source.data, ...source.data, ...source.data]),
-  );
+  assert.deepEqual(target.data, Uint8Array.from([...source.data, ...source.data, ...source.data]));
   const clamped = blankImage(3, 3);
-  blitExtruded({ from: { x: 0, y: 0, width: 1, height: 1 }, extrude: 1, at: { x: 1, y: 1 } }, source, clamped);
-  assert.deepEqual(
-    clamped.data,
-    Uint8Array.from(Array(9).fill([1, 2, 3, 0]).flat()),
+  blitExtruded(
+    { from: { x: 0, y: 0, width: 1, height: 1 }, extrude: 1, at: { x: 1, y: 1 } },
+    source,
+    clamped,
   );
+  assert.deepEqual(clamped.data, Uint8Array.from(Array(9).fill([1, 2, 3, 0]).flat()));
 });
 
 test("page build shares decoding, bypasses supplied images and preserves metadata order", async () => {
@@ -97,9 +89,7 @@ test("page build shares decoding, bypasses supplied images and preserves metadat
     width: 1,
     height: 1,
     metadata,
-    blits: [
-      { source, from: { x: 0, y: 0, width: 1, height: 1 }, at: { x: 0, y: 0 } },
-    ],
+    blits: [{ source, from: { x: 0, y: 0, width: 1, height: 1 }, at: { x: 0, y: 0 } }],
   }));
   const result = await buildAtlasPages(
     {
@@ -143,10 +133,7 @@ test("page build shares decoding, bypasses supplied images and preserves metadat
     ),
     (error) => error === failure,
   );
-  assert.throws(
-    () => drawAtlasPage(0, new Map(), pages[0]),
-    /No atlas source for shared/,
-  );
+  assert.throws(() => drawAtlasPage(0, new Map(), pages[0]), /No atlas source for shared/);
 });
 
 test("packs wide strips and tall and wide rectangles once into bounded nonoverlapping extruded cells", () => {
@@ -173,10 +160,7 @@ test("packs wide strips and tall and wide rectangles once into bounded nonoverla
     const items = sizes.map((size, index) => item(index, size));
     const extrude = 1;
     const maxSize = 2048;
-    const result = packAtlas(
-      { ...policy, extrude, maxSize, widths: [maxSize] },
-      items,
-    );
+    const result = packAtlas({ ...policy, extrude, maxSize, widths: [maxSize] }, items);
     assert.ok(result, `${name} packs`);
     const placed = [];
     for (const page of result.pages) {
@@ -191,10 +175,7 @@ test("packs wide strips and tall and wide rectangles once into bounded nonoverla
           const right = left + rectangle.width + 2 * extrude;
           const bottom = top + rectangle.height + 2 * extrude;
           assert.ok(
-            left >= 0 &&
-              top >= 0 &&
-              right <= page.width &&
-              bottom <= page.height,
+            left >= 0 && top >= 0 && right <= page.width && bottom <= page.height,
             `${name} cell within page`,
           );
           for (const other of cells) {

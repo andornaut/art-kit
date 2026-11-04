@@ -38,20 +38,11 @@ const LOSSLESS = {
 };
 
 // The image as a lossless WebP.
-export async function encodeLosslessWebp({
-  data,
-  height,
-  width,
-}: RgbaImage): Promise<Uint8Array> {
+export async function encodeLosslessWebp({ data, height, width }: RgbaImage): Promise<Uint8Array> {
   encoder ??= wasmModule("enc/webp_enc.wasm").then((wasm) =>
     initEmscriptenModule(encoderFactory, wasm),
   );
-  const bytes = (await encoder).encode(
-    new Uint8Array(data),
-    width,
-    height,
-    LOSSLESS,
-  );
+  const bytes = (await encoder).encode(new Uint8Array(data), width, height, LOSSLESS);
   if (bytes === null) {
     throw new Error(`libwebp could not encode a ${width}x${height} image`);
   }

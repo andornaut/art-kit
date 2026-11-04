@@ -56,7 +56,11 @@ function medianCut(budget: number, colours: Colour[]): Colour[][] {
     );
     const total = box.reduce((sum, { weight }) => sum + weight, 0);
     let split = 1;
-    for (let cumulative = box[0].weight; split < box.length - 1 && cumulative * 2 < total; split++) {
+    for (
+      let cumulative = box[0].weight;
+      split < box.length - 1 && cumulative * 2 < total;
+      split++
+    ) {
       cumulative += box[split].weight;
     }
     boxes.splice(best, 1, box.slice(0, split), box.slice(split));
@@ -79,7 +83,8 @@ function nearest(palette: readonly Rgba[], first: number, rgb: number): number {
   let bestDistance = Infinity;
   for (let i = first; i < palette.length; i++) {
     const [r, g, b] = palette[i];
-    const distance = (r - channel(rgb, 0)) ** 2 + (g - channel(rgb, 1)) ** 2 + (b - channel(rgb, 2)) ** 2;
+    const distance =
+      (r - channel(rgb, 0)) ** 2 + (g - channel(rgb, 1)) ** 2 + (b - channel(rgb, 2)) ** 2;
     if (distance < bestDistance) {
       [best, bestDistance] = [i, distance];
     }
@@ -115,11 +120,18 @@ export function quantise(options: QuantiseOptions, frames: readonly RgbaImage[])
       }
     }
   });
-  const colours = [...counts].map(([rgb, weight]) => ({ rgb, weight })).sort((a, b) => a.rgb - b.rgb);
+  const colours = [...counts]
+    .map(([rgb, weight]) => ({ rgb, weight }))
+    .sort((a, b) => a.rgb - b.rgb);
   const entry = (rgb: number): Rgba => [channel(rgb, 0), channel(rgb, 1), channel(rgb, 2), 255];
   const reserved = transparent.size > 0 ? 1 : 0;
   if (transparent.size <= 1 && colours.length + reserved <= maxColours) {
-    const clear = [...transparent].map((value): Rgba => [value >>> 24, (value >>> 16) & 0xff, (value >>> 8) & 0xff, 0]);
+    const clear = [...transparent].map((value): Rgba => [
+      value >>> 24,
+      (value >>> 16) & 0xff,
+      (value >>> 8) & 0xff,
+      0,
+    ]);
     return { frames: [...frames], palette: [...clear, ...colours.map(({ rgb }) => entry(rgb))] };
   }
   const budget = maxColours - reserved;

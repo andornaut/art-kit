@@ -149,7 +149,14 @@ function hline(image: RgbaImage, x0: number, y0: number, x1: number, ink: Rgba, 
 }
 
 // Bresenham segment without its end point.
-function segment(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, ink: Rgba): void {
+function segment(
+  image: RgbaImage,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  ink: Rgba,
+): void {
   let dy = y1 - y0;
   let ys: number;
   if (dy < 0) {
@@ -374,7 +381,8 @@ function polygonPrimitive(
       }
       edges.push(edge(x0, y0, x1, y1));
     }
-    if (xy[i * 2] !== xy[0] || xy[i * 2 + 1] !== xy[1]) edges.push(edge(xy[i * 2]!, xy[i * 2 + 1]!, xy[0]!, xy[1]!));
+    if (xy[i * 2] !== xy[0] || xy[i * 2 + 1] !== xy[1])
+      edges.push(edge(xy[i * 2]!, xy[i * 2 + 1]!, xy[0]!, xy[1]!));
     polygonGeneric(image, edges, ink, mask);
     return;
   }
@@ -558,7 +566,10 @@ function clip(node: ClipNode | undefined, x0: number, y: number, x1: number): Cl
     let t: ClipEvent;
     const e1 = l1[i1];
     const e2 = l2[i2];
-    if (e2 === undefined || (e1 !== undefined && (e1.x < e2.x || (e1.x === e2.x && e1.type > e2.type)))) {
+    if (
+      e2 === undefined ||
+      (e1 !== undefined && (e1.x < e2.x || (e1.x === e2.x && e1.type > e2.type)))
+    ) {
       t = e1!;
       k1 += t.type;
       i1++;
@@ -572,7 +583,8 @@ function clip(node: ClipNode | undefined, x0: number, y: number, x1: number): Cl
     if (
       (node.type === "or" && (opens || (t.type === -1 && k1 === 0 && k2 === 0))) ||
       (node.type === "and" &&
-        ((opens && k1 > 0 && k2 > 0) || (t.type === -1 && tail !== undefined && tail.type === 1 && (k1 === 0 || k2 === 0))))
+        ((opens && k1 > 0 && k2 > 0) ||
+          (t.type === -1 && tail !== undefined && tail.type === 1 && (k1 === 0 || k2 === 0))))
     ) {
       out.push(t);
     }
@@ -631,40 +643,73 @@ function arcInit(a: number, b: number, w: number, al: number, ar: number): Clipp
   const combine = span < 180 ? "and" : "or";
   return {
     spans,
-    root: { type: combine, l: { type: combine, l: lc, r: rc }, r: clipNode(0, ar < 180 || ar > 540 ? 1 : -1, 0) },
+    root: {
+      type: combine,
+      l: { type: combine, l: lc, r: rc },
+      r: clipNode(0, ar < 180 || ar > 540 ? 1 : -1, 0),
+    },
   };
 }
 
 function pieInit(a: number, b: number, w: number, al: number, ar: number): ClippedEllipse {
   const spans = new EllipseSpans(a, b, w);
-  const xl = a * Math.cos(al * Math.PI / 180);
-  const xr = a * Math.cos(ar * Math.PI / 180);
-  const yl = b * Math.sin(al * Math.PI / 180);
-  const yr = b * Math.sin(ar * Math.PI / 180);
+  const xl = a * Math.cos((al * Math.PI) / 180);
+  const xr = a * Math.cos((ar * Math.PI) / 180);
+  const yl = b * Math.sin((al * Math.PI) / 180);
+  const yr = b * Math.sin((ar * Math.PI) / 180);
   const span = f32(ar - al);
-  let root: ClipNode = { type: span < 180 ? "and" : "or", l: clipNode(-yl, xl, 0), r: clipNode(yr, -xr, 0) };
+  let root: ClipNode = {
+    type: span < 180 ? "and" : "or",
+    l: clipNode(-yl, xl, 0),
+    r: clipNode(yr, -xr, 0),
+  };
   // One more half-plane avoids spikes.
   if (span < 90) root = { type: "and", l: root, r: clipNode((xl + xr) / 2, (yl + yr) / 2, 0) };
   return { spans, root };
 }
 
-function drawClipped(image: RgbaImage, x0: number, y0: number, a: number, b: number, shape: ClippedEllipse, ink: Rgba): void {
+function drawClipped(
+  image: RgbaImage,
+  x0: number,
+  y0: number,
+  a: number,
+  b: number,
+  shape: ClippedEllipse,
+  ink: Rgba,
+): void {
   let span: Span | undefined;
   while ((span = shape.spans.next()) !== undefined) {
     const [sx0, sy, sx1] = span;
     const events = clip(shape.root, sx0, sy, sx1);
     for (let i = 0; i + 1 < events.length; i += 2) {
       const y = y0 + Math.trunc((sy + b) / 2);
-      hline(image, x0 + Math.trunc((events[i]!.x + a) / 2), y, x0 + Math.trunc((events[i + 1]!.x + a) / 2), ink, undefined);
+      hline(
+        image,
+        x0 + Math.trunc((events[i]!.x + a) / 2),
+        y,
+        x0 + Math.trunc((events[i + 1]!.x + a) / 2),
+        ink,
+        undefined,
+      );
     }
   }
 }
 
 function checkSpan(a: number, b: number): void {
-  if (a >= MAX_ELLIPSE_SPAN || b >= MAX_ELLIPSE_SPAN) throw new RangeError(`Ellipse box spans must be below ${MAX_ELLIPSE_SPAN}`);
+  if (a >= MAX_ELLIPSE_SPAN || b >= MAX_ELLIPSE_SPAN)
+    throw new RangeError(`Ellipse box spans must be below ${MAX_ELLIPSE_SPAN}`);
 }
 
-function ellipsePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, ink: Rgba, fill: boolean, width: number): void {
+function ellipsePrimitive(
+  image: RgbaImage,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  ink: Rgba,
+  fill: boolean,
+  width: number,
+): void {
   const a = x1 - x0;
   const b = y1 - y0;
   if (a < 0 || b < 0) return;
@@ -673,11 +718,28 @@ function ellipsePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, 
   let span: Span | undefined;
   while ((span = spans.next()) !== undefined) {
     const [sx0, sy, sx1] = span;
-    hline(image, x0 + Math.trunc((sx0 + a) / 2), y0 + Math.trunc((sy + b) / 2), x0 + Math.trunc((sx1 + a) / 2), ink, undefined);
+    hline(
+      image,
+      x0 + Math.trunc((sx0 + a) / 2),
+      y0 + Math.trunc((sy + b) / 2),
+      x0 + Math.trunc((sx1 + a) / 2),
+      ink,
+      undefined,
+    );
   }
 }
 
-function arcPrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, start: number, end: number, ink: Rgba, width: number): void {
+function arcPrimitive(
+  image: RgbaImage,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  start: number,
+  end: number,
+  ink: Rgba,
+  width: number,
+): void {
   [start, end] = normalizeAngles(start, end);
   if (f32(start + 360) === end) {
     ellipsePrimitive(image, x0, y0, x1, y1, ink, false, width);
@@ -692,7 +754,16 @@ function arcPrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: 
 }
 
 // Filled pie slice only.
-function pieslicePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, start: number, end: number, ink: Rgba): void {
+function pieslicePrimitive(
+  image: RgbaImage,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  start: number,
+  end: number,
+  ink: Rgba,
+): void {
   [start, end] = normalizeAngles(start, end);
   if (f32(start + 360) === end) {
     ellipsePrimitive(image, x0, y0, x1, y1, ink, true, 0);
@@ -713,29 +784,68 @@ function boxInts(box: readonly number[]): [number, number, number, number] {
   return [Math.trunc(box[0]!), Math.trunc(box[1]!), Math.trunc(box[2]!), Math.trunc(box[3]!)];
 }
 
-function drawRectangle(image: RgbaImage, box: readonly number[], ink: Rgba, fill: boolean, width = 0): void {
+function drawRectangle(
+  image: RgbaImage,
+  box: readonly number[],
+  ink: Rgba,
+  fill: boolean,
+  width = 0,
+): void {
   const [x0, y0, x1, y1] = boxInts(box);
   rectanglePrimitive(image, x0, y0, x1, y1, ink, fill, width);
 }
 
-function drawEllipse(image: RgbaImage, box: readonly number[], ink: Rgba, fill: boolean, width = 0): void {
+function drawEllipse(
+  image: RgbaImage,
+  box: readonly number[],
+  ink: Rgba,
+  fill: boolean,
+  width = 0,
+): void {
   const [x0, y0, x1, y1] = boxInts(box);
   ellipsePrimitive(image, x0, y0, x1, y1, ink, fill, width);
 }
 
-function drawArc(image: RgbaImage, box: readonly number[], start: number, end: number, ink: Rgba, width: number): void {
+function drawArc(
+  image: RgbaImage,
+  box: readonly number[],
+  start: number,
+  end: number,
+  ink: Rgba,
+  width: number,
+): void {
   const [x0, y0, x1, y1] = boxInts(box);
   arcPrimitive(image, x0, y0, x1, y1, f32(start), f32(end), ink, width);
 }
 
-function drawPieslice(image: RgbaImage, box: readonly number[], start: number, end: number, ink: Rgba): void {
+function drawPieslice(
+  image: RgbaImage,
+  box: readonly number[],
+  start: number,
+  end: number,
+  ink: Rgba,
+): void {
   const [x0, y0, x1, y1] = boxInts(box);
   pieslicePrimitive(image, x0, y0, x1, y1, f32(start), f32(end), ink);
 }
 
-function drawPolygon(image: RgbaImage, points: readonly XY[], ink: Rgba, fill: boolean, width = 0, mask?: Uint8Array): void {
+function drawPolygon(
+  image: RgbaImage,
+  points: readonly XY[],
+  ink: Rgba,
+  fill: boolean,
+  width = 0,
+  mask?: Uint8Array,
+): void {
   if (points.length < 2) throw new TypeError("Coordinate list must contain at least 2 coordinates");
-  polygonPrimitive(image, points.flatMap(([x, y]) => [Math.trunc(x), Math.trunc(y)]), ink, fill, width, mask);
+  polygonPrimitive(
+    image,
+    points.flatMap(([x, y]) => [Math.trunc(x), Math.trunc(y)]),
+    ink,
+    fill,
+    width,
+    mask,
+  );
 }
 
 function drawLines(image: RgbaImage, points: readonly XY[], ink: Rgba, width: number): void {
@@ -773,23 +883,41 @@ function lineXY(style: LineStyle, points: readonly XY[], image: RgbaImage): void
     const angles = [
       [points[i - 1]!, p],
       [p, points[i + 1]!],
-    ].map(([s, e]) => floorMod(RAD_TO_DEG * Math.atan2(e![0] - s![0], s![1] - e![1]), 360)) as [number, number];
+    ].map(([s, e]) => floorMod(RAD_TO_DEG * Math.atan2(e![0] - s![0], s![1] - e![1]), 360)) as [
+      number,
+      number,
+    ];
     if (angles[0] === angles[1]) continue;
     const coordAtAngle = ([x, y]: XY, angle: number): XY => {
       angle -= 90;
       const distance = width / 2 - 1;
       const offset = (d: number) => (d > 0 ? Math.floor(d) : Math.ceil(d));
-      return [x + offset(distance * Math.cos(DEG_TO_RAD * angle)), y + offset(distance * Math.sin(DEG_TO_RAD * angle))];
+      return [
+        x + offset(distance * Math.cos(DEG_TO_RAD * angle)),
+        y + offset(distance * Math.sin(DEG_TO_RAD * angle)),
+      ];
     };
     const flipped =
-      (angles[1] > angles[0] && angles[1] - 180 > angles[0]) || (angles[1] < angles[0] && angles[1] + 180 > angles[0]);
-    const box = [p[0] - width / 2 + 1, p[1] - width / 2 + 1, p[0] + width / 2 - 1, p[1] + width / 2 - 1];
-    const [start, end] = flipped ? [angles[1] + 90, angles[0] + 90] : [angles[0] - 90, angles[1] - 90];
+      (angles[1] > angles[0] && angles[1] - 180 > angles[0]) ||
+      (angles[1] < angles[0] && angles[1] + 180 > angles[0]);
+    const box = [
+      p[0] - width / 2 + 1,
+      p[1] - width / 2 + 1,
+      p[0] + width / 2 - 1,
+      p[1] + width / 2 - 1,
+    ];
+    const [start, end] = flipped
+      ? [angles[1] + 90, angles[0] + 90]
+      : [angles[0] - 90, angles[1] - 90];
     drawPieslice(image, box, start - 90, end - 90, fill);
     if (width > 8) {
       // Cover potential gaps between the line and the joint.
       const turn = flipped ? 90 : -90;
-      lineXY({ fill, width: 3 }, [coordAtAngle(p, angles[0] + turn), p, coordAtAngle(p, angles[1] + turn)], image);
+      lineXY(
+        { fill, width: 3 },
+        [coordAtAngle(p, angles[0] + turn), p, coordAtAngle(p, angles[1] + turn)],
+        image,
+      );
     }
   }
 }
@@ -806,7 +934,11 @@ export function polygon(style: ShapeStyle, vertices: readonly Point[], image: Rg
     return;
   }
   const mask = new Uint8Array(image.width * image.height);
-  const maskImage = { data: new Uint8Array(image.width * image.height * 4), height: image.height, width: image.width };
+  const maskImage = {
+    data: new Uint8Array(image.width * image.height * 4),
+    height: image.height,
+    width: image.width,
+  };
   drawPolygon(maskImage, points, [1, 0, 0, 0], true);
   for (let i = 0; i < mask.length; i++) mask[i] = maskImage.data[i * 4]!;
   drawPolygon(image, points, ink, false, width * 2 - 1, mask);
@@ -818,11 +950,18 @@ export function ellipse(style: ShapeStyle, bounds: Bounds, image: RgbaImage): vo
   const [ink, fillInk] = inks(style);
   const width = style.width ?? 1;
   if (fillInk !== undefined) drawEllipse(image, box, fillInk, true);
-  if (ink !== undefined && !sameInk(ink, fillInk) && width !== 0) drawEllipse(image, box, ink, false, width);
+  if (ink !== undefined && !sameInk(ink, fillInk) && width !== 0)
+    drawEllipse(image, box, ink, false, width);
 }
 
 // Pillow ImageDraw.arc: degrees clockwise from three o'clock.
-export function arc(style: ArcStyle, bounds: Bounds, start: number, end: number, image: RgbaImage): void {
+export function arc(
+  style: ArcStyle,
+  bounds: Bounds,
+  start: number,
+  end: number,
+  image: RgbaImage,
+): void {
   const box = boxOf(bounds);
   const fill = checkColour(style.fill);
   const width = style.width ?? 1;
@@ -835,11 +974,16 @@ export function rectangle(style: ShapeStyle, bounds: Bounds, image: RgbaImage): 
   const [ink, fillInk] = inks(style);
   const width = style.width ?? 1;
   if (fillInk !== undefined) drawRectangle(image, box, fillInk, true);
-  if (ink !== undefined && !sameInk(ink, fillInk) && width !== 0) drawRectangle(image, box, ink, false, width);
+  if (ink !== undefined && !sameInk(ink, fillInk) && width !== 0)
+    drawRectangle(image, box, ink, false, width);
 }
 
 // Pillow ImageDraw.rounded_rectangle, composed of pie slices, arcs and rectangles.
-export function roundedRectangle(style: RoundedRectangleStyle, bounds: Bounds, image: RgbaImage): void {
+export function roundedRectangle(
+  style: RoundedRectangleStyle,
+  bounds: Bounds,
+  image: RgbaImage,
+): void {
   let [x0, y0, x1, y1] = boxOf(bounds);
   if (x1 < x0) throw new RangeError("x1 must be greater than or equal to x0");
   if (y1 < y0) throw new RangeError("y1 must be greater than or equal to y0");
@@ -894,7 +1038,8 @@ export function roundedRectangle(style: RoundedRectangleStyle, bounds: Bounds, i
   if (fillInk !== undefined) {
     drawCorners(true, fillInk);
     if (fullX) drawRectangle(image, [x0, y0 + r + 1, x1, y1 - r - 1], fillInk, true);
-    else if (x1 - r - 1 >= x0 + r + 1) drawRectangle(image, [x0 + r + 1, y0, x1 - r - 1, y1], fillInk, true);
+    else if (x1 - r - 1 >= x0 + r + 1)
+      drawRectangle(image, [x0 + r + 1, y0, x1 - r - 1, y1], fillInk, true);
     if (!fullX && !fullY) {
       const left = [x0, y0, x0 + r, y1];
       if (rounded[0]) left[1] += r + 1;
