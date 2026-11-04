@@ -1,15 +1,13 @@
-/** Hexadecimal RGB and WCAG 2.0 contrast with its 0.03928 transfer threshold. */
+// Hexadecimal RGB and WCAG 2.0 contrast with its 0.03928 transfer threshold.
+/** The bytes of a six-digit hexadecimal colour without "#"; any other string throws RangeError. */
 export function rgb(colour: string): [
     number,
     number,
     number
 ] {
-    return [0, 2, 4].map((i) => {
-        const part = colour.slice(i, i + 2);
-        if (!/^[0-9a-f]{1,2}$/i.test(part))
-            throw new RangeError("Invalid hexadecimal colour");
-        return Number.parseInt(part, 16);
-    }) as [
+    if (!/^[0-9a-f]{6}$/i.test(colour))
+        throw new RangeError(`Invalid hexadecimal colour ${JSON.stringify(colour)}`);
+    return [0, 2, 4].map((i) => Number.parseInt(colour.slice(i, i + 2), 16)) as [
         number,
         number,
         number

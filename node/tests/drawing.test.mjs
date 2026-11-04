@@ -39,6 +39,11 @@ test("outline uses original neighbours in top bottom left right priority and clo
   assert.equal(f[1][1], null);
   assert.deepEqual(g.outlined({ enabled: false }), f);
   assert.throws(() => g.outlined(), /outline colour rule/);
+  // A null edge leaves the pixel clear.
+  const skipped = g.outlined({ edge: (c) => (c === "a" ? null : c.toUpperCase()) });
+  assert.equal(skipped[1][1], null);
+  assert.equal(skipped[0][0], "B");
+  assert.equal(skipped[0][2], "C");
 });
 test("pixel-centred shapes and triangle boundaries remain explicit", () => {
   for (const method of ["ell", "blob", "cel"]) {
@@ -142,6 +147,8 @@ test("invalid layouts and ragged frames fail explicitly", () => {
 });
 test("hex channels and WCAG contrast", () => {
   assert.deepEqual(rgb("01aBff"), [1, 171, 255]);
+  for (const invalid of ["abcde", "aabbccdd", "#aabbcc", "abc", "", "gg0000", " aabbcc"])
+    assert.throws(() => rgb(invalid), RangeError, invalid);
   assert.equal(contrast("000000", "ffffff"), 21);
 });
 

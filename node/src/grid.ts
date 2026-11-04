@@ -1,6 +1,7 @@
 export type Colour = string | null;
 export type Frame = Colour[][];
-export type Edge = (colour: string) => string;
+// The outline colour for a clear pixel beside colour, or null to leave it clear.
+export type Edge = (colour: string) => Colour;
 type Point = readonly [number, number];
 export interface OutlineOptions {
   enabled?: boolean;
