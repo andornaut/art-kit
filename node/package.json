@@ -26,5 +26,17 @@
   "files": ["dist", "LICENSE", "SOURCE_COMMIT"],
   "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0", "skia-canvas": "4.0.0" },
   "peerDependenciesMeta": { "skia-canvas": { "optional": true } },
-  "devDependencies": { "@types/node": "24.19.2", "@types/pngjs": "6.0.5", "typescript": "6.0.3" }
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.19.2",
+    "@types/pngjs": "6.0.5",
+    "eslint": "10.14.0",
+    "eslint-plugin-import-x": "4.17.1",
+    "eslint-plugin-simple-import-sort": "14.0.0",
+    "eslint-plugin-sort-destructure-keys": "3.0.0",
+    "globals": "17.14.0",
+    "prettier": "3.9.10",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
 }

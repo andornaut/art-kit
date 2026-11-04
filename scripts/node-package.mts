@@ -29,6 +29,16 @@ for (const [name, expected] of Object.entries<string>({ ...descriptor.devDepende
 }
 const { version } = descriptor;
 if (!/^\d+\.\d+\.\d+$/.test(version ?? '')) throw new Error('Missing or invalid package version');
+if (mode === 'check') {
+  // The linters resolve their configs' imports through node_modules beside them; preserving the symlinked
+  // path lets each package find its siblings in /deps.
+  symlinkSync('/deps', `${root}/node_modules`);
+  const tool = (path: string, args: readonly string[]): void => {
+    execFileSync('node', ['--preserve-symlinks', '--preserve-symlinks-main', `${root}/node_modules/${path}`, ...args], { cwd: root, stdio: 'inherit' });
+  };
+  tool('prettier/bin/prettier.cjs', ['--check', '.']);
+  tool('eslint/bin/eslint.js', ['--max-warnings', '0', '.']);
+}
 symlinkSync('/deps', `${root}/node/node_modules`);
 execFileSync('node', ['/deps/typescript/bin/tsc', '-p', `${root}/node/tsconfig.json`], { stdio: 'inherit' });
 const packageDir = `${work}/package`;

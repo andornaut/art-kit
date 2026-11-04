@@ -220,13 +220,15 @@ async function check(dependencyPath: string): Promise<void> {
   const evidence = evidenceDirectory('check');
   guardSource();
   const commit = revision();
+  // The listed top-level entries, so the format and lint gates see the whole tree.
+  const entries = [...new Set(git(['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0').filter(Boolean).map(path => path.split('/')[0]))];
   const spec: ContainerSpec = {
     network: 'none', mounts: [[root, '/app'], [dependencies, '/deps']],
     env: { npm_config_cache: '/tmp/npm-cache', ART_KIT_TEST_FIXTURES: '/tmp/work/source/node/tests/fixtures' },
   };
   await withContainer(spec, 'art-kit-check', NODE_IMAGE, async container => {
     await exec({}, container, ['mkdir', '-p', '/tmp/work/source', '/tmp/out']);
-    await exec({}, container, ['cp', '-R', '/app/node', '/app/LICENSE', '/tmp/work/source/']);
+    await exec({}, container, ['cp', '-R', ...entries.map(entry => `/app/${entry}`), '/tmp/work/source/']);
     await exec({}, container, ['node', '/app/scripts/node-package.mts', 'check', commit]);
     await copyOut(container, '/tmp/out/.', evidence);
   });

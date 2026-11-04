@@ -1,0 +1,6 @@
+.claude/
+.worktrees/
+node_modules/
+dist/
+# Fixtures are compared byte for byte.
+node/tests/fixtures/
