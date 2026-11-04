@@ -36,3 +36,10 @@ test('supports empty glyph sets and zero padding without inventing metrics', () 
   assert.equal(result.metadata.glyphs.get(' ').yoffset, 4);
   assert.equal(build({...options, padding: 0}, new Map()).metadata.glyphs.size, 0);
 });
+test('an explicit padded layout matches the default layout', () => {
+  const glyphs = new Map([['j', glyph], [' ', space], ['A', glyph]]);
+  const implicit = build(options, glyphs), explicit = build({ ...options, layout: 'padded' }, glyphs);
+  assert.equal(explicit.xml, implicit.xml);
+  assert.deepEqual(explicit.image.data, implicit.image.data);
+  assert.equal(implicit.metadata.layout, 'padded');
+});

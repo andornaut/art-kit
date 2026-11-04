@@ -21,7 +21,14 @@ export type { ColourContext, Rgb, Sprite, Tag as FrameTag } from "./frames.js";
 export { buildBitmapFont } from "./fonts.js";
 export type { BitmapFontOptions, BitmapGlyph } from "./fonts.js";
 export { buildBitmapFontFromGlyphs } from "./glyphAtlas.js";
-export type { GlyphAtlasOptions, GlyphKerning, SuppliedBitmapGlyph } from "./glyphAtlas.js";
+export type {
+  GlyphAtlasLayout,
+  GlyphAtlasOptions,
+  GlyphKerning,
+  PackedGlyphAtlasOptions,
+  PaddedGlyphAtlasOptions,
+  SuppliedBitmapGlyph,
+} from "./glyphAtlas.js";
 export { exportBitmapFont, exportBitmapFontFromGlyphs } from "./fontExport.js";
 export type { BitmapFontExportOptions, BitmapFontFromGlyphsExportOptions } from "./fontExport.js";
 export { export as exportAseprite, lua as asepriteLua } from "./aseprite.js";

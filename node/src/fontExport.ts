@@ -9,8 +9,11 @@ export interface BitmapFontExportOptions {
   output: { png: string; fnt: string };
 }
 
+// Distributes over the layout union so each variant keeps its own options.
+type WithoutKey<T> = T extends unknown ? Omit<T, "key"> : never;
+
 export interface BitmapFontFromGlyphsExportOptions {
-  font: Omit<GlyphAtlasOptions, "key">;
+  font: WithoutKey<GlyphAtlasOptions>;
   glyphs: ReadonlyMap<string, SuppliedBitmapGlyph>;
   output: { png: string; fnt: string };
 }
