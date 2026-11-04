@@ -3,9 +3,9 @@ import type { Rgba } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
 // Pillow 13.0.0 ImageDraw.Draw(image) on an RGBA image: every operation writes its ink bytes
-// directly, without blending. Coordinates are truncated toward zero as Pillow's C layer casts them;
-// rounded rectangles round their box first, as Pillow's Python layer does. Float arithmetic that
-// Pillow performs in single precision is reproduced with Math.fround.
+// directly, without blending. Coordinates are truncated toward zero; rounded rectangles round
+// their box half to even first. Float arithmetic that Pillow performs in single precision is
+// reproduced with Math.fround.
 
 // Inclusive corner pixels of a shape's box: x1 >= x0 and y1 >= y0, so a box with x0 = x1 is one
 // pixel wide.
@@ -57,7 +57,7 @@ const WHITE: Rgba = [255, 255, 255, 255];
 const MAX_ELLIPSE_SPAN = 8192;
 
 const f32 = Math.fround;
-// CPython's math.degrees and math.radians multiply by these constants.
+// Degree and radian conversion multiply by these constants rather than dividing.
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -106,8 +106,8 @@ function roundAway(v: number): number {
   return v < 0 ? -Math.round(-v) : Math.round(v);
 }
 
-// Python float modulo: the result takes the divisor's sign.
-function pyMod(a: number, b: number): number {
+// Floored modulo: the result takes the divisor's sign.
+function floorMod(a: number, b: number): number {
   let mod = a % b;
   if (mod) {
     if (b < 0 !== mod < 0) mod += b;
@@ -117,8 +117,8 @@ function pyMod(a: number, b: number): number {
   return mod;
 }
 
-// Python round(): half to even.
-function pyRound(v: number): number {
+// Round half to even.
+function roundHalfEven(v: number): number {
   const floor = Math.floor(v);
   const diff = v - floor;
   if (diff > 0.5) return floor + 1;
@@ -773,7 +773,7 @@ function lineXY(style: LineStyle, points: readonly XY[], image: RgbaImage): void
     const angles = [
       [points[i - 1]!, p],
       [p, points[i + 1]!],
-    ].map(([s, e]) => pyMod(RAD_TO_DEG * Math.atan2(e![0] - s![0], s![1] - e![1]), 360)) as [number, number];
+    ].map(([s, e]) => floorMod(RAD_TO_DEG * Math.atan2(e![0] - s![0], s![1] - e![1]), 360)) as [number, number];
     if (angles[0] === angles[1]) continue;
     const coordAtAngle = ([x, y]: XY, angle: number): XY => {
       angle -= 90;
@@ -846,7 +846,7 @@ export function roundedRectangle(style: RoundedRectangleStyle, bounds: Bounds, i
   const rounded = style.corners ?? [true, true, true, true];
   const width = style.width ?? 1;
   let d = Math.min(x1 - x0, y1 - y0, style.radius * 2);
-  [x0, y0, x1, y1] = [pyRound(x0), pyRound(y0), pyRound(x1), pyRound(y1)];
+  [x0, y0, x1, y1] = [roundHalfEven(x0), roundHalfEven(y0), roundHalfEven(x1), roundHalfEven(y1)];
   let fullX = false;
   let fullY = false;
   if (rounded.every(Boolean)) {

@@ -21,8 +21,8 @@ interface GlyphAtlasCommonOptions {
 /** Inset and spaced by `padding` (default 1); the atlas height fits the last row. */
 export interface PaddedGlyphAtlasOptions extends GlyphAtlasCommonOptions { layout?: "padded"; padding?: number }
 /**
- * Python art_kit 0.10 `fonts.pack` and `bmfont_xml`: from (0, 0) with 1 px spacing, a power-of-two
- * height and the full info attribute set, with `smooth` and `aa` from `antialias`.
+ * From (0, 0) with 1 px spacing, a power-of-two height and the full info attribute set, with
+ * `smooth` and `aa` from `antialias`; byte-identical to the frozen `bmfont-packed.json` references.
  */
 export interface PackedGlyphAtlasOptions extends GlyphAtlasCommonOptions { layout: "packed"; antialias: boolean }
 export type GlyphAtlasOptions = PaddedGlyphAtlasOptions | PackedGlyphAtlasOptions;
@@ -37,13 +37,14 @@ function scalar(id: number) {
   if (id >= 0xd800 && id <= 0xdfff) throw new RangeError("Invalid Unicode scalar");
   return id;
 }
-function quote(value: string, python = false) {
+function quote(value: string, singleQuotes = false) {
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(value))
     throw new RangeError("Invalid XML attribute character");
   const text = value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
     .replaceAll("\t", "&#9;").replaceAll("\n", "&#10;").replaceAll("\r", "&#13;");
-  // Python xml.sax.saxutils.quoteattr wraps a value holding only double quotes in single quotes.
-  if (python && !text.includes("'")) return text.includes('"') ? `'${text}'` : `"${text}"`;
+  // With singleQuotes, a value holding double quotes but no single quotes is wrapped in single
+  // quotes and its double quotes are left unescaped.
+  if (singleQuotes && !text.includes("'")) return text.includes('"') ? `'${text}'` : `"${text}"`;
   return `"${text.replaceAll('"', "&quot;")}"`;
 }
 /**

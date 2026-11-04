@@ -109,7 +109,7 @@ export function buildBitmapFont(options: BitmapFontOptions) {
 
   let family = families.get(path);
   if (!family) {
-    family = `art_kit_bitmap_${families.size}`;
+    family = `art-kit-bitmap-${families.size}`;
     FontLibrary.use(family, path);
     families.set(path, family);
   }
@@ -142,7 +142,6 @@ export function buildBitmapFont(options: BitmapFontOptions) {
     rowHeight = 0;
   for (const char of characters) {
     const id = codePoint(char);
-    if (glyphs.has(char)) continue;
     const m = context.measureText(char);
     advances.set(char, m.width);
     const left = Math.floor(-m.actualBoundingBoxLeft);
