@@ -10,6 +10,8 @@
     "./indexedPng": { "types": "./dist/indexedPng.d.ts", "import": "./dist/indexedPng.js" },
     "./png": { "types": "./dist/png.d.ts", "import": "./dist/png.js" },
     "./webp": { "types": "./dist/webp.d.ts", "import": "./dist/webp.js" },
+    "./gif": { "types": "./dist/gif.d.ts", "import": "./dist/gif.js" },
+    "./ico": { "types": "./dist/ico.d.ts", "import": "./dist/ico.js" },
     "./aseprite": { "types": "./dist/aseprite.d.ts", "import": "./dist/aseprite.js" },
     "./draw": { "types": "./dist/draw.d.ts", "import": "./dist/draw.js" },
     "./colour": { "types": "./dist/colour.d.ts", "import": "./dist/colour.js" },
