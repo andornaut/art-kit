@@ -52,18 +52,23 @@ function integer(
   min = Number.MIN_SAFE_INTEGER,
   max = Number.MAX_SAFE_INTEGER,
 ) {
-  if (!Number.isSafeInteger(value) || value < min || value > max)
+  if (!Number.isSafeInteger(value) || value < min || value > max) {
     throw new RangeError(`${label} must be an integer in ${min}..${max}`);
+  }
   return value;
 }
 function scalar(id: number) {
   integer(id, "Code point", 0, 0x10ffff);
-  if (id >= 0xd800 && id <= 0xdfff) throw new RangeError("Invalid Unicode scalar");
+  if (id >= 0xd800 && id <= 0xdfff) {
+    throw new RangeError("Invalid Unicode scalar");
+  }
   return id;
 }
 function quote(value: string, singleQuotes = false) {
-  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(value))
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(value)) {
     throw new RangeError("Invalid XML attribute character");
+  }
   const text = value
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -73,7 +78,9 @@ function quote(value: string, singleQuotes = false) {
     .replaceAll("\r", "&#13;");
   // With singleQuotes, a value holding double quotes but no single quotes is wrapped in single
   // quotes and its double quotes are left unescaped.
-  if (singleQuotes && !text.includes("'")) return text.includes('"') ? `'${text}'` : `"${text}"`;
+  if (singleQuotes && !text.includes("'")) {
+    return text.includes('"') ? `'${text}'` : `"${text}"`;
+  }
   return `"${text.replaceAll('"', "&quot;")}"`;
 }
 /**
@@ -85,16 +92,20 @@ export function buildBitmapFontFromGlyphs(
   supplied: ReadonlyMap<string, SuppliedBitmapGlyph>,
 ) {
   const layout: GlyphAtlasLayout = options.layout ?? "padded";
-  if (layout !== "padded" && layout !== "packed")
+  if (layout !== "padded" && layout !== "packed") {
     throw new RangeError("Layout must be padded or packed");
+  }
   const packed = layout === "packed";
   const loose = options as { padding?: unknown; antialias?: unknown };
-  if (packed && loose.padding !== undefined)
+  if (packed && loose.padding !== undefined) {
     throw new RangeError("Packed layout has fixed 1 px spacing and no padding");
-  if (!packed && loose.antialias !== undefined)
+  }
+  if (!packed && loose.antialias !== undefined) {
     throw new RangeError("antialias applies only to the packed layout");
-  if (packed && typeof loose.antialias !== "boolean")
+  }
+  if (packed && typeof loose.antialias !== "boolean") {
     throw new RangeError("Packed layout requires a boolean antialias");
+  }
   const width = integer(options.atlasWidth, "Atlas width", 1, 16384);
   const limit = 16384;
   const padding = packed
@@ -104,7 +115,7 @@ export function buildBitmapFontFromGlyphs(
   const base = integer(options.base, "Base");
   const lineHeight = integer(options.lineHeight, "Line height", 1, 16384);
   const face = quote(options.face, packed),
-    page = quote(options.key + ".png", packed);
+    page = quote(`${options.key}.png`, packed);
   const glyphs = new Map<string, BitmapGlyph>();
   // Packed starts at the origin and wraps when the glyph plus its trailing spacing pixel overflows.
   const spacing = packed ? 1 : padding;
@@ -112,22 +123,31 @@ export function buildBitmapFontFromGlyphs(
     y = padding,
     rowHeight = 0;
   for (const [char, source] of supplied) {
-    if ([...char].length !== 1) throw new RangeError("Glyph key must be one Unicode scalar");
+    if ([...char].length !== 1) {
+      throw new RangeError("Glyph key must be one Unicode scalar");
+    }
     const id = scalar(char.codePointAt(0)!);
     const { image } = source;
     const w = image ? integer(image.width, "Glyph width", 1, 16384) : 0;
     const h = image ? integer(image.height, "Glyph height", 1, 16384) : 0;
-    if (image && (!(image.data instanceof Uint8Array) || image.data.length !== w * h * 4))
+    if (image && (!(image.data instanceof Uint8Array) || image.data.length !== w * h * 4)) {
       throw new RangeError("Glyph data must contain exactly width * height * 4 bytes");
+    }
     if (image) {
-      if (w + 2 * padding > width) throw new RangeError(`Glyph ${char} exceeds atlas width`);
+      if (w + 2 * padding > width) {
+        throw new RangeError(`Glyph ${char} exceeds atlas width`);
+      }
       if (x + w + spacing > width) {
         x = padding;
         y += rowHeight + spacing;
         rowHeight = 0;
       }
-      if (y + h + padding > limit) throw new RangeError("Glyph atlas exceeds maximum height");
+      if (y + h + padding > limit) {
+        throw new RangeError("Glyph atlas exceeds maximum height");
+      }
     }
+    // Field order is the BMFont char attribute order.
+    /* eslint-disable sort-keys */
     glyphs.set(char, {
       id,
       x: image ? x : 0,
@@ -138,27 +158,37 @@ export function buildBitmapFontFromGlyphs(
       yoffset: integer(source.yoffset, "yoffset"),
       xadvance: integer(source.xadvance, "xadvance"),
     });
+    /* eslint-enable sort-keys */
     if (image) {
       x += w + spacing;
       rowHeight = Math.max(rowHeight, h);
     }
   }
   let height = Math.max(1, y + rowHeight + padding);
-  if (packed) for (height = 1; height < y + rowHeight + 1;) height *= 2;
-  if (height > limit) throw new RangeError("Glyph atlas exceeds maximum height");
+  if (packed) {
+    for (height = 1; height < y + rowHeight + 1;) {
+      height *= 2;
+    }
+  }
+  if (height > limit) {
+    throw new RangeError("Glyph atlas exceeds maximum height");
+  }
   const kernings = (options.kernings ?? []).map((k) => {
     const first = scalar(k.first),
       second = scalar(k.second);
-    if (!glyphs.has(String.fromCodePoint(first)) || !glyphs.has(String.fromCodePoint(second)))
+    if (!glyphs.has(String.fromCodePoint(first)) || !glyphs.has(String.fromCodePoint(second))) {
       throw new RangeError("Kerning pair must belong to supplied glyphs");
-    return { first, second, amount: integer(k.amount, "Kerning amount") };
+    }
+    return { amount: integer(k.amount, "Kerning amount"), first, second };
   });
   const image = blankImage(width, height);
   for (const [char, source] of supplied) {
-    if (!source.image) continue;
+    if (!source.image) {
+      continue;
+    }
     const g = glyphs.get(char)!;
     blitExtruded(
-      { at: g, extrude: 0, from: { x: 0, y: 0, width: g.width, height: g.height } },
+      { at: g, extrude: 0, from: { height: g.height, width: g.width, x: 0, y: 0 } },
       source.image,
       image,
     );
@@ -175,33 +205,35 @@ export function buildBitmapFontFromGlyphs(
     `  <pages><page id="0" file=${page}/></pages>`,
     `  <chars count="${glyphs.size}">`,
   ];
-  for (const g of glyphs.values())
+  for (const g of glyphs.values()) {
     lines.push(
       `    <char ${Object.entries(g)
         .map(([k, v]) => `${k}="${v}"`)
         .join(" ")} page="0" chnl="15"/>`,
     );
+  }
   lines.push("  </chars>");
   // Packed omits an empty kernings element.
   if (!packed || kernings.length) {
     lines.push(`  <kernings count="${kernings.length}">`);
-    for (const k of kernings)
+    for (const k of kernings) {
       lines.push(`    <kerning first="${k.first}" second="${k.second}" amount="${k.amount}"/>`);
+    }
     lines.push("  </kernings>");
   }
   lines.push("</font>", "");
   return {
     image,
-    xml: lines.join("\n"),
     metadata: {
+      base,
+      face: options.face,
       glyphs,
       kernings,
-      size,
-      base,
-      lineHeight,
-      face: options.face,
       layout,
+      lineHeight,
+      size,
       ...(packed ? { antialias: Boolean(aa) } : {}),
     },
+    xml: lines.join("\n"),
   };
 }

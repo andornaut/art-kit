@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { inflateSync } from "node:zlib";
+
 import { encodeGif } from "@andornaut/art-kit/gif";
 import { encodeIco } from "@andornaut/art-kit/ico";
 import { decodePng } from "@andornaut/art-kit/png";
@@ -10,7 +11,7 @@ const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
 // Frozen inputs and Pillow 13.0.0 decodes; see fixtures/README.md.
 const reference = JSON.parse(readFileSync(`${fixtures}/gif-ico/pillow.json`, "utf8"));
-const image = ({ width, height, rgba }) => ({
+const image = ({ height, rgba, width }) => ({
   width,
   height,
   data: new Uint8Array(inflateSync(Buffer.from(rgba, "base64"))),
@@ -29,16 +30,24 @@ function lzwDecode(minCodeSize, data) {
   let bit = 0;
   while (bit + codeSize <= data.length * 8) {
     let code = 0;
-    for (let i = 0; i < codeSize; i++, bit++) code |= ((data[bit >> 3] >> (bit & 7)) & 1) << i;
+    for (let i = 0; i < codeSize; i++, bit++) {
+      code |= ((data[bit >> 3] >> (bit & 7)) & 1) << i;
+    }
     if (code === clear) {
       reset();
       continue;
     }
-    if (code === clear + 1) return out;
+    if (code === clear + 1) {
+      return out;
+    }
     const entry = table[code] ?? [...table[previous], table[previous][0]];
     out.push(...entry);
-    if (previous !== undefined && table.length < 4096) table.push([...table[previous], entry[0]]);
-    if (table.length === 1 << codeSize && codeSize < 12) codeSize++;
+    if (previous !== undefined && table.length < 4096) {
+      table.push([...table[previous], entry[0]]);
+    }
+    if (table.length === 1 << codeSize && codeSize < 12) {
+      codeSize++;
+    }
     previous = code;
   }
   throw new Error("LZW data has no end code");
@@ -51,12 +60,16 @@ function parseGif(bytes) {
   const u16 = () => bytes[at++] | (bytes[at++] << 8);
   const table = (flags) => {
     const colours = [];
-    for (let i = 0; i < 2 << (flags & 7); i++) colours.push([u8(), u8(), u8()]);
+    for (let i = 0; i < 2 << (flags & 7); i++) {
+      colours.push([u8(), u8(), u8()]);
+    }
     return colours;
   };
   const blocks = () => {
     const parts = [];
-    for (let size = u8(); size; size = u8()) parts.push(...bytes.subarray(at, (at += size)));
+    for (let size = u8(); size; size = u8()) {
+      parts.push(...bytes.subarray(at, (at += size)));
+    }
     return Uint8Array.from(parts);
   };
   assert.equal(new TextDecoder().decode(bytes.subarray(0, 6)), "GIF89a");
@@ -68,7 +81,9 @@ function parseGif(bytes) {
   let control;
   for (;;) {
     const kind = u8();
-    if (kind === 0x3b) return { ...gif, trailing: bytes.length - at };
+    if (kind === 0x3b) {
+      return { ...gif, trailing: bytes.length - at };
+    }
     if (kind === 0x21) {
       const label = u8();
       const data = blocks();
@@ -104,16 +119,18 @@ function merged(durations, frames) {
   const kept = [];
   frames.forEach((frame, i) => {
     const last = kept.at(-1);
-    if (last && Buffer.from(last.image.data).equals(Buffer.from(frame.data)))
+    if (last && Buffer.from(last.image.data).equals(Buffer.from(frame.data))) {
       last.duration += durations[i];
-    else kept.push({ image: frame, duration: durations[i] });
+    } else {
+      kept.push({ image: frame, duration: durations[i] });
+    }
   });
   return kept;
 }
 
-for (const [name, { options, frames, pillow }] of Object.entries(reference.gif)) {
+for (const [name, { frames, options, pillow }] of Object.entries(reference.gif)) {
   test(`GIF ${name} holds every distinct frame whole with Pillow's timing and loop`, () => {
-    const { duration, loop, disposal = 0 } = options;
+    const { disposal = 0, duration, loop } = options;
     const inputs = frames.map(image);
     const gif = parseGif(encodeGif({ durations: duration, loop, disposal }, inputs));
     assert.equal(gif.trailing, 0);
@@ -131,7 +148,7 @@ for (const [name, { options, frames, pillow }] of Object.entries(reference.gif))
 }
 
 test("GIF frames beyond 256 colours together use local colour tables", () => {
-  const { options, frames } = reference.gif.noise;
+  const { frames, options } = reference.gif.noise;
   const gif = parseGif(encodeGif({ durations: options.duration }, frames.map(image)));
   assert.deepEqual(
     gif.frames.map((frame) => frame.local),
@@ -164,7 +181,9 @@ test("GIF rejects input it cannot encode exactly", () => {
     );
   }
   const many = { width: 257, height: 1, data: new Uint8Array(257 * 4) };
-  for (let i = 0; i < 257; i++) many.data.set([i & 0xff, i >> 8, 0, 255], i * 4);
+  for (let i = 0; i < 257; i++) {
+    many.data.set([i & 0xff, i >> 8, 0, 255], i * 4);
+  }
   assert.throws(() => encodeGif({ durations: 10 }, [many]), RangeError);
 });
 

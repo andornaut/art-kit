@@ -22,7 +22,6 @@ const MIN_MATCH = 3;
 const MAX_MATCH = 258;
 const MIN_LOOKAHEAD = MAX_MATCH + MIN_MATCH + 1;
 const WIN_INIT = MAX_MATCH;
-const TOO_FAR = 4096;
 // Level 6: good_length, max_lazy, nice_length and max_chain.
 const GOOD_LENGTH = 8;
 const MAX_LAZY = 16;
@@ -57,7 +56,8 @@ const EXTRA_DBITS = [
 const EXTRA_BLBITS = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7];
 const BL_ORDER = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15];
 
-function reverseBits(code: number, length: number): number {
+function reverseBits(value: number, length: number): number {
+  let code = value;
   let result = 0;
   for (let i = 0; i < length; i++) {
     result = (result << 1) | (code & 1);
@@ -159,26 +159,26 @@ const STATIC_DTREE_CODES = new Uint16Array(D_CODES);
 
 const STATIC_L_DESC: StaticDescription = {
   codes: STATIC_LTREE_CODES,
-  lens: STATIC_LTREE_LENS,
-  extraBits: EXTRA_LBITS,
-  extraBase: LITERALS + 1,
   elements: L_CODES,
+  extraBase: LITERALS + 1,
+  extraBits: EXTRA_LBITS,
+  lens: STATIC_LTREE_LENS,
   maxLength: MAX_BITS,
 };
 const STATIC_D_DESC: StaticDescription = {
   codes: STATIC_DTREE_CODES,
-  lens: STATIC_DTREE_LENS,
-  extraBits: EXTRA_DBITS,
-  extraBase: 0,
   elements: D_CODES,
+  extraBase: 0,
+  extraBits: EXTRA_DBITS,
+  lens: STATIC_DTREE_LENS,
   maxLength: MAX_BITS,
 };
 const STATIC_BL_DESC: StaticDescription = {
   codes: undefined,
-  lens: undefined,
-  extraBits: EXTRA_BLBITS,
-  extraBase: 0,
   elements: BL_CODES,
+  extraBase: 0,
+  extraBits: EXTRA_BLBITS,
+  lens: undefined,
   maxLength: MAX_BL_BITS,
 };
 
@@ -562,7 +562,7 @@ class Deflater {
   }
 
   private generateBitLengths(tree: Tree, desc: StaticDescription): void {
-    const { heap, blCount } = this;
+    const { blCount, heap } = this;
     const { maxCode } = tree;
     const { extraBase, extraBits, lens: staticLens, maxLength } = desc;
     let overflow = 0;
@@ -618,7 +618,7 @@ class Deflater {
   }
 
   private buildTree(tree: Tree, desc: StaticDescription): void {
-    const { heap, depth } = this;
+    const { depth, heap } = this;
     const { elements, lens: staticLens } = desc;
     let maxCode = -1;
     this.heapLen = 0;

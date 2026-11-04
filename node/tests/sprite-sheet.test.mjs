@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { readFileSync } from "node:fs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+
 import { decodePng } from "@andornaut/art-kit/png";
 import { spriteSheet, writeSpriteSheet } from "@andornaut/art-kit/spriteSheet";
 
@@ -46,7 +47,7 @@ function exportedTags({ data, sheet }) {
       }),
     ),
   );
-  return json.meta.frameTags.map(({ name, from, to }) => [
+  return json.meta.frameTags.map(({ from, name, to }) => [
     name,
     frames.slice(from, to + 1),
     entries.slice(from, to + 1).map(({ duration }) => duration),

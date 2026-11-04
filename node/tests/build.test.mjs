@@ -3,9 +3,10 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+
 import {
-  BuildError,
   buildCommand,
+  BuildError,
   buildOrder,
   CheckError,
   runBuilds,
@@ -20,7 +21,9 @@ function table(entries, ran = [], failing) {
       {
         needs,
         build: async () => {
-          if (name === failing) throw new Error(`${name} broke`);
+          if (name === failing) {
+            throw new Error(`${name} broke`);
+          }
           ran.push(name);
         },
       },
@@ -83,7 +86,7 @@ const orders = [
   },
 ];
 
-for (const { name, entries, selected, order } of orders) {
+for (const { entries, name, order, selected } of orders) {
   test(`buildOrder: ${name}`, () => {
     assert.deepEqual(buildOrder(table(entries), selected), order);
   });
@@ -122,7 +125,7 @@ const invalid = [
   },
 ];
 
-for (const { name, entries, selected, error, message } of invalid) {
+for (const { entries, error, message, name, selected } of invalid) {
   test(`buildOrder rejects ${name}`, () => {
     assert.throws(
       () => buildOrder(table(entries), selected),
@@ -137,7 +140,9 @@ test("runBuilds runs sequentially in order and logs each set", async () => {
     slow: {
       build: async () => {
         events.push("slow start");
-        await new Promise((resolve) => setTimeout(resolve, 20));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 20);
+        });
         events.push("slow end");
       },
     },
@@ -220,7 +225,7 @@ const checks = [
   },
 ];
 
-for (const { name, edit, changes } of checks) {
+for (const { changes, edit, name } of checks) {
   test(`runBuilds check: ${name}`, async (t) => {
     const dir = await scratch(t);
     const sets = { only: { build: () => edit(dir) } };
@@ -288,13 +293,13 @@ const commands = [
 ];
 
 for (const {
-  name,
   argv,
   check = true,
-  failing,
-  status,
-  ran: expected,
   errors: expectedErrors,
+  failing,
+  name,
+  ran: expected,
+  status,
 } of commands) {
   test(`buildCommand: ${name}`, async (t) => {
     const dir = await scratch(t);

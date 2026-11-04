@@ -2,8 +2,9 @@
 // suite calls as the oracle.
 import assert from "node:assert/strict";
 import test from "node:test";
+
+import { encodeRgbaPng, encodeRgbPng } from "@andornaut/art-kit/png";
 import { PNG } from "pngjs";
-import { encodeRgbPng, encodeRgbaPng } from "@andornaut/art-kit/png";
 
 const ENCODERS = [
   { name: "RGBA", encode: encodeRgbaPng, pngjsOptions: { colorType: 6 } },
@@ -26,7 +27,7 @@ function outcome(encode) {
 }
 
 function assertMatchesPngjs(options, image, label) {
-  for (const { name, encode, pngjsOptions } of ENCODERS) {
+  for (const { encode, name, pngjsOptions } of ENCODERS) {
     const source =
       name === "RGB"
         ? { ...image, data: image.data.map((value, i) => (i % 4 === 3 ? 255 : value)) }

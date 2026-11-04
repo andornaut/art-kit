@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+
 import {
   arc,
   ellipse,
@@ -36,8 +37,8 @@ function background(width, height) {
 }
 
 // Fixtures record Pillow's argument shapes: [x, y] points and [x0, y0, x1, y1] boxes.
-function draw({ op, args }, image) {
-  const { start, end, joint, ...rest } = args;
+function draw({ args, op }, image) {
+  const { end, joint, start, ...rest } = args;
   delete rest.box;
   delete rest.points;
   const points = args.points?.map(([x, y]) => ({ x, y }));
@@ -48,7 +49,9 @@ function draw({ op, args }, image) {
       key === "fill" || key === "outline" ? fixture.colours[value] : value,
     ]),
   );
-  if (joint) style.joint = joint;
+  if (joint) {
+    style.joint = joint;
+  }
   switch (op) {
     case "point":
       return point(style.fill, points, image);
@@ -86,7 +89,7 @@ test("draw fixtures come from Pillow 13.0.0 and cover every operation", () => {
 });
 
 test("mode 1 and L targets cover the same pixels as RGBA in every fixture case", () => {
-  const { L, 1: bilevel, mismatches } = fixture.equivalence;
+  const { 1: bilevel, L, mismatches } = fixture.equivalence;
   assert.ok(L.cases > 0 && bilevel.cases > 0);
   assert.equal(L.matched, L.cases);
   assert.equal(bilevel.matched, bilevel.cases);
@@ -97,19 +100,26 @@ for (const op of new Set(fixture.cases.map((c) => c.op))) {
   test(`${op} matches Pillow RGBA bytes exactly`, () => {
     const failures = [];
     for (const [index, c] of fixture.cases.entries()) {
-      if (c.op !== op) continue;
+      if (c.op !== op) {
+        continue;
+      }
       const image = background(...c.size);
       let threw = false;
       try {
         draw(c, image);
       } catch (error) {
-        if (!(error instanceof RangeError)) throw error;
+        if (!(error instanceof RangeError)) {
+          throw error;
+        }
         threw = true;
       }
       const hash = createHash("sha256").update(image.data).digest("hex").slice(0, 16);
-      if (threw !== Boolean(c.error) || hash !== c.sha256) failures.push(index);
-      if (c.rgba)
+      if (threw !== Boolean(c.error) || hash !== c.sha256) {
+        failures.push(index);
+      }
+      if (c.rgba) {
         assert.deepEqual(Buffer.from(image.data), Buffer.from(c.rgba, "base64"), `case ${index}`);
+      }
     }
     assert.deepEqual(failures, []);
   });

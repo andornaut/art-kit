@@ -1,6 +1,7 @@
 // PNG decoding and encoding for Node build tools.
 import { Buffer } from "node:buffer";
 import { constants, createDeflate, type Deflate } from "node:zlib";
+
 import { PNG } from "pngjs";
 
 import { pngFile } from "./pngChunks.js";

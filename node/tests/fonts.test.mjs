@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { Canvas, FontLibrary } from "skia-canvas";
+
 import { rasteriseGlyphs } from "@andornaut/art-kit/fonts";
 import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/glyphAtlas";
 import { decodePng } from "@andornaut/art-kit/png";
+import { Canvas, FontLibrary } from "skia-canvas";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
@@ -18,10 +19,10 @@ const CHARS = [...Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + 
 
 test("glyphs are trimmed white coverage with signed bearings, empty spaces and the AA policy", () => {
   const bearings = [];
-  for (const weight of ["Regular", "Bold"])
-    for (const size of [12, 16])
+  for (const weight of ["Regular", "Bold"]) {
+    for (const size of [12, 16]) {
       for (const antialias of [true, false]) {
-        const { glyphs, base, lineHeight, ascent, descent, kernings } = rasteriseGlyphs({
+        const { ascent, base, descent, glyphs, kernings, lineHeight } = rasteriseGlyphs({
           ...options(weight, size),
           antialias,
         });
@@ -35,8 +36,10 @@ test("glyphs are trimmed white coverage with signed bearings, empty spaces and t
         assert.ok(space.xadvance > 0);
         let partial = false;
         for (const [char, { image }] of glyphs) {
-          if (!image) continue;
-          const { data, width, height } = image;
+          if (!image) {
+            continue;
+          }
+          const { data, height, width } = image;
           const alpha = (x, y) => data[(y * width + x) * 4 + 3];
           // Trimmed: every edge row and column holds ink.
           assert.ok(
@@ -63,6 +66,8 @@ test("glyphs are trimmed white coverage with signed bearings, empty spaces and t
         }
         assert.equal(partial, antialias);
       }
+    }
+  }
   // j's tail reaches left of the pen at some size and policy.
   assert.ok(Math.min(...bearings) < 0);
 });
@@ -124,8 +129,9 @@ test("all kerning emits each nonzero ordered pair once, bounded to 256 character
 });
 
 test("rasterization rejects invalid input before rendering", () => {
-  for (const size of [0, 1.5, 16385])
+  for (const size of [0, 1.5, 16385]) {
     assert.throws(() => rasteriseGlyphs({ ...options(), size }), RangeError);
+  }
   assert.throws(() => rasteriseGlyphs({ ...options(), characters: ["ab"] }), /Unicode/);
   assert.throws(() => rasteriseGlyphs({ ...options(), characters: ["\ud800"] }), /Unicode/);
   assert.throws(() => rasteriseGlyphs({ ...options(), path: "/missing-font.ttf" }), /ENOENT/);
@@ -134,8 +140,13 @@ test("rasterization rejects invalid input before rendering", () => {
 // The two games' pipelines over rasteriseGlyphs reproduce their frozen buildBitmapFont outputs.
 function chibiStyle(key, size, weight) {
   const r = rasteriseGlyphs({ path: font(weight), size, characters: CHARS, kerning: "all" });
-  for (const { image } of r.glyphs.values())
-    if (image) for (let i = 0; i < image.data.length; i += 4) image.data.fill(255, i, i + 3);
+  for (const { image } of r.glyphs.values()) {
+    if (image) {
+      for (let i = 0; i < image.data.length; i += 4) {
+        image.data.fill(255, i, i + 3);
+      }
+    }
+  }
   return buildBitmapFontFromGlyphs(
     {
       layout: "packed",
@@ -178,7 +189,7 @@ for (const [key, pipeline, size, weight] of [
   ["chibi-bold-16", chibiStyle, 16, "Bold"],
   ["archie-regular-12", archieStyle, 12, "Regular"],
   ["archie-bold-8", archieStyle, 8, "Bold"],
-])
+]) {
   test(`game font pipeline matches the frozen buildBitmapFont reference: ${key}`, () => {
     const { image, xml } = pipeline(key, size, weight);
     const expected = decodePng(readFileSync(`${fixtures}/fonts/${key}.png`));
@@ -186,3 +197,4 @@ for (const [key, pipeline, size, weight] of [
     assert.deepEqual([image.width, image.height], [expected.width, expected.height]);
     assert.ok(Buffer.from(image.data).equals(Buffer.from(expected.data)));
   });
+}

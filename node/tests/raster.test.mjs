@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { createHash } from "node:crypto";
+
 import * as raster from "@andornaut/art-kit/raster";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
@@ -10,7 +11,7 @@ assert.ok(fixtures, "Required fixture directory");
 // Frozen Pillow 13.0.0 references; see fixtures/README.md.
 const reference = JSON.parse(readFileSync(join(fixtures, "raster", "pillow.json"), "utf8"));
 
-function decode({ width, height, data }) {
+function decode({ data, height, width }) {
   return { data: new Uint8Array(Buffer.from(data, "base64")), height, width };
 }
 const inputs = () =>
@@ -79,8 +80,9 @@ test("raster output is byte-equal to Pillow 13.0.0 references, including partial
     "composeContactSheet",
     "rotateNearest",
     "mapChannels",
-  ])
+  ]) {
     assert.ok(ops.has(op), op);
+  }
   reference.cases.forEach((c, i) => {
     const all = inputs();
     const before = all.a.data.slice();
@@ -89,8 +91,9 @@ test("raster output is byte-equal to Pillow 13.0.0 references, including partial
     assert.equal(actual.width, expected.width, `case ${i} ${c.op} width`);
     assert.equal(actual.height, expected.height, `case ${i} ${c.op} height`);
     assert.deepEqual(Buffer.from(actual.data), Buffer.from(expected.data), `case ${i} ${c.op}`);
-    if (c.target !== "a")
+    if (c.target !== "a") {
       assert.deepEqual(all.a.data, before, `case ${i} ${c.op} leaves its source unchanged`);
+    }
   });
 });
 
@@ -136,8 +139,11 @@ test("nearest resize matches Pillow 13.0.0 sample indices for non-integer ratios
   ];
   for (const [[iw, ih], [ow, oh], xs, ys] of cases) {
     const source = raster.filledImage([0, 0, 0, 255], iw, ih);
-    for (let y = 0; y < ih; y++)
-      for (let x = 0; x < iw; x++) source.data.set([x, y], (y * iw + x) * 4);
+    for (let y = 0; y < ih; y++) {
+      for (let x = 0; x < iw; x++) {
+        source.data.set([x, y], (y * iw + x) * 4);
+      }
+    }
     const out = raster.resizeNearest(ow, oh, source);
     assert.deepEqual(
       [...Array(ow).keys()].map((x) => out.data[x * 4]),
@@ -232,17 +238,19 @@ test("largest-frame contact sheets equal the frozen Skia contact sheets", () => 
 
 test("integer-factor nearest resize replicates every pixel, including RGB under clear alpha", () => {
   const all = inputs();
-  for (const source of [all.a, all.b, all.rotateWide])
+  for (const source of [all.a, all.b, all.rotateWide]) {
     for (const factor of [1, 2, 3, 5]) {
       const expected = new Uint8Array(source.width * factor * source.height * factor * 4);
-      for (let y = 0; y < source.height * factor; y++)
+      for (let y = 0; y < source.height * factor; y++) {
         for (let x = 0; x < source.width * factor; x++) {
           const read = (Math.floor(y / factor) * source.width + Math.floor(x / factor)) * 4;
           expected.set(source.data.subarray(read, read + 4), (y * source.width * factor + x) * 4);
         }
+      }
       const out = raster.resizeNearest(source.width * factor, source.height * factor, source);
       assert.deepEqual(Buffer.from(out.data), Buffer.from(expected));
     }
+  }
 });
 
 test("fill, paste and composite mutate in place; other operations return new images", () => {
@@ -311,7 +319,8 @@ test("invalid geometry and plane sizes throw RangeError", () => {
     () => raster.resizeNearest(2.5, 1, image),
     () => raster.channel(4, image),
     () => raster.mapChannels([[], [], [], []], image),
-  ])
+  ]) {
     assert.throws(call, RangeError);
+  }
   raster.paste({ at: { x: 0, y: 0 }, mask: plane }, image, image);
 });

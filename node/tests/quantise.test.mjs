@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+
 import { encodeGif } from "@andornaut/art-kit/gif";
 import { quantise } from "@andornaut/art-kit/quantise";
 
@@ -16,7 +17,9 @@ function goldenInput() {
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
-        if (x === 0) continue;
+        if (x === 0) {
+          continue;
+        }
         const block = x >= 2 + f * 3 && x < 5 + f * 3 && y >= 2 && y < 4;
         data.set(
           block ? [240, 40 + f * 20, 30, 255] : [x * 30 + f, y * 40, (x * y * 7) % 256, 255],
@@ -52,7 +55,9 @@ test("quantise is deterministic and bounds the shared palette", () => {
     assert.deepEqual(first, second);
     assert.ok(first.palette.length <= maxColours);
     const entries = new Set(first.palette.map((entry) => entry.join()));
-    for (const colour of distinct(first.frames)) assert.ok(entries.has(colour), colour);
+    for (const colour of distinct(first.frames)) {
+      assert.ok(entries.has(colour), colour);
+    }
   }
 });
 
@@ -62,8 +67,9 @@ test("quantise preserves transparent pixels as one entry", () => {
   const { frames, palette } = quantise({ maxColours: 4 }, input);
   assert.deepEqual(palette[0], [0, 0, 0, 0]);
   frames.forEach((frame, f) => {
-    for (let i = 3; i < frame.data.length; i += 4)
+    for (let i = 3; i < frame.data.length; i += 4) {
       assert.equal(frame.data[i] === 0, input[f].data[i] === 0);
+    }
   });
   assert.ok(frames[1].data.subarray(4, 8).every((v) => v === 0));
 });
@@ -83,8 +89,9 @@ test("quantise rejects partial alpha and invalid limits", () => {
   assert.throws(() => quantise({ maxColours: 8 }, input), RangeError);
   // One entry is the transparent one, leaving none for opaque colours.
   assert.throws(() => quantise({ maxColours: 1 }, goldenInput()), /no entry for opaque/);
-  for (const maxColours of [0, 257, 2.5])
+  for (const maxColours of [0, 257, 2.5]) {
     assert.throws(() => quantise({ maxColours }, goldenInput()), RangeError);
+  }
 });
 
 test("encodeGif accepts quantised frames", () => {

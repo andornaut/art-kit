@@ -23,7 +23,9 @@ function writeChunk(
     end += piece.length;
   }
   view.setUint32(at, end - at - 8);
-  for (let i = 0; i < 4; i++) out[at + 4 + i] = type.charCodeAt(i);
+  for (let i = 0; i < 4; i++) {
+    out[at + 4 + i] = type.charCodeAt(i);
+  }
   view.setUint32(end, crc32(out.subarray(at + 4, end)));
   return end + 4;
 }
@@ -37,6 +39,8 @@ export function pngFile(
   );
   out.set(PNG_SIGNATURE, 0);
   let at = PNG_SIGNATURE.length;
-  for (const [type, pieces] of chunks) at = writeChunk(at, type, pieces, out);
+  for (const [type, pieces] of chunks) {
+    at = writeChunk(at, type, pieces, out);
+  }
   return out;
 }

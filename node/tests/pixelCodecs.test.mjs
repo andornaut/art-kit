@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
+
 import { encodeIndexedPng } from "@andornaut/art-kit/indexedPng";
-import { decodePng, encodeRgbPng, encodeRgbaPng } from "@andornaut/art-kit/png";
+import { decodePng, encodeRgbaPng, encodeRgbPng } from "@andornaut/art-kit/png";
 import { blankImage, opaqueRect } from "@andornaut/art-kit/rgbaImage";
 
 const indexedOptions = { level: 9, memLevel: 9 };

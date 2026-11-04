@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { packAtlas } from "@andornaut/art-kit/atlasLayout";
+
 import { buildAtlasPages, drawAtlasPage } from "@andornaut/art-kit/atlasBuild";
+import { packAtlas } from "@andornaut/art-kit/atlasLayout";
 import { blankImage, blitExtruded } from "@andornaut/art-kit/rgbaImage";
 
 const item = (value, ...sizes) => ({
@@ -117,7 +118,9 @@ test("page build shares decoding, bypasses supplied images and preserves metadat
     result.map(({ metadata }) => metadata),
     [0, 1, 2],
   );
-  for (const page of result) assert.deepEqual(page.image, image);
+  for (const page of result) {
+    assert.deepEqual(page.image, image);
+  }
   const failure = new Error("read failed");
   await assert.rejects(
     buildAtlasPages(
@@ -210,6 +213,7 @@ test("page build propagates synchronous and asynchronous codec failures by ident
       throw failure;
     },
   ]) {
+    // eslint-disable-next-line no-await-in-loop
     await assert.rejects(
       buildAtlasPages(
         {

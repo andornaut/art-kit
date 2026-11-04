@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
+
 import { buildBitmapFontFromGlyphs as build } from "@andornaut/art-kit/glyphAtlas";
 
 // Frozen packed-layout references; see fixtures/README.md.
@@ -23,7 +24,7 @@ function inputs(fixture) {
       },
     ]),
   );
-  const { key, face, size, line_height: lineHeight, base } = fixture.info;
+  const { base, face, key, line_height: lineHeight, size } = fixture.info;
   const options = {
     layout: "packed",
     antialias: fixture.antialias,
@@ -41,7 +42,7 @@ function inputs(fixture) {
 for (const fixture of fixtures.cases) {
   test(`packed layout matches the frozen reference: ${fixture.name}`, () => {
     const { glyphs, options } = inputs(fixture);
-    const { image, xml, metadata } = build(options, glyphs);
+    const { image, metadata, xml } = build(options, glyphs);
     assert.equal(xml, fixture.xml);
     assert.deepEqual([image.width, image.height], [fixture.atlas.width, fixture.atlas.height]);
     assert.equal(sha256(image.data), fixture.atlas.sha256);
@@ -90,8 +91,9 @@ test("packed layout requires antialias and rejects padding; padded rejects antia
     { layout: "padded", antialias: false },
     { antialias: true },
     { layout: "extruded" },
-  ])
+  ]) {
     assert.throws(() => build({ ...base, ...options }, new Map()), RangeError);
+  }
   assert.throws(
     () => build({ ...base, layout: "packed", antialias: false }, glyphs),
     /exceeds atlas width/,

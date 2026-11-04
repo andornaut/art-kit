@@ -36,11 +36,14 @@ export interface ContactSheetOptions {
 }
 
 function integer(value: number, name: string): void {
-  if (!Number.isSafeInteger(value)) throw new RangeError(`${name} must be a safe integer`);
+  if (!Number.isSafeInteger(value)) {
+    throw new RangeError(`${name} must be a safe integer`);
+  }
 }
 function size(value: number, name: string): void {
-  if (!Number.isSafeInteger(value) || value < 0)
+  if (!Number.isSafeInteger(value) || value < 0) {
     throw new RangeError(`${name} must be a nonnegative safe integer`);
+  }
 }
 function point({ x, y }: Point): void {
   integer(x, "x");
@@ -54,26 +57,32 @@ function rect(r: Rect): void {
 function image(im: RgbaImage): void {
   size(im.width, "Image width");
   size(im.height, "Image height");
-  if (im.data.length !== im.width * im.height * 4)
+  if (im.data.length !== im.width * im.height * 4) {
     throw new RangeError("Image data must hold width * height * 4 bytes");
+  }
 }
 function plane(p: Plane): void {
   size(p.width, "Plane width");
   size(p.height, "Plane height");
-  if (p.data.length !== p.width * p.height)
+  if (p.data.length !== p.width * p.height) {
     throw new RangeError("Plane data must hold width * height bytes");
+  }
 }
 function byte(value: number, name: string): void {
-  if (!Number.isInteger(value) || value < 0 || value > 255)
+  if (!Number.isInteger(value) || value < 0 || value > 255) {
     throw new RangeError(`${name} must be an integer from 0 to 255`);
+  }
 }
 function colour(value: readonly number[], length: number): void {
-  if (value.length !== length) throw new RangeError(`Colour must have ${length} channels`);
+  if (value.length !== length) {
+    throw new RangeError(`Colour must have ${length} channels`);
+  }
   value.forEach((channel) => byte(channel, "Colour channel"));
 }
 function positive(value: number, name: string): void {
-  if (!Number.isSafeInteger(value) || value <= 0)
+  if (!Number.isSafeInteger(value) || value <= 0) {
     throw new RangeError(`${name} must be a positive safe integer`);
+  }
 }
 
 // The part of a width x height block placed at `at` that lies inside image: target origin,
@@ -90,7 +99,7 @@ function clip(
     sy = dy - at.y;
   const w = Math.min(width - sx, target.width - dx),
     h = Math.min(height - sy, target.height - dy);
-  return w > 0 && h > 0 ? { dx, dy, sx, sy, w, h } : undefined;
+  return w > 0 && h > 0 ? { dx, dy, h, sx, sy, w } : undefined;
 }
 
 // Pillow ImagingUtils.h: DIV255 rounds a 16-bit product to the nearest multiple of 1/255.
@@ -108,14 +117,17 @@ export function filledImage(rgba: Rgba, width: number, height: number): RgbaImag
   size(width, "Width");
   size(height, "Height");
   const data = new Uint8Array(width * height * 4);
-  for (let i = 0; i < data.length; i += 4) data.set(rgba, i);
+  for (let i = 0; i < data.length; i += 4) {
+    data.set(rgba, i);
+  }
   return { data, height, width };
 }
 
 // The RGB of a frame colour name: the resolver's, or the palette entry's (else the name's) hex.
 function colourResolver(context: ColourContext): (colour: string) => Rgb {
-  if (typeof context.resolveRgb === "function")
+  if (typeof context.resolveRgb === "function") {
     return context.resolveRgb as (colour: string) => Rgb;
+  }
   const palette = context as Readonly<Record<string, string>>;
   return (name) => rgb(Object.hasOwn(palette, name) ? palette[name] : name);
 }
@@ -123,15 +135,18 @@ function colourResolver(context: ColourContext): (colour: string) => Rgb {
 /** The frame as an image: null cells are (0,0,0,0), others their resolved colour, opaque. */
 export function frameToRgba(context: ColourContext, frame: Frame): RgbaImage {
   const width = frame[0]?.length ?? 0;
-  if (frame.some((row) => row.length !== width))
+  if (frame.some((row) => row.length !== width)) {
     throw new RangeError("Frame rows must have equal widths");
+  }
   positive(width, "Frame width");
   positive(frame.length, "Frame height");
   const resolve = colourResolver(context);
   const out = { data: new Uint8Array(width * frame.length * 4), height: frame.length, width };
   frame.forEach((row, y) =>
     row.forEach((name, x) => {
-      if (!name) return;
+      if (!name) {
+        return;
+      }
       const value = resolve(name);
       colour(value, 3);
       out.data.set([...value, 255], (y * width + x) * 4);
@@ -151,13 +166,15 @@ export interface SheetOptions {
  * blending or scaling) and clipped to its cell; unused cells are (0,0,0,0).
  */
 export function composeSheet(
-  { columns, cellWidth, cellHeight }: SheetOptions,
+  { cellHeight, cellWidth, columns }: SheetOptions,
   images: readonly RgbaImage[],
 ): RgbaImage {
   positive(columns, "Columns");
   positive(cellWidth, "Cell width");
   positive(cellHeight, "Cell height");
-  if (!images.length) throw new RangeError("Sheet requires images");
+  if (!images.length) {
+    throw new RangeError("Sheet requires images");
+  }
   images.forEach(image);
   const sheet = filledImage(
     [0, 0, 0, 0],
@@ -192,18 +209,21 @@ export interface FillOptions {
  * channel blends by the mask value, and a fully transparent pixel takes the full colour in its
  * RGB channels wherever the mask is nonzero, so only its alpha carries the coverage.
  */
-export function fill({ rect: r, mask }: FillOptions, rgba: Rgba, target: RgbaImage): void {
+export function fill({ mask, rect: r }: FillOptions, rgba: Rgba, target: RgbaImage): void {
   colour(rgba, 4);
   rect(r);
   image(target);
   if (mask) {
     plane(mask);
-    if (mask.width !== r.width || mask.height !== r.height)
+    if (mask.width !== r.width || mask.height !== r.height) {
       throw new RangeError("Mask must match the rect size");
+    }
   }
   const c = clip(r, r.width, r.height, target);
-  if (!c) return;
-  for (let y = 0; y < c.h; y++)
+  if (!c) {
+    return;
+  }
+  for (let y = 0; y < c.h; y++) {
     for (let x = 0; x < c.w; x++) {
       const t = ((c.dy + y) * target.width + c.dx + x) * 4;
       if (!mask) {
@@ -216,6 +236,7 @@ export function fill({ rect: r, mask }: FillOptions, rgba: Rgba, target: RgbaIma
         target.data[t + i] = blend(weight, target.data[t + i], rgba[i]);
       }
     }
+  }
 }
 
 export interface PasteOptions {
@@ -236,7 +257,7 @@ export interface PasteOptions {
  * nearest byte; it is a weighted copy, not alpha compositing (see composite).
  */
 export function paste(
-  { at, mask, keepAlpha = false }: PasteOptions,
+  { at, keepAlpha = false, mask }: PasteOptions,
   source: RgbaImage,
   target: RgbaImage,
 ): void {
@@ -246,7 +267,9 @@ export function paste(
   const data = source === target ? source.data.slice() : source.data;
   const weight = mask === undefined ? undefined : maskPlane(mask, { ...source, data });
   const c = clip(at, source.width, source.height, target);
-  if (!c) return;
+  if (!c) {
+    return;
+  }
   const channels = keepAlpha ? 3 : 4;
   for (let y = 0; y < c.h; y++) {
     if (!weight && !keepAlpha) {
@@ -258,17 +281,21 @@ export function paste(
       const s = (c.sy + y) * source.width + c.sx + x,
         t = ((c.dy + y) * target.width + c.dx + x) * 4;
       const m = weight ? weight(s) : 255;
-      for (let i = 0; i < channels; i++)
+      for (let i = 0; i < channels; i++) {
         target.data[t + i] = blend(m, target.data[t + i], data[s * 4 + i]);
+      }
     }
   }
 }
 
 function maskPlane(mask: Plane | "alpha", source: RgbaImage): (i: number) => number {
-  if (mask === "alpha") return (i) => source.data[i * 4 + 3];
+  if (mask === "alpha") {
+    return (i) => source.data[i * 4 + 3];
+  }
   plane(mask);
-  if (mask.width !== source.width || mask.height !== source.height)
+  if (mask.width !== source.width || mask.height !== source.height) {
     throw new RangeError("Mask must match the source size");
+  }
   return (i) => mask.data[i];
 }
 
@@ -281,14 +308,18 @@ export function composite(at: Point, source: RgbaImage, target: RgbaImage): void
   image(source);
   image(target);
   const c = clip(at, source.width, source.height, target);
-  if (!c) return;
+  if (!c) {
+    return;
+  }
   const data = source === target ? source.data.slice() : source.data;
-  for (let y = 0; y < c.h; y++)
+  for (let y = 0; y < c.h; y++) {
     for (let x = 0; x < c.w; x++) {
       const s = ((c.sy + y) * source.width + c.sx + x) * 4,
         t = ((c.dy + y) * target.width + c.dx + x) * 4;
       const sa = data[s + 3];
-      if (sa === 0) continue;
+      if (sa === 0) {
+        continue;
+      }
       // Pillow AlphaComposite.c: unsigned 32-bit maths with 7 bits of extra precision.
       const outa255 = sa * 255 + target.data[t + 3] * (255 - sa);
       const coef1 = Math.floor((sa * 255 * 255 * 128) / outa255),
@@ -300,6 +331,7 @@ export function composite(at: Point, source: RgbaImage, target: RgbaImage): void
       const a = outa255 + 0x80;
       target.data[t + 3] = ((a >>> 8) + a) >>> 8;
     }
+  }
 }
 
 function clone(source: RgbaImage): RgbaImage {
@@ -341,7 +373,9 @@ function scaleAffine(
   }
   for (let y = 0; y < height; y++, yo += yScale) {
     const yin = yo < 0 ? -1 : Math.trunc(yo);
-    if (yin < 0 || yin >= source.height) continue;
+    if (yin < 0 || yin >= source.height) {
+      continue;
+    }
     for (let x = xmin; x < xmax; x++) {
       const read = (yin * source.width + columns[x]) * 4;
       out.data.set(source.data.subarray(read, read + 4), (y * width + x) * 4);
@@ -379,8 +413,9 @@ function round15(value: number): number {
 function rotate180(source: RgbaImage): RgbaImage {
   const out = clone(source);
   const count = source.width * source.height;
-  for (let i = 0; i < count; i++)
+  for (let i = 0; i < count; i++) {
     out.data.set(source.data.subarray(i * 4, i * 4 + 4), (count - 1 - i) * 4);
+  }
   return out;
 }
 
@@ -388,12 +423,13 @@ function rotate180(source: RgbaImage): RgbaImage {
 function rotateSquare(clockwise: boolean, source: RgbaImage): RgbaImage {
   const n = source.width;
   const out = clone(source);
-  for (let y = 0; y < n; y++)
+  for (let y = 0; y < n; y++) {
     for (let x = 0; x < n; x++) {
       const [sx, sy] = clockwise ? [y, n - 1 - x] : [n - 1 - y, x];
       const read = (sy * n + sx) * 4;
       out.data.set(source.data.subarray(read, read + 4), (y * n + x) * 4);
     }
+  }
   return out;
 }
 
@@ -405,18 +441,29 @@ function rotateSquare(clockwise: boolean, source: RgbaImage): RgbaImage {
  * +-32768, double precision otherwise.
  */
 export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
-  if (!Number.isFinite(angle)) throw new RangeError("Angle must be finite");
+  if (!Number.isFinite(angle)) {
+    throw new RangeError("Angle must be finite");
+  }
   image(source);
   // Floored modulo into 0..360.
   let degrees = angle % 360;
   if (degrees !== 0) {
-    if (degrees < 0) degrees += 360;
-  } else degrees = 0;
-  if (degrees === 0) return clone(source);
-  if (degrees === 180) return rotate180(source);
-  if ((degrees === 90 || degrees === 270) && source.width === source.height)
+    if (degrees < 0) {
+      degrees += 360;
+    }
+  } else {
+    degrees = 0;
+  }
+  if (degrees === 0) {
+    return clone(source);
+  }
+  if (degrees === 180) {
+    return rotate180(source);
+  }
+  if ((degrees === 90 || degrees === 270) && source.width === source.height) {
     return rotateSquare(degrees === 270, source);
-  const { width: w, height: h } = source;
+  }
+  const { height: h, width: w } = source;
   const [cx, cy] = [w / 2, h / 2];
   const radians = -(degrees * (Math.PI / 180));
   const a = [
@@ -427,11 +474,13 @@ export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
     round15(Math.cos(radians)),
     0,
   ];
-  const [tx, ty] = [-cx - 0, -cy - 0];
+  const [tx, ty] = [-cx, -cy];
   [a[2], a[5]] = [a[0] * tx + a[1] * ty + a[2], a[3] * tx + a[4] * ty + a[5]];
   a[2] += cx;
   a[5] += cy;
-  if (a[1] === 0 && a[3] === 0) return scaleAffine([a[0], a[2], a[4], a[5]], w, h, source);
+  if (a[1] === 0 && a[3] === 0) {
+    return scaleAffine([a[0], a[2], a[4], a[5]], w, h, source);
+  }
   const out = { data: new Uint8Array(w * h * 4), height: h, width: w };
   const write = (x: number, y: number, xin: number, yin: number): void => {
     if (xin >= 0 && xin < w && yin >= 0 && yin < h) {
@@ -449,8 +498,9 @@ export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
     for (let y = 0; y < h; y++, a2 = (a2 + a1) | 0, a5 = (a5 + a4) | 0) {
       let xx = a2,
         yy = a5;
-      for (let x = 0; x < w; x++, xx = (xx + a0) | 0, yy = (yy + a3) | 0)
+      for (let x = 0; x < w; x++, xx = (xx + a0) | 0, yy = (yy + a3) | 0) {
         write(x, y, xx >> 16, yy >> 16);
+      }
     }
     return out;
   }
@@ -460,7 +510,9 @@ export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
   for (let y = 0; y < h; y++, xo += a[1], yo += a[4]) {
     let xx = xo,
       yy = yo;
-    for (let x = 0; x < w; x++, xx += a[0], yy += a[3]) write(x, y, coord(xx), coord(yy));
+    for (let x = 0; x < w; x++, xx += a[0], yy += a[3]) {
+      write(x, y, coord(xx), coord(yy));
+    }
   }
   return out;
 }
@@ -468,7 +520,9 @@ export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
 /** image with alpha set to 255 and RGB kept, including RGB under previously clear pixels. */
 export function opaque(source: RgbaImage): RgbaImage {
   const out = clone(source);
-  for (let i = 3; i < out.data.length; i += 4) out.data[i] = 255;
+  for (let i = 3; i < out.data.length; i += 4) {
+    out.data[i] = 255;
+  }
   return out;
 }
 
@@ -488,7 +542,9 @@ export function grayscale(source: RgbaImage): Plane {
 /** Channel index of image: 0 red, 1 green, 2 blue, 3 alpha. */
 export type ChannelIndex = 0 | 1 | 2 | 3;
 function channelIndex(index: number): void {
-  if (![0, 1, 2, 3].includes(index)) throw new RangeError("Channel index must be 0, 1, 2 or 3");
+  if (![0, 1, 2, 3].includes(index)) {
+    throw new RangeError("Channel index must be 0, 1, 2 or 3");
+  }
 }
 
 /** One channel of image as a plane. */
@@ -496,7 +552,9 @@ export function channel(index: ChannelIndex, source: RgbaImage): Plane {
   channelIndex(index);
   image(source);
   const data = new Uint8Array(source.width * source.height);
-  for (let i = 0; i < data.length; i++) data[i] = source.data[i * 4 + index];
+  for (let i = 0; i < data.length; i++) {
+    data[i] = source.data[i * 4 + index];
+  }
   return { data, height: source.height, width: source.width };
 }
 
@@ -505,13 +563,21 @@ export function mapChannels(
   luts: readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>, ArrayLike<number>],
   source: RgbaImage,
 ): RgbaImage {
-  if (luts.length !== 4) throw new RangeError("Four channel tables are required");
+  if (luts.length !== 4) {
+    throw new RangeError("Four channel tables are required");
+  }
   for (const lut of luts) {
-    if (lut.length !== 256) throw new RangeError("Channel tables must have 256 entries");
-    for (let i = 0; i < 256; i++) byte(lut[i], "Channel table entry");
+    if (lut.length !== 256) {
+      throw new RangeError("Channel tables must have 256 entries");
+    }
+    for (let i = 0; i < 256; i++) {
+      byte(lut[i], "Channel table entry");
+    }
   }
   const out = clone(source);
-  for (let i = 0; i < out.data.length; i++) out.data[i] = luts[i & 3][out.data[i]];
+  for (let i = 0; i < out.data.length; i++) {
+    out.data[i] = luts[i & 3][out.data[i]];
+  }
   return out;
 }
 
@@ -524,21 +590,23 @@ export function mapChannels(
  * frame cell (empty cells in the ground colour) and lets later frames overwrite earlier overflow.
  */
 export function composeContactSheet(
-  { resolveRgb, background, cellSize, scale = 3, gap = 4 }: ContactSheetOptions,
+  { background, cellSize, gap = 4, resolveRgb, scale = 3 }: ContactSheetOptions,
   sprites: readonly Sprite[],
   grounds: readonly string[],
 ): RgbaImage {
   positive(scale, "Preview scale");
   size(gap, "Gap");
-  if (cellSize !== "row-first-frame" && cellSize !== "largest-frame")
+  if (cellSize !== "row-first-frame" && cellSize !== "largest-frame") {
     throw new RangeError('Cell size must be "row-first-frame" or "largest-frame"');
+  }
   colour(background, 3);
   const rows = sprites.flatMap(([, tags]) => {
     const frames = tags.flatMap(([, frames]) => frames);
     return grounds.map((ground) => ({ frames, ground }));
   });
-  if (!rows.length || rows.some(({ frames }) => !frames.length))
+  if (!rows.length || rows.some(({ frames }) => !frames.length)) {
     throw new RangeError("Contact sheet requires frames and grounds");
+  }
   const ink = (name: string): Rgba => {
     const value = resolveRgb(name);
     colour(value, 3);

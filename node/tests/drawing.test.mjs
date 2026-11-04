@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
+import { contrast, rgb } from "@andornaut/art-kit/colour";
 import { flipped, Grid, opaqueCols, opaqueRows } from "@andornaut/art-kit/grid";
-import { rgb, contrast } from "@andornaut/art-kit/colour";
 import { composeContactSheet, composeSheet, frameToRgba } from "@andornaut/art-kit/raster";
 
 test("grid truncates coordinates, resolves own palette keys and keeps Bresenham ties", () => {
@@ -139,8 +140,9 @@ test("invalid layouts and ragged frames fail explicitly", () => {
 });
 test("hex channels and WCAG contrast", () => {
   assert.deepEqual(rgb("01aBff"), [1, 171, 255]);
-  for (const invalid of ["abcde", "aabbccdd", "#aabbcc", "abc", "", "gg0000", " aabbcc"])
+  for (const invalid of ["abcde", "aabbccdd", "#aabbcc", "abc", "", "gg0000", " aabbcc"]) {
     assert.throws(() => rgb(invalid), RangeError, invalid);
+  }
   assert.equal(contrast("000000", "ffffff"), 21);
 });
 

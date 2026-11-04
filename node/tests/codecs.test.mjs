@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { PNG } from "pngjs";
-import { decodePng } from "@andornaut/art-kit/png";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { test } from "node:test";
+
+import { decodePng } from "@andornaut/art-kit/png";
+import { encodeLosslessWebp } from "@andornaut/art-kit/webp";
 import decoderFactory from "@jsquash/webp/codec/dec/webp_dec.js";
 import { initEmscriptenModule } from "@jsquash/webp/utils.js";
-import { encodeLosslessWebp } from "@andornaut/art-kit/webp";
+import { PNG } from "pngjs";
 
 // The pinned peer's own decoder checks that encoding is lossless.
 async function decodeWebp(bytes) {

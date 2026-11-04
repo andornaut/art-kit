@@ -1,8 +1,9 @@
 // Hexadecimal RGB and WCAG 2.0 contrast with its 0.03928 transfer threshold.
 /** The bytes of a six-digit hexadecimal colour without "#"; any other string throws RangeError. */
 export function rgb(colour: string): [number, number, number] {
-  if (!/^[0-9a-f]{6}$/i.test(colour))
+  if (!/^[0-9a-f]{6}$/i.test(colour)) {
     throw new RangeError(`Invalid hexadecimal colour ${JSON.stringify(colour)}`);
+  }
   return [0, 2, 4].map((i) => Number.parseInt(colour.slice(i, i + 2), 16)) as [
     number,
     number,
@@ -25,8 +26,9 @@ export function contrast(a: string, b: string): number {
 // sRGB transfer: https://www.w3.org/TR/css-color-4/#color-conversion-code
 type Triple = readonly [number, number, number];
 function triple(values: Triple): Triple {
-  if (values.length !== 3 || !values.every((v) => typeof v === "number" && Number.isFinite(v)))
+  if (values.length !== 3 || !values.every((v) => typeof v === "number" && Number.isFinite(v))) {
     throw new RangeError("Expected three finite numbers");
+  }
   return values;
 }
 function linearLab([L, a, b]: Triple): [number, number, number] {
@@ -40,16 +42,17 @@ function linearLab([L, a, b]: Triple): [number, number, number] {
   ];
 }
 function bytes(values: Triple): [number, number, number] {
-  return values.map((v) => {
-    v = Math.max(0, Math.min(1, v));
+  return values.map((value) => {
+    const v = Math.max(0, Math.min(1, value));
     return Math.floor(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055) + 0.5);
   }) as [number, number, number];
 }
 /** Convert sRGB bytes to D65 Oklab (L, a, b). */
 export function srgbToOklab(colour: Triple): [number, number, number] {
   triple(colour);
-  if (!colour.every((v) => Number.isInteger(v) && v >= 0 && v <= 255))
+  if (!colour.every((v) => Number.isInteger(v) && v >= 0 && v <= 255)) {
     throw new RangeError("Expected RGB bytes in 0..255");
+  }
   const [r, g, b] = colour.map((c) => {
     const v = c / 255;
     return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
@@ -78,7 +81,9 @@ export function oklchToSrgb(colour: Triple): [number, number, number] {
   L = Math.max(0, Math.min(1, L));
   C = Math.max(0, Math.min(1, C));
   h = ((((h % 360) + 360) % 360) * Math.PI) / 180;
-  if (L === 0 || L === 1) return L === 0 ? [0, 0, 0] : [255, 255, 255];
+  if (L === 0 || L === 1) {
+    return L === 0 ? [0, 0, 0] : [255, 255, 255];
+  }
   const linear = (chroma: number) => linearLab([L, chroma * Math.cos(h), chroma * Math.sin(h)]);
   const inGamut = (v: Triple) => v.every((c) => Number.isFinite(c) && c >= 0 && c <= 1);
   let values = linear(C);
@@ -87,8 +92,11 @@ export function oklchToSrgb(colour: Triple): [number, number, number] {
       high = Math.min(C, 1);
     for (let i = 0; i < 24; i++) {
       const mid = (low + high) / 2;
-      if (inGamut(linear(mid))) low = mid;
-      else high = mid;
+      if (inGamut(linear(mid))) {
+        low = mid;
+      } else {
+        high = mid;
+      }
     }
     values = linear(low);
   }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+
 import { buildBitmapFontFromGlyphs as build } from "@andornaut/art-kit/glyphAtlas";
 const options = {
   key: 'a&"\n',
@@ -52,15 +53,17 @@ test("rejects invalid inputs and bounded packing overflow", () => {
     { face: "\ud800" },
     { padding: -1 },
     { kernings: [{ first: 106, second: 65, amount: 1 }] },
-  ])
+  ]) {
     assert.throws(() => build({ ...options, ...patch }, one), RangeError);
+  }
   for (const [key, value] of [
     ["jj", glyph],
     ["\ud800", glyph],
     ["j", { ...glyph, xadvance: 0.5 }],
     ["j", { ...glyph, image: { ...glyph.image, data: pixels.slice(1) } }],
-  ])
+  ]) {
     assert.throws(() => build(options, new Map([[key, value]])), RangeError);
+  }
 });
 test("supports empty glyph sets and zero padding without inventing metrics", () => {
   const result = build({ ...options, padding: 0 }, new Map([[" ", space]]));

@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs";
+
 import { Canvas, FontLibrary } from "skia-canvas";
 
 import type { GlyphKerning, SuppliedBitmapGlyph } from "./glyphAtlas.js";
@@ -41,6 +42,7 @@ function positive(value: number, label: string): number {
 }
 
 function codePoint(char: string): number {
+  // eslint-disable-next-line no-control-regex
   if ([...char].length !== 1 || /[\u0000-\u001f\u007f-\u009f\ud800-\udfff]/u.test(char)) {
     throw new RangeError("Characters must be printable Unicode code points");
   }
@@ -58,11 +60,14 @@ function codePoint(char: string): number {
 export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
   const size = positive(options.size, "Font size");
   const kerning = options.kerning ?? "none";
-  if (kerning !== "none" && kerning !== "all") throw new RangeError("Kerning must be none or all");
+  if (kerning !== "none" && kerning !== "all") {
+    throw new RangeError("Kerning must be none or all");
+  }
   const characters = [...new Set(options.characters)];
   characters.forEach(codePoint);
-  if (kerning === "all" && characters.length > 256)
+  if (kerning === "all" && characters.length > 256) {
     throw new RangeError("All kerning supports at most 256 unique characters");
+  }
   const antialias = options.antialias ?? true;
   const hinting = options.hinting ?? true;
   const path = realpathSync(options.path);
@@ -82,13 +87,13 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
     ctx.fontKerning = "normal";
     // Glyphs are separate, so pair widths must not substitute ligatures.
     ctx.fontFeatureSettings = {
-      liga: false,
+      calt: false,
       clig: false,
       dlig: false,
       hlig: false,
-      rlig: false,
-      calt: false,
+      liga: false,
       rclt: false,
+      rlig: false,
     };
     ctx.fontHinting = hinting;
     ctx.fontSmoothing = antialias;
@@ -121,14 +126,16 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
     ctx.fillText(char, MARGIN - left, MARGIN - top);
     const { data } = ctx.getImageData(0, 0, width, height);
     let [x0, y0, x1, y1] = [width, height, -1, -1];
-    for (let y = 0; y < height; y++)
-      for (let x = 0; x < width; x++)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
         if (data[(y * width + x) * 4 + 3]) {
           x0 = Math.min(x0, x);
           x1 = Math.max(x1, x);
           y0 = Math.min(y0, y);
           y1 = Math.max(y1, y);
         }
+      }
+    }
     if (x1 < 0) {
       glyphs.set(char, { image: undefined, xadvance, xoffset: 0, yoffset: 0 });
       continue;
@@ -136,11 +143,14 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
     const iw = x1 - x0 + 1,
       ih = y1 - y0 + 1;
     const pixels = new Uint8Array(iw * ih * 4);
-    for (let y = 0; y < ih; y++)
+    for (let y = 0; y < ih; y++) {
       for (let x = 0; x < iw; x++) {
         const alpha = data[((y0 + y) * width + x0 + x) * 4 + 3];
-        if (alpha) pixels.set([255, 255, 255, alpha], (y * iw + x) * 4);
+        if (alpha) {
+          pixels.set([255, 255, 255, alpha], (y * iw + x) * 4);
+        }
       }
+    }
     glyphs.set(char, {
       image: { data: pixels, height: ih, width: iw },
       xadvance,
@@ -149,14 +159,17 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
     });
   }
   const kernings: GlyphKerning[] = [];
-  if (kerning === "all")
-    for (const first of characters)
+  if (kerning === "all") {
+    for (const first of characters) {
       for (const second of characters) {
         const amount = Math.round(
           measure.measureText(first + second).width - advances.get(first)! - advances.get(second)!,
         );
-        if (amount !== 0)
-          kernings.push({ first: codePoint(first), second: codePoint(second), amount });
+        if (amount !== 0) {
+          kernings.push({ amount, first: codePoint(first), second: codePoint(second) });
+        }
       }
+    }
+  }
   return { ascent, base, descent, glyphs, kernings, lineHeight };
 }

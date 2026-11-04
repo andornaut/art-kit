@@ -4,7 +4,7 @@
 // container as uid 19001, which owns nothing on the host. Host paths are read-only bind mounts readable through
 // their group or world bits. Writable state lives in a per-run named volume at /tmp (copied up from the image's
 // 1777 /tmp), results leave through docker cp as the host user, and the container and volume are removed on exit.
-import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createHash, randomInt } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { loadavg } from "node:os";
@@ -48,14 +48,19 @@ function run(options: RunOptions, command: string, args: readonly string[]): Pro
     });
     // A consumer that exits early reports through its exit status, not a pipe error.
     child.stdin?.on("error", () => {});
-    if (typeof options.input === "string") child.stdin?.end(options.input);
-    else if (options.input) options.input.stdout?.pipe(child.stdin!);
+    if (typeof options.input === "string") {
+      child.stdin?.end(options.input);
+    } else if (options.input) {
+      options.input.stdout?.pipe(child.stdin!);
+    }
     child.on("error", reject);
     child.on("close", (code, signal) => {
       children.delete(child);
-      if (code === 0) resolve(stdout);
-      else
+      if (code === 0) {
+        resolve(stdout);
+      } else {
         reject(new Failure(`${command} ${args[0]} failed: ${signal ?? `exit ${code}`}`, code ?? 1));
+      }
     });
   });
 }
@@ -68,14 +73,16 @@ async function pipeline(producer: readonly string[], consumer: readonly string[]
     source.on("error", reject);
     source.on("close", (code, signal) => {
       children.delete(source);
-      if (code === 0) resolve();
-      else
+      if (code === 0) {
+        resolve();
+      } else {
         reject(
           new Failure(
             `${producer[0]} ${producer[1]} failed: ${signal ?? `exit ${code}`}`,
             code ?? 1,
           ),
         );
+      }
     });
   });
   await Promise.all([produced, run({ input: source }, consumer[0], consumer.slice(1))]);
@@ -86,14 +93,18 @@ function git(args: readonly string[]): string {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "inherit"],
   });
-  if (result.status !== 0) throw new Failure(`git ${args[0]} failed`);
+  if (result.status !== 0) {
+    throw new Failure(`git ${args[0]} failed`);
+  }
   return result.stdout;
 }
 
 // Host guards
 
 function requireIdle(): void {
-  if (!(loadavg()[0] < 24)) throw new Failure("One-minute load must be below 24");
+  if (!(loadavg()[0] < 24)) {
+    throw new Failure("One-minute load must be below 24");
+  }
 }
 
 function fingerprint(): string {
@@ -125,16 +136,22 @@ function guardSource(): void {
 }
 
 function verifySource(): void {
-  if (sourceBefore === undefined) return;
+  if (sourceBefore === undefined) {
+    return;
+  }
   const before = sourceBefore;
   sourceBefore = undefined;
-  if (fingerprint() !== before) throw new Failure("Source changed; discard result");
+  if (fingerprint() !== before) {
+    throw new Failure("Source changed; discard result");
+  }
 }
 
 function emptyOutput(path: string): string {
   mkdirSync(path, { recursive: true });
   const output = realpathSync(path);
-  if (readdirSync(output).length) throw new Failure("Output directory must be empty");
+  if (readdirSync(output).length) {
+    throw new Failure("Output directory must be empty");
+  }
   return output;
 }
 
@@ -193,7 +210,9 @@ function policyArguments(spec: ContainerSpec, name: string): string[] {
       String(statSync(source).gid),
     );
   }
-  for (const [key, value] of Object.entries(spec.env ?? {})) args.push("-e", `${key}=${value}`);
+  for (const [key, value] of Object.entries(spec.env ?? {})) {
+    args.push("-e", `${key}=${value}`);
+  }
   return args;
 }
 
@@ -238,9 +257,15 @@ function exec(
   command: readonly string[],
 ): Promise<string> {
   const args = ["exec"];
-  if (options.input !== undefined) args.push("-i");
-  if (options.workdir) args.push("-w", options.workdir);
-  for (const [key, value] of Object.entries(options.env ?? {})) args.push("-e", `${key}=${value}`);
+  if (options.input !== undefined) {
+    args.push("-i");
+  }
+  if (options.workdir) {
+    args.push("-w", options.workdir);
+  }
+  for (const [key, value] of Object.entries(options.env ?? {})) {
+    args.push("-e", `${key}=${value}`);
+  }
   return run(options, "docker", [...args, container.name, ...command]);
 }
 
@@ -267,8 +292,12 @@ function copyOut(container: Container, source: string, destination: string): Pro
 }
 
 function cleanup(): void {
-  for (const child of children) child.kill("SIGTERM");
-  for (const name of [...containers]) remove(name);
+  for (const child of children) {
+    child.kill("SIGTERM");
+  }
+  for (const name of [...containers]) {
+    remove(name);
+  }
 }
 
 process.on("exit", cleanup);
@@ -403,11 +432,14 @@ const COMMANDS: Record<keyof typeof USAGE, (...args: string[]) => Promise<void>>
 
 const [command, ...args] = process.argv.slice(2);
 try {
-  if (!Object.hasOwn(COMMANDS, command))
+  if (!Object.hasOwn(COMMANDS, command)) {
     throw new Failure(`Usage: container.mts <${Object.keys(USAGE).join("|")}> ...`, 2);
+  }
   const name = command as keyof typeof USAGE;
   const handler = COMMANDS[name];
-  if (args.length !== handler.length) throw new Failure(`Usage: container.mts ${USAGE[name]}`, 2);
+  if (args.length !== handler.length) {
+    throw new Failure(`Usage: container.mts ${USAGE[name]}`, 2);
+  }
   await handler(...args);
 } catch (error) {
   console.error(error instanceof Failure ? error.message : error);

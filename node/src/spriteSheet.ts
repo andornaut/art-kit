@@ -316,6 +316,7 @@ export async function writeSpriteSheet(
 ): Promise<void> {
   const { data, sheet } = spriteSheet({ ...options, image: basename(paths.sheet) }, tags);
   for (const path of [paths.sheet, paths.data]) {
+    // eslint-disable-next-line no-await-in-loop
     await mkdir(dirname(path), { recursive: true });
   }
   await writeFile(paths.sheet, sheet);
