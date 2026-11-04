@@ -25,7 +25,7 @@ test('copies all RGBA bytes and preserves caller metrics, order and kerning', ()
 });
 test('rejects invalid inputs and bounded packing overflow', () => {
   const one = new Map([['j', glyph]]);
-  for (const patch of [{atlasWidth: 3}, {maxHeight: 2}, {base: NaN}, {face: '\ud800'}, {padding: -1}, {kernings: [{first: 106, second: 65, amount: 1}]}])
+  for (const patch of [{atlasWidth: 3}, {base: NaN}, {face: '\ud800'}, {padding: -1}, {kernings: [{first: 106, second: 65, amount: 1}]}])
     assert.throws(() => build({...options, ...patch}, one), RangeError);
   for (const [key, value] of [['jj', glyph], ['\ud800', glyph], ['j', {...glyph, xadvance: .5}], ['j', {...glyph, image: {...glyph.image, data: pixels.slice(1)}}]])
     assert.throws(() => build(options, new Map([[key, value]])), RangeError);

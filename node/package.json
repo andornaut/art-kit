@@ -25,7 +25,7 @@
     "./generate": { "types": "./dist/generate.d.ts", "import": "./dist/generate.js" }
   },
   "files": ["dist", "LICENSE", "SOURCE_COMMIT"],
-  "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0", "skia-canvas": "4.0.0", "fontkit": "2.0.4" },
-  "peerDependenciesMeta": { "skia-canvas": { "optional": true }, "fontkit": { "optional": true } },
+  "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0", "skia-canvas": "4.0.0" },
+  "peerDependenciesMeta": { "skia-canvas": { "optional": true } },
   "devDependencies": { "@types/node": "24.19.2", "@types/pngjs": "6.0.5", "typescript": "6.0.3" }
 }

@@ -48,12 +48,12 @@ const installedManifest = JSON.parse(readFileSync(`${install}/node_modules/@ando
 if (readFileSync(`${install}/node_modules/@andornaut/art-kit/SOURCE_COMMIT`, 'utf8') !== `${revision}\n`) throw new Error('Installed source identity differs');
 if (readdirSync(`${install}/node_modules/@andornaut/art-kit`, { encoding: 'utf8', recursive: true }).some(path => /(?:^|\/)fixtures(?:\/|$)|\.(?:ttf|otf|woff2?)$/i.test(path))) throw new Error('Font fixtures must not be published');
 if (installedManifest.version !== version || existsSync(`${install}/node_modules/@andornaut/art-kit/src`)) throw new Error('Invalid compiled package');
-// Every subpath except fonts, frames and generate imports without the optional peers.
-for (const name of ['skia-canvas', 'fontkit']) unlinkSync(`${install}/node_modules/${name}`);
+// Every subpath except fonts, frames and generate imports without the optional Skia peer.
+unlinkSync(`${install}/node_modules/skia-canvas`);
 for (const subpath of ['atlasBuild', 'atlasLayout', 'colour', 'draw', 'gif', 'glyphAtlas', 'grid', 'ico', 'indexedPng', 'png', 'quantise', 'raster', 'rgbaImage', 'webp']) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`], { cwd: install, stdio: 'inherit' });
 }
-for (const name of ['skia-canvas', 'fontkit']) symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);
+symlinkSync('/deps/skia-canvas', `${install}/node_modules/skia-canvas`);
 for (const subpath of Object.keys(descriptor.exports)) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath.slice(2)}`)})`], { cwd: install, stdio: 'inherit' });
 }

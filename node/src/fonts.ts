@@ -1,5 +1,4 @@
 import { realpathSync } from "node:fs";
-import { requireFontCoverage } from "./fontCoverage.js";
 import { Canvas, FontLibrary } from "skia-canvas";
 
 export interface BitmapFontOptions {
@@ -8,16 +7,13 @@ export interface BitmapFontOptions {
   key: string;
   characters: Iterable<string>;
   atlasWidth: number;
-  maxHeight?: number;
   padding?: number;
   lineHeight?: number;
   face?: string;
   base?: number;
-  coverage?: "system" | "strict";
-  kerning?: "requested" | "all";
+  kerning?: "none" | "all";
   antialias?: boolean;
   hinting?: boolean;
-  kerningPairs?: Iterable<readonly [string, string]>;
 }
 
 export interface BitmapGlyph {
@@ -67,17 +63,13 @@ function quote(value: string): string {
 /**
  * CPU Skia bitmap atlas. Metrics use outward-rounded ink bounds and nearest
  * integer advances/kerning; no shaping across glyph boundaries is represented.
- * Font files remain immutable after registration. Skia may use system fallback:
- * strict coverage preflights the selected file but cannot disable internal fallback.
+ * Font files remain immutable after registration. Skia may use system fallback.
  * All-pair kerning is limited to 256 unique characters and retains nonzero amounts.
  */
 export function buildBitmapFont(options: BitmapFontOptions) {
   const size = positive(options.size, "Font size");
   const width = positive(options.atlasWidth, "Atlas width");
-  const maxHeight = positive(
-    options.maxHeight ?? 16384,
-    "Maximum atlas height",
-  );
+  const maxHeight = 16384;
   const padding = options.padding ?? 1;
   if (!Number.isSafeInteger(padding) || padding < 1 || padding > 16384) {
     throw new RangeError("Padding must be an integer in 1..16384");
@@ -85,27 +77,19 @@ export function buildBitmapFont(options: BitmapFontOptions) {
   const key = quote(options.key + ".png");
   const face = options.face ?? options.key;
   quote(face);
-  const coverage = options.coverage ?? "system";
-  const kerning = options.kerning ?? "requested";
-  if (coverage !== "system" && coverage !== "strict")
-    throw new RangeError("Coverage must be system or strict");
-  if (kerning !== "requested" && kerning !== "all")
-    throw new RangeError("Kerning must be requested or all");
+  const kerning = options.kerning ?? "none";
+  if (kerning !== "none" && kerning !== "all")
+    throw new RangeError("Kerning must be none or all");
   const characters = [...new Set(options.characters)];
   characters.forEach(codePoint);
-  if (kerning === "all") {
-    if (options.kerningPairs !== undefined)
-      throw new RangeError("All kerning cannot be combined with kerningPairs");
-    if (characters.length > 256)
-      throw new RangeError("All kerning supports at most 256 unique characters");
-  }
+  if (kerning === "all" && characters.length > 256)
+    throw new RangeError("All kerning supports at most 256 unique characters");
   if (
     options.base !== undefined &&
     (!Number.isSafeInteger(options.base) || options.base < 0 || options.base > 16384)
   )
     throw new RangeError("Base must be an integer in 0..16384");
   const path = realpathSync(options.path);
-  if (coverage === "strict") requireFontCoverage(path, characters);
 
   let family = families.get(path);
   if (!family) {
@@ -176,28 +160,17 @@ export function buildBitmapFont(options: BitmapFontOptions) {
     }
   }
   const kernings = [] as { first: number; second: number; amount: number }[];
-  const seen = new Set<string>();
-  function* allPairs(): Generator<readonly [string, string]> {
+  if (kerning === "all")
     for (const first of characters)
-      for (const second of characters) yield [first, second];
-  }
-  const pairs = kerning === "all" ? allPairs() : options.kerningPairs ?? [];
-  for (const [first, second] of pairs) {
-    const a = codePoint(first),
-      b = codePoint(second),
-      pair = `${a},${b}`;
-    if (!glyphs.has(first) || !glyphs.has(second))
-      throw new RangeError("Kerning pair must belong to characters");
-    if (seen.has(pair)) continue;
-    seen.add(pair);
-    const amount = Math.round(
-      context.measureText(first + second).width -
-        advances.get(first)! -
-        advances.get(second)!,
-    );
-    if (kerning === "requested" || amount !== 0)
-      kernings.push({ first: a, second: b, amount });
-  }
+      for (const second of characters) {
+        const amount = Math.round(
+          context.measureText(first + second).width -
+            advances.get(first)! -
+            advances.get(second)!,
+        );
+        if (amount !== 0)
+          kernings.push({ first: codePoint(first), second: codePoint(second), amount });
+      }
   image.height = Math.max(1, y + rowHeight + padding);
   if (image.height > maxHeight)
     throw new RangeError("Font exceeds maximum atlas height");
@@ -240,7 +213,6 @@ export function buildBitmapFont(options: BitmapFontOptions) {
       kernings,
       size,
       face,
-      coverage,
       kerning,
       base,
       lineHeight,

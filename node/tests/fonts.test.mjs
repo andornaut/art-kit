@@ -62,28 +62,27 @@ test("native CPU atlas retains signed bearings, spaces, bounds and AA policy", (
     }
 });
 
-test("metadata/XML preserve caller policy, whitespace and bounded explicit kerning", () => {
+test("metadata/XML preserve caller policy, whitespace and kerning", () => {
   const key = 'A\tB\nC\rD & "<';
   const { metadata, xml } = buildBitmapFont({
     ...options(),
     key,
     lineHeight: 23,
     characters: "AV j😀A",
-    kerningPairs: [
-      ["A", "V"],
-      ["A", "V"],
-    ],
+    kerning: "all",
   });
   assert.deepEqual([...metadata.glyphs.keys()], [..."AV j😀"]);
   assert.equal(metadata.lineHeight, 23);
-  assert.equal(metadata.kernings.length, 1);
-  assert.ok(metadata.kernings[0].amount < 0);
+  const av = metadata.kernings.find((k) => k.first === 65 && k.second === 86);
+  assert.ok(av.amount < 0);
   assert.match(xml, /A&#9;B&#10;C&#13;D &amp; &quot;&lt;/);
   assert.match(xml, /id="128512"/);
   assert.match(xml, /lineHeight="23"/);
   assert.match(xml, /smooth="1" aa="1"/);
-  assert.match(xml, /kernings count="1"/);
-  assert.equal(buildBitmapFont(options()).metadata.kernings.length, 0);
+  assert.match(xml, new RegExp(`kernings count="${metadata.kernings.length}"`));
+  const plain = buildBitmapFont(options()).metadata;
+  assert.equal(plain.kerning, "none");
+  assert.equal(plain.kernings.length, 0);
 });
 
 test("builder rejects impossible atlases and invalid input before rendering", () => {
@@ -93,7 +92,6 @@ test("builder rejects impossible atlases and invalid input before rendering", ()
     "atlasWidth",
     "lineHeight",
     "padding",
-    "maxHeight",
   ]) {
     assert.throws(() => buildBitmapFont({ ...opts, [field]: 0 }), RangeError);
   }
@@ -102,20 +100,12 @@ test("builder rejects impossible atlases and invalid input before rendering", ()
     /atlas width/,
   );
   assert.throws(
-    () => buildBitmapFont({ ...opts, maxHeight: 2 }),
-    /atlas height/,
-  );
-  assert.throws(
     () => buildBitmapFont({ ...opts, characters: ["ab"] }),
     /Unicode/,
   );
   assert.throws(
     () => buildBitmapFont({ ...opts, characters: ["\ud800"] }),
     /Unicode/,
-  );
-  assert.throws(
-    () => buildBitmapFont({ ...opts, kerningPairs: [["A", "z"]] }),
-    /belong/,
   );
   assert.throws(() => buildBitmapFont({ ...opts, key: "\0" }), /XML/);
   assert.throws(() => buildBitmapFont({ ...opts, key: "\ud800" }), /XML/);
@@ -139,20 +129,14 @@ test("pair kerning uses separate glyph positioning without ligature substitution
   context.fontSmoothing = true;
   context.fontKerning = "normal";
   context.fontFeatureSettings = { liga: false, clig: false, dlig: false, hlig: false, rlig: false, calt: false, rclt: false };
-  const pairs = [["f", "i"], ["A", "V"]];
-  const { metadata } = buildBitmapFont({ ...options(), characters: "fiAV", kerningPairs: pairs });
-  assert.deepEqual(metadata.kernings.map(k => k.amount), pairs.map(([a, b]) => Math.round(context.measureText(a + b).width - context.measureText(a).width - context.measureText(b).width)));
-});
-
-test("strict coverage validates actual font characters including astral code points", () => {
-  for (const weight of ["Regular", "Bold"]) {
-    const font = buildBitmapFont({ ...options(weight), coverage: "strict" });
-    assert.equal(font.metadata.coverage, "strict");
-    assert.ok(font.metadata.glyphs.get("j").xoffset < 0);
-    assert.throws(() => buildBitmapFont({
-      ...options(weight), coverage: "strict", characters: "A😀\u{10ffff}",
-    }), error => error instanceof RangeError && /U\+1F600/.test(error.message) && /U\+10FFFF/.test(error.message));
-  }
+  const unique = [..."fiAV"];
+  const expected = unique.flatMap(a => unique.map(b => ({
+    first: a.codePointAt(0), second: b.codePointAt(0),
+    amount: Math.round(context.measureText(a + b).width - context.measureText(a).width - context.measureText(b).width),
+  }))).filter(k => k.amount !== 0);
+  const { metadata } = buildBitmapFont({ ...options(), characters: "fiAV", kerning: "all" });
+  assert.ok(expected.length > 0);
+  assert.deepEqual(metadata.kernings, expected);
 });
 
 test("explicit face and baseline change metadata without moving atlas ink", () => {
@@ -174,20 +158,17 @@ test("explicit face and baseline change metadata without moving atlas ink", () =
     assert.throws(() => buildBitmapFont({ ...options(), base }), /Base/);
 });
 
-test("all kerning equals complete explicit ordered pairs with zero adjustments removed", () => {
+test("all kerning emits each nonzero ordered pair once, bounded to 256 characters", () => {
   const characters = "AVTofi jAV";
-  const unique = [...new Set(characters)];
-  const pairs = unique.flatMap(a => unique.map(b => [a, b]));
   for (const weight of ["Regular", "Bold"]) {
-    const requested = buildBitmapFont({ ...options(weight), characters, kerningPairs: pairs });
     const all = buildBitmapFont({ ...options(weight), characters, kerning: "all" });
-    assert.deepEqual(all.metadata.kernings, requested.metadata.kernings.filter(k => k.amount !== 0));
+    const keys = all.metadata.kernings.map(k => `${k.first},${k.second}`);
+    assert.equal(new Set(keys).size, keys.length);
     assert.ok(all.metadata.kernings.length > 0);
+    assert.ok(all.metadata.kernings.every(k => k.amount !== 0 && Number.isInteger(k.amount)));
     assert.equal(all.metadata.kerning, "all");
   }
-  assert.throws(() => buildBitmapFont({ ...options(), kerning: "all", kerningPairs: [] }), /combined/);
   const tooMany = Array.from({ length: 257 }, (_, i) => String.fromCodePoint(0x100 + i));
   assert.throws(() => buildBitmapFont({ ...options(), kerning: "all", characters: tooMany }), /256/);
-  assert.throws(() => buildBitmapFont({ ...options(), coverage: "unknown" }), /Coverage/);
   assert.throws(() => buildBitmapFont({ ...options(), kerning: "unknown" }), /Kerning/);
 });

@@ -48,6 +48,4 @@ test('packed layout requires antialias and rejects padding; padded rejects antia
     { layout: 'padded', antialias: false }, { antialias: true }, { layout: 'extruded' }])
     assert.throws(() => build({ ...base, ...options }, new Map()), RangeError);
   assert.throws(() => build({ ...base, layout: 'packed', antialias: false }, glyphs), /exceeds atlas width/);
-  assert.throws(() => build({ ...base, layout: 'packed', antialias: false, maxHeight: 2 },
-    new Map([['a', { image: { width: 4, height: 3, data: new Uint8Array(48) }, xoffset: 0, yoffset: 0, xadvance: 1 }]])), /maximum height/);
 });

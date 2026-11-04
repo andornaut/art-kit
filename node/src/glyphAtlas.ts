@@ -15,7 +15,6 @@ interface GlyphAtlasCommonOptions {
   base: number;
   lineHeight: number;
   atlasWidth: number;
-  maxHeight?: number;
   kernings?: readonly GlyphKerning[];
 }
 /** Inset and spaced by `padding` (default 1); the atlas height fits the last row. */
@@ -60,7 +59,7 @@ export function buildBitmapFontFromGlyphs(options: GlyphAtlasOptions, supplied: 
   if (!packed && loose.antialias !== undefined) throw new RangeError("antialias applies only to the packed layout");
   if (packed && typeof loose.antialias !== "boolean") throw new RangeError("Packed layout requires a boolean antialias");
   const width = integer(options.atlasWidth, "Atlas width", 1, 16384);
-  const limit = integer(options.maxHeight ?? 16384, "Maximum height", 1, 16384);
+  const limit = 16384;
   const padding = packed ? 0 : integer((options as PaddedGlyphAtlasOptions).padding ?? 1, "Padding", 0, 16384);
   const size = integer(options.size, "Size", 1, 16384);
   const base = integer(options.base, "Base");
