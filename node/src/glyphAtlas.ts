@@ -100,7 +100,7 @@ export function buildBitmapFontFromGlyphs(options: GlyphAtlasOptions, supplied: 
   for (const [char, source] of supplied) {
     if (!source.image) continue;
     const g = glyphs.get(char)!;
-    blitExtruded(source.image, { x: 0, y: 0, width: g.width, height: g.height }, 0, image, g);
+    blitExtruded({ at: g, extrude: 0, from: { x: 0, y: 0, width: g.width, height: g.height } }, source.image, image);
   }
   const aa = packed ? Number((options as PackedGlyphAtlasOptions).antialias) : 0;
   const info = packed

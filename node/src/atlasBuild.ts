@@ -34,7 +34,7 @@ export function drawAtlasPage(
     if (image === undefined) {
       throw new Error(`No atlas source for ${source}`);
     }
-    blitExtruded(image, from, extrude, page, at, bounds);
+    blitExtruded({ at, bounds, extrude, from }, image, page);
   }
   return page;
 }

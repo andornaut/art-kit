@@ -67,22 +67,21 @@ test("extrusion reads original bounds and retains RGB under zero alpha", () => {
   };
   const target = blankImage(3, 3);
   blitExtruded(
+    {
+      from: { x: 1, y: 0, width: 1, height: 1 },
+      extrude: 1,
+      at: { x: 1, y: 1 },
+      bounds: { x: 0, y: 0, width: 3, height: 1 },
+    },
     source,
-    { x: 1, y: 0, width: 1, height: 1 },
-    1,
     target,
-    { x: 1, y: 1 },
-    { x: 0, y: 0, width: 3, height: 1 },
   );
   assert.deepEqual(
     target.data,
     Uint8Array.from([...source.data, ...source.data, ...source.data]),
   );
   const clamped = blankImage(3, 3);
-  blitExtruded(source, { x: 0, y: 0, width: 1, height: 1 }, 1, clamped, {
-    x: 1,
-    y: 1,
-  });
+  blitExtruded({ from: { x: 0, y: 0, width: 1, height: 1 }, extrude: 1, at: { x: 1, y: 1 } }, source, clamped);
   assert.deepEqual(
     clamped.data,
     Uint8Array.from(Array(9).fill([1, 2, 3, 0]).flat()),

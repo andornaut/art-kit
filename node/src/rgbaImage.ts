@@ -12,18 +12,25 @@ export function blankImage(width: number, height: number): RgbaImage {
   return { data: new Uint8Array(width * height * 4), height, width };
 }
 
+export interface BlitExtrudedOptions {
+  // The rect of source to copy.
+  from: Rect;
+  // Pixels of border added on every side.
+  extrude: number;
+  // Where the copied rect's top-left lands in target.
+  at: Point;
+  // The whole frame a trimmed rect was cut from, so the border holds what the whole frame's pixels
+  // hold there; defaults to from.
+  bounds?: Rect;
+}
+
 // Copies the from rect of source to target with its top-left at, and extrude pixels around it on
 // every side as source holds them inside bounds, repeating bounds' edge pixels past its edges, so
-// a frame sampled just past its edge reads its own colour rather than a neighbour's. bounds is
-// the whole frame a trimmed rect was cut from, so the border holds what the whole frame's pixels
-// hold there; it defaults to from.
+// a frame sampled just past its edge reads its own colour rather than a neighbour's.
 export function blitExtruded(
+  { from, extrude, at, bounds = from }: BlitExtrudedOptions,
   source: RgbaImage,
-  from: Rect,
-  extrude: number,
   target: RgbaImage,
-  at: Point,
-  bounds: Rect = from,
 ): void {
   for (let dy = -extrude; dy < from.height + extrude; dy++) {
     const sourceY =
