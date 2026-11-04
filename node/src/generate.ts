@@ -10,3 +10,5 @@ export type {
   SliceOptions as AsepriteSliceOptions,
   Tag as AsepriteTag,
 } from "./aseprite.js";
+export { spriteSheet, writeSpriteSheet } from "./spriteSheet.js";
+export type { Margins, SpriteSheet, SpriteSheetOptions, Tag as SpriteSheetTag } from "./spriteSheet.js";

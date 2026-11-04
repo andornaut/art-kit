@@ -1,6 +1,6 @@
 {
   "name": "@andornaut/art-kit",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "type": "module",
   "license": "MIT",
   "engines": { "node": ">=24.21.0" },
@@ -15,6 +15,7 @@
     "./ico": { "types": "./dist/ico.d.ts", "import": "./dist/ico.js" },
     "./quantise": { "types": "./dist/quantise.d.ts", "import": "./dist/quantise.js" },
     "./aseprite": { "types": "./dist/aseprite.d.ts", "import": "./dist/aseprite.js" },
+    "./spriteSheet": { "types": "./dist/spriteSheet.d.ts", "import": "./dist/spriteSheet.js" },
     "./draw": { "types": "./dist/draw.d.ts", "import": "./dist/draw.js" },
     "./colour": { "types": "./dist/colour.d.ts", "import": "./dist/colour.js" },
     "./fonts": { "types": "./dist/fonts.d.ts", "import": "./dist/fonts.js" },

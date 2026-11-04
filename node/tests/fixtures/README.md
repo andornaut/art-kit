@@ -11,6 +11,10 @@ These fixtures are frozen reference outputs. Their generators are not in this tr
 | `gif-ico/pillow.json` | GIF and ICO inputs with Pillow 13.0.0 decodes of its own saves | `tests/gif_ico_reference.py` |
 | `bmfont-packed.json` | Glyph inputs with art_kit v0.10.0 `fonts.pack` and `bmfont_xml` outputs (cases without antialiasing also match v0.5.0); its Liberation Sans cases are rasterized from the fonts below | `node/tests/bmfont_fixtures.py` |
 
+## Aseprite exports
+
+`sprite-sheet/` holds Aseprite 1.2.30 (the 1.2.30-1 amd64 package, x86-64 with SSE4.2 and PCLMUL) `aseprite -b --sheet --data --format json-hash --list-tags` exports, with `--list-slices` and `--sheet-columns` where a case sets margins or columns. `cases.json` lists each case's key, `meta.image` and options. `generated` cases also hold their input tags: frames are rows of palette indices, `.` for clear; they were exported through `aseprite.export` from art-kit 0.15.0 and cover single frames, partial and wide column layouts, slices, empty frames, escaped tag names, duration truncation and clamping, and streams that slide the deflate window. The `archies-dog-walks` and `chibis-way-home` cases are those games' committed exports (`public/art/sprites/<key>.png` and `.json`); their inputs are read back from the sheet and data, and `archie-tour-group` spans two IDAT chunks.
+
 `quantise-golden.json` is the committed output of the Node `quantise` subpath, not a Pillow reference.
 
 ## Fonts

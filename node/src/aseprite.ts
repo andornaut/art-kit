@@ -4,12 +4,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { rgb } from './colour.js';
-import type { Frame } from './grid.js';
+import type { Margins, Tag } from './spriteSheet.js';
 
-export type Tag = readonly [name: string, frames: readonly Frame[], milliseconds: number | readonly number[]];
+export type { Tag };
 export interface SliceOptions {
   key?: string;
-  margins?: readonly [left: number, top: number, right: number, bottom: number];
+  margins?: Margins;
 }
 export interface ExportOptions extends SliceOptions {
   columns?: number;

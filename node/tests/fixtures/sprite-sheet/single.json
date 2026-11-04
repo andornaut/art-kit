@@ -1,0 +1,22 @@
+{ "frames": {
+   "one frame.aseprite": {
+    "frame": { "x": 0, "y": 0, "w": 3, "h": 3 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 3, "h": 3 },
+    "sourceSize": { "w": 3, "h": 3 },
+    "duration": 1000
+   }
+ },
+ "meta": {
+  "app": "http://www.aseprite.org/",
+  "version": "1.2.30-x64",
+  "image": "one frame.png",
+  "format": "RGBA8888",
+  "size": { "w": 3, "h": 3 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "idle", "from": 0, "to": 0, "direction": "forward" }
+  ]
+ }
+}

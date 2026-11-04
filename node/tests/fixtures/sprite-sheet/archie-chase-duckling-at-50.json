@@ -1,0 +1,96 @@
+{ "frames": {
+   "chase-duckling@50 0.aseprite": {
+    "frame": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 300
+   },
+   "chase-duckling@50 1.aseprite": {
+    "frame": { "x": 10, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 300
+   },
+   "chase-duckling@50 2.aseprite": {
+    "frame": { "x": 20, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 80
+   },
+   "chase-duckling@50 3.aseprite": {
+    "frame": { "x": 30, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 80
+   },
+   "chase-duckling@50 4.aseprite": {
+    "frame": { "x": 40, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 80
+   },
+   "chase-duckling@50 5.aseprite": {
+    "frame": { "x": 50, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 80
+   },
+   "chase-duckling@50 6.aseprite": {
+    "frame": { "x": 60, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 100
+   },
+   "chase-duckling@50 7.aseprite": {
+    "frame": { "x": 70, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 100
+   },
+   "chase-duckling@50 8.aseprite": {
+    "frame": { "x": 80, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 100
+   },
+   "chase-duckling@50 9.aseprite": {
+    "frame": { "x": 90, "y": 0, "w": 10, "h": 12 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 10, "h": 12 },
+    "sourceSize": { "w": 10, "h": 12 },
+    "duration": 100
+   }
+ },
+ "meta": {
+  "app": "http://www.aseprite.org/",
+  "version": "1.2.30-x64",
+  "image": "chase-duckling@50.png",
+  "format": "RGBA8888",
+  "size": { "w": 100, "h": 12 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "idle", "from": 0, "to": 1, "direction": "forward" },
+   { "name": "run", "from": 2, "to": 5, "direction": "forward" },
+   { "name": "hop", "from": 6, "to": 9, "direction": "forward" }
+  ]
+ }
+}

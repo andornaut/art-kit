@@ -1,0 +1,111 @@
+{ "frames": {
+   "background-deer-large 0.aseprite": {
+    "frame": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 1000
+   },
+   "background-deer-large 1.aseprite": {
+    "frame": { "x": 216, "y": 0, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 180
+   },
+   "background-deer-large 2.aseprite": {
+    "frame": { "x": 432, "y": 0, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 180
+   },
+   "background-deer-large 3.aseprite": {
+    "frame": { "x": 648, "y": 0, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 1000
+   },
+   "background-deer-large 4.aseprite": {
+    "frame": { "x": 864, "y": 0, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 350
+   },
+   "background-deer-large 5.aseprite": {
+    "frame": { "x": 1080, "y": 0, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 300
+   },
+   "background-deer-large 6.aseprite": {
+    "frame": { "x": 0, "y": 144, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 300
+   },
+   "background-deer-large 7.aseprite": {
+    "frame": { "x": 216, "y": 144, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 650
+   },
+   "background-deer-large 8.aseprite": {
+    "frame": { "x": 432, "y": 144, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 650
+   },
+   "background-deer-large 9.aseprite": {
+    "frame": { "x": 648, "y": 144, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 350
+   },
+   "background-deer-large 10.aseprite": {
+    "frame": { "x": 864, "y": 144, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 300
+   },
+   "background-deer-large 11.aseprite": {
+    "frame": { "x": 1080, "y": 144, "w": 216, "h": 144 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 216, "h": 144 },
+    "sourceSize": { "w": 216, "h": 144 },
+    "duration": 350
+   }
+ },
+ "meta": {
+  "app": "http://www.aseprite.org/",
+  "version": "1.2.30-x64",
+  "image": "background-deer-large.png",
+  "format": "RGBA8888",
+  "size": { "w": 1296, "h": 288 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "idle", "from": 0, "to": 3, "direction": "forward" },
+   { "name": "graze", "from": 4, "to": 11, "direction": "forward" }
+  ]
+ }
+}

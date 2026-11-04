@@ -1,0 +1,31 @@
+{ "frames": {
+   "wide 0.aseprite": {
+    "frame": { "x": 0, "y": 0, "w": 4, "h": 6 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 6 },
+    "sourceSize": { "w": 4, "h": 6 },
+    "duration": 120
+   },
+   "wide 1.aseprite": {
+    "frame": { "x": 4, "y": 0, "w": 4, "h": 6 },
+    "rotated": false,
+    "trimmed": false,
+    "spriteSourceSize": { "x": 0, "y": 0, "w": 4, "h": 6 },
+    "sourceSize": { "w": 4, "h": 6 },
+    "duration": 120
+   }
+ },
+ "meta": {
+  "app": "http://www.aseprite.org/",
+  "version": "1.2.30-x64",
+  "image": "wide.png",
+  "format": "RGBA8888",
+  "size": { "w": 8, "h": 6 },
+  "scale": "1",
+  "frameTags": [
+   { "name": "a", "from": 0, "to": 0, "direction": "forward" },
+   { "name": "b", "from": 1, "to": 1, "direction": "forward" }
+  ]
+ }
+}
