@@ -10,10 +10,9 @@ The `frames` and `fonts` generation modules render with CPU Skia canvases; `rast
 | Grid | 185 |
 | Frames and composition | 183 |
 | Fonts, packing and coverage | 419 |
-| Aseprite | 109 |
-| Total | 1013 |
+| Total | 904 |
 
-These are physical lines including types, comments and whitespace, excluding tests, the atlas/codec modules and packaging. The fonts total includes rasterization (253), strict coverage (42) and supplied-glyph assembly (125). The consolidated generation entry adds another 12 lines. The numbers are not a complexity score. The rendering path has no custom alpha arithmetic, manually scaled pixel writes, intermediate glyph RGBA buffers or Pillow-specific rounding. TypeScript owns typed options, input/bounds validation, packing and XML. Font construction adds native pair-kerning derivation and structured metadata.
+These are physical lines including types, comments and whitespace, excluding tests, the atlas/codec modules and packaging. The fonts total includes rasterization (252), strict coverage (42) and supplied-glyph assembly (125). The consolidated generation entry adds another 8 lines. The numbers are not a complexity score. The rendering path has no custom alpha arithmetic, manually scaled pixel writes, intermediate glyph RGBA buffers or Pillow-specific rounding. TypeScript owns typed options, input/bounds validation, packing and XML. Font construction adds native pair-kerning derivation and structured metadata.
 
 Generation exposes renderFrame, composeSheet and renderContactSheet returning CPU Canvas objects. Keep those surfaces through composition and encode at the boundary. buildBitmapFont is one font-and-atlas operation in place of separate rasterize, pack and XML calls. Exact-copy buffer utilities and codecs remain separate. This reduces caller assembly and renderer-specific buffer handling.
 
@@ -31,4 +30,4 @@ Skia Canvas 4.0.0 is an exact optional peer for generation modules. Strict cover
 
 ## Verification
 
-The isolated local gate passes 93 Node tests with zero skips, plus declarations, installed-package imports and the build. It requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.
+The isolated local gate passes every Node test with zero skips, plus declarations, installed-package imports and the build. It requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.

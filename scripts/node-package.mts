@@ -50,7 +50,7 @@ if (readdirSync(`${install}/node_modules/@andornaut/art-kit`, { encoding: 'utf8'
 if (installedManifest.version !== version || existsSync(`${install}/node_modules/@andornaut/art-kit/src`)) throw new Error('Invalid compiled package');
 // Every subpath except fonts, frames and generate imports without the optional peers.
 for (const name of ['skia-canvas', 'fontkit']) unlinkSync(`${install}/node_modules/${name}`);
-for (const subpath of ['aseprite', 'atlasBuild', 'atlasLayout', 'colour', 'draw', 'gif', 'glyphAtlas', 'grid', 'ico', 'indexedPng', 'png', 'quantise', 'raster', 'rgbaImage', 'webp']) {
+for (const subpath of ['atlasBuild', 'atlasLayout', 'colour', 'draw', 'gif', 'glyphAtlas', 'grid', 'ico', 'indexedPng', 'png', 'quantise', 'raster', 'rgbaImage', 'webp']) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`], { cwd: install, stdio: 'inherit' });
 }
 for (const name of ['skia-canvas', 'fontkit']) symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);

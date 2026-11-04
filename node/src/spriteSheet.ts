@@ -44,7 +44,8 @@ function escape(text: string): string {
   return text.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
 }
 
-// The duration Aseprite stores: the Lua export's seconds times 1000, truncated, within 1..65535.
+// The duration Aseprite stores for one given in milliseconds: converted to seconds and back, truncated,
+// within 1..65535.
 function storedDuration(milliseconds: number): number {
   if (!Number.isFinite(milliseconds)) {
     throw new RangeError("Durations must be finite");
@@ -299,8 +300,8 @@ function png(image: RgbaImage): Uint8Array {
 // ---------- public interface ----------
 
 // The sheet PNG and its json-hash data. Frames are laid out left to right in tag order, wrapping
-// after columns; every pixel is opaque or clear. Durations are stored as Aseprite stores the export's
-// seconds: truncated to whole milliseconds within 1..65535, so 1001 becomes 1000.
+// after columns; every pixel is opaque or clear. Durations are stored as Aseprite stores them:
+// truncated to whole milliseconds within 1..65535, so 1001 becomes 1000.
 export function spriteSheet(options: SpriteSheetOptions, tags: readonly Tag[]): SpriteSheet {
   const { columns, margins } = options;
   if (columns !== undefined && (!Number.isSafeInteger(columns) || columns <= 0)) {
