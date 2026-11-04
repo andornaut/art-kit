@@ -3,11 +3,11 @@ import type { Point, Rect } from "./geometry.js";
 import type { Frame } from "./grid.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
-// Straight (non-premultiplied) RGBA operations reproducing Pillow 13.0.0 integer maths. An RGB
-// image is modelled as an RgbaImage whose alpha is 255. Fill and paste functions mutate their
-// target; every other function returns a new image or plane.
+// Straight (non-premultiplied) RGBA raster operations with exact integer rounding; Pillow 13.0.0 is
+// the parity reference. An opaque (RGB) image is an RgbaImage whose alpha is 255. fill, paste and
+// composite mutate their target; every other function returns a new image or plane.
 
-/** One 8-bit channel (Pillow mode "L"), one byte per pixel, row by row from the top-left. */
+/** One 8-bit channel, one byte per pixel, row by row from the top-left. */
 export interface Plane {
   data: Uint8Array;
   height: number;
@@ -28,8 +28,8 @@ export type Sprite = readonly [name: string, tags: readonly Tag[]];
 export interface ContactSheetOptions {
   resolveRgb: (colour: string) => Rgb;
   background: Rgb;
-  /** "first-frame" sizes cells from each row's first frame (Python art_kit 0.5.0); "all-frames" matches frames.renderContactSheet. */
-  cells: "first-frame" | "all-frames";
+  /** "row-first-frame" sizes cells from first frames; "largest-frame" from every frame. */
+  cellSize: "row-first-frame" | "largest-frame";
   scale?: number;
   gap?: number;
 }
@@ -141,28 +141,81 @@ export function frameToRgba(context: ColourContext, frame: Frame): RgbaImage {
   return out;
 }
 
-/** Replaces every pixel of rect, clipped to image, with rgba (Pillow paste of a colour into a box). */
-export function fillRect(rgba: Rgba, r: Rect, target: RgbaImage): void {
+export interface FillOptions {
+  /** The pixels to fill, clipped to the image. */
+  rect: Rect;
+  /** Coverage plane sized to rect: 0 keeps a pixel, 255 writes rgba and values between blend. */
+  mask?: Plane;
+}
+
+/**
+ * Writes rgba into rect. Without a mask every pixel is replaced, alpha included. With a mask each
+ * channel blends by the mask value, and a fully transparent pixel takes the full colour in its
+ * RGB channels wherever the mask is nonzero, so only its alpha carries the coverage.
+ */
+export function fill({ rect: r, mask }: FillOptions, rgba: Rgba, target: RgbaImage): void {
   colour(rgba, 4);
   rect(r);
   image(target);
+  if (mask) {
+    plane(mask);
+    if (mask.width !== r.width || mask.height !== r.height) throw new RangeError("Mask must match the rect size");
+  }
   const c = clip(r, r.width, r.height, target);
   if (!c) return;
   for (let y = 0; y < c.h; y++)
-    for (let x = 0; x < c.w; x++) target.data.set(rgba, ((c.dy + y) * target.width + c.dx + x) * 4);
+    for (let x = 0; x < c.w; x++) {
+      const t = ((c.dy + y) * target.width + c.dx + x) * 4;
+      if (!mask) {
+        target.data.set(rgba, t);
+        continue;
+      }
+      const m = mask.data[(c.sy + y) * mask.width + c.sx + x];
+      for (let i = 0; i < 4; i++) {
+        const weight = i !== 3 && m !== 0 && target.data[t + 3] === 0 ? 255 : m;
+        target.data[t + i] = blend(weight, target.data[t + i], rgba[i]);
+      }
+    }
 }
 
-/** Replaces target pixels, including alpha, with source placed at `at` (Pillow paste without a mask). */
-export function paste(at: Point, source: RgbaImage, target: RgbaImage): void {
+export interface PasteOptions {
+  /** Where the source's top-left lands; the source is clipped to the image on every side. */
+  at: Point;
+  /**
+   * Omitted: source pixels replace target pixels. A plane sized to source, or "alpha" for the
+   * source's own alpha: each channel blends from target to source by the mask value.
+   */
+  mask?: Plane | "alpha";
+  /** Write only RGB and keep the target's alpha, for opaque (RGB) targets. Defaults to false. */
+  keepAlpha?: boolean;
+}
+
+/**
+ * Draws source onto image. The four combinations of mask and keepAlpha are all defined: replace
+ * RGBA, replace RGB only, blend RGBA, or blend RGB only. Blending rounds each channel to the
+ * nearest byte; it is a weighted copy, not alpha compositing (see composite).
+ */
+export function paste({ at, mask, keepAlpha = false }: PasteOptions, source: RgbaImage, target: RgbaImage): void {
   point(at);
   image(source);
   image(target);
+  const data = source === target ? source.data.slice() : source.data;
+  const weight = mask === undefined ? undefined : maskPlane(mask, { ...source, data });
   const c = clip(at, source.width, source.height, target);
   if (!c) return;
-  const copy = source === target ? source.data.slice() : source.data;
+  const channels = keepAlpha ? 3 : 4;
   for (let y = 0; y < c.h; y++) {
-    const read = ((c.sy + y) * source.width + c.sx) * 4;
-    target.data.set(copy.subarray(read, read + c.w * 4), ((c.dy + y) * target.width + c.dx) * 4);
+    if (!weight && !keepAlpha) {
+      const read = ((c.sy + y) * source.width + c.sx) * 4;
+      target.data.set(data.subarray(read, read + c.w * 4), ((c.dy + y) * target.width + c.dx) * 4);
+      continue;
+    }
+    for (let x = 0; x < c.w; x++) {
+      const s = (c.sy + y) * source.width + c.sx + x,
+        t = ((c.dy + y) * target.width + c.dx + x) * 4;
+      const m = weight ? weight(s) : 255;
+      for (let i = 0; i < channels; i++) target.data[t + i] = blend(m, target.data[t + i], data[s * 4 + i]);
+    }
   }
 }
 
@@ -173,68 +226,12 @@ function maskPlane(mask: Plane | "alpha", source: RgbaImage): (i: number) => num
     throw new RangeError("Mask must match the source size");
   return (i) => mask.data[i];
 }
-function pasteBlended(
-  channels: number,
-  at: Point,
-  source: RgbaImage,
-  mask: Plane | "alpha",
-  target: RgbaImage,
-): void {
-  point(at);
-  image(source);
-  image(target);
-  const data = source === target ? source.data.slice() : source.data;
-  const weight = maskPlane(mask, { ...source, data });
-  const c = clip(at, source.width, source.height, target);
-  if (!c) return;
-  for (let y = 0; y < c.h; y++)
-    for (let x = 0; x < c.w; x++) {
-      const s = (c.sy + y) * source.width + c.sx + x,
-        t = ((c.dy + y) * target.width + c.dx + x) * 4,
-        m = weight(s);
-      for (let i = 0; i < channels; i++)
-        target.data[t + i] = blend(m, target.data[t + i], data[s * 4 + i]);
-    }
-}
 
 /**
- * Blends source placed at `at` into an RGBA target by an L mask plane sized to source, or by the
- * source's own alpha with "alpha"; all four channels blend (Pillow Paste.c paste_mask_L/RGBA).
+ * Composites source over image at `at` with straight alpha ("over"): a clear source pixel keeps the
+ * target, an opaque one replaces it and partial alpha combines both colours and alphas.
  */
-export function pasteMasked(at: Point, source: RgbaImage, mask: Plane | "alpha", target: RgbaImage): void {
-  pasteBlended(4, at, source, mask, target);
-}
-
-/** As pasteMasked onto a Pillow mode "RGB" target: R, G and B blend and target alpha is unchanged. */
-export function pasteMaskedRgb(at: Point, source: RgbaImage, mask: Plane | "alpha", target: RgbaImage): void {
-  pasteBlended(3, at, source, mask, target);
-}
-
-/**
- * Blends rgba into an RGBA target through an L mask plane placed at `at` (Pillow paste of a colour
- * with an L mask, Paste.c fill_mask_L): colour channels of a clear target pixel take the full
- * colour wherever the mask is nonzero.
- */
-export function pasteColour(rgba: Rgba, at: Point, mask: Plane, target: RgbaImage): void {
-  colour(rgba, 4);
-  point(at);
-  plane(mask);
-  image(target);
-  const c = clip(at, mask.width, mask.height, target);
-  if (!c) return;
-  for (let y = 0; y < c.h; y++)
-    for (let x = 0; x < c.w; x++) {
-      const m = mask.data[(c.sy + y) * mask.width + c.sx + x],
-        t = ((c.dy + y) * target.width + c.dx + x) * 4;
-      for (let i = 0; i < 4; i++) {
-        const weight = i !== 3 && m !== 0 && target.data[t + 3] === 0 ? 255 : m;
-        target.data[t + i] = blend(weight, target.data[t + i], rgba[i]);
-      }
-    }
-}
-
-/** Composites source over target at `at` with straight alpha (Pillow Image.alpha_composite method). */
-export function alphaComposite(at: Point, source: RgbaImage, target: RgbaImage): void {
+export function composite(at: Point, source: RgbaImage, target: RgbaImage): void {
   point(at);
   image(source);
   image(target);
@@ -260,8 +257,7 @@ export function alphaComposite(at: Point, source: RgbaImage, target: RgbaImage):
     }
 }
 
-/** A new copy of image. */
-export function copy(source: RgbaImage): RgbaImage {
+function clone(source: RgbaImage): RgbaImage {
   image(source);
   return { data: source.data.slice(), height: source.height, width: source.width };
 }
@@ -271,27 +267,20 @@ export function crop(r: Rect, source: RgbaImage): RgbaImage {
   rect(r);
   image(source);
   const out = { data: new Uint8Array(r.width * r.height * 4), height: r.height, width: r.width };
-  paste({ x: -r.x, y: -r.y }, source, out);
+  paste({ at: { x: -r.x, y: -r.y } }, source, out);
   return out;
 }
 
 /** image mirrored left to right. */
 export function flipX(source: RgbaImage): RgbaImage {
   image(source);
-  const out = copy(source);
+  const out = clone(source);
   for (let y = 0; y < source.height; y++)
     for (let x = 0; x < source.width; x++) {
       const read = (y * source.width + x) * 4;
       out.data.set(source.data.subarray(read, read + 4), (y * source.width + source.width - 1 - x) * 4);
     }
   return out;
-}
-
-/** image with each pixel replicated factor x factor times, including RGB under clear alpha. */
-export function scaleNearest(factor: number, source: RgbaImage): RgbaImage {
-  positive(factor, "Scale factor");
-  image(source);
-  return resizeNearest(source.width * factor, source.height * factor, source);
 }
 
 // Geometry.c ImagingScaleAffine with fill: source x starts at x offset + 0.5 * x scale and
@@ -329,8 +318,9 @@ function scaleAffine(
 }
 
 /**
- * image resampled to width x height as Pillow resize with NEAREST does: source x starts at
- * 0.5 * in/out and accumulates in/out in double precision, truncated; y likewise.
+ * image resampled to width x height by nearest pixel centre, copying RGBA exactly (including RGB
+ * under clear alpha). An integer multiple of the source size replicates each pixel. Sampling
+ * accumulates in/out in double precision from half a step, as the parity reference does.
  */
 export function resizeNearest(width: number, height: number, source: RgbaImage): RgbaImage {
   size(width, "Width");
@@ -354,7 +344,7 @@ function round15(value: number): number {
 }
 
 function rotate180(source: RgbaImage): RgbaImage {
-  const out = copy(source);
+  const out = clone(source);
   const count = source.width * source.height;
   for (let i = 0; i < count; i++) out.data.set(source.data.subarray(i * 4, i * 4 + 4), (count - 1 - i) * 4);
   return out;
@@ -363,7 +353,7 @@ function rotate180(source: RgbaImage): RgbaImage {
 // Square transposes: ROTATE_90 is counter-clockwise, ROTATE_270 clockwise.
 function rotateSquare(clockwise: boolean, source: RgbaImage): RgbaImage {
   const n = source.width;
-  const out = copy(source);
+  const out = clone(source);
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
       const [sx, sy] = clockwise ? [y, n - 1 - x] : [n - 1 - y, x];
@@ -374,10 +364,11 @@ function rotateSquare(clockwise: boolean, source: RgbaImage): RgbaImage {
 }
 
 /**
- * image rotated counter-clockwise by angle degrees about its centre, as Pillow
- * Image.rotate(angle, NEAREST) does with expand=False and a transparent black fill: the same
- * matrix construction and fast paths, then Geometry.c nearest affine sampling (16.16 fixed point
- * when every corner maps inside +-32768, double precision otherwise).
+ * image rotated counter-clockwise by angle degrees about its centre by nearest pixel, keeping its
+ * size; uncovered pixels are (0,0,0,0). Multiples of 90 degrees that keep the shape are exact
+ * transposes. Other angles reproduce Pillow's rotation matrix (cos and sin rounded to 15
+ * decimals) and its nearest affine sampling: 16.16 fixed point when every corner maps inside
+ * +-32768, double precision otherwise.
  */
 export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
   if (!Number.isFinite(angle)) throw new RangeError("Angle must be finite");
@@ -387,7 +378,7 @@ export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
   if (degrees !== 0) {
     if (degrees < 0) degrees += 360;
   } else degrees = 0;
-  if (degrees === 0) return copy(source);
+  if (degrees === 0) return clone(source);
   if (degrees === 180) return rotate180(source);
   if ((degrees === 90 || degrees === 270) && source.width === source.height)
     return rotateSquare(degrees === 270, source);
@@ -432,15 +423,15 @@ export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
   return out;
 }
 
-/** image with alpha set to 255 and RGB kept, including under clear pixels (Pillow convert "RGB"). */
-export function withoutAlpha(source: RgbaImage): RgbaImage {
-  const out = copy(source);
+/** image with alpha set to 255 and RGB kept, including RGB under previously clear pixels. */
+export function opaque(source: RgbaImage): RgbaImage {
+  const out = clone(source);
   for (let i = 3; i < out.data.length; i += 4) out.data[i] = 255;
   return out;
 }
 
-/** Luma as Pillow convert("L") computes it: (R*19595 + G*38470 + B*7471 + 0x8000) >> 16. */
-export function toGrayscale(source: RgbaImage): Plane {
+/** ITU-R 601-2 luma per pixel, ignoring alpha: (R*19595 + G*38470 + B*7471 + 0x8000) >> 16. */
+export function grayscale(source: RgbaImage): Plane {
   image(source);
   const data = new Uint8Array(source.width * source.height);
   for (let i = 0; i < data.length; i++) {
@@ -450,65 +441,68 @@ export function toGrayscale(source: RgbaImage): Plane {
   return { data, height: source.height, width: source.width };
 }
 
-/** Channel index (0 red, 1 green, 2 blue, 3 alpha) of image as a plane. */
-export function getChannel(index: number, source: RgbaImage): Plane {
+/** Channel index of image: 0 red, 1 green, 2 blue, 3 alpha. */
+export type ChannelIndex = 0 | 1 | 2 | 3;
+function channelIndex(index: number): void {
   if (![0, 1, 2, 3].includes(index)) throw new RangeError("Channel index must be 0, 1, 2 or 3");
+}
+
+/** One channel of image as a plane. */
+export function channel(index: ChannelIndex, source: RgbaImage): Plane {
+  channelIndex(index);
   image(source);
   const data = new Uint8Array(source.width * source.height);
   for (let i = 0; i < data.length; i++) data[i] = source.data[i * 4 + index];
   return { data, height: source.height, width: source.width };
 }
 
-/** The red, green, blue and alpha planes of image. */
-export function split(source: RgbaImage): [Plane, Plane, Plane, Plane] {
-  return [0, 1, 2, 3].map((index) => getChannel(index, source)) as [Plane, Plane, Plane, Plane];
-}
-
-/** A copy of image with alpha replaced by a plane of the same size or a constant byte. */
-export function putAlpha(alpha: Plane | number, source: RgbaImage): RgbaImage {
-  const out = copy(source);
-  if (typeof alpha === "number") byte(alpha, "Alpha");
+/** A new image with one channel replaced by a plane of the image's size or a constant byte. */
+export function withChannel(index: ChannelIndex, value: Plane | number, source: RgbaImage): RgbaImage {
+  channelIndex(index);
+  const out = clone(source);
+  if (typeof value === "number") byte(value, "Channel value");
   else {
-    plane(alpha);
-    if (alpha.width !== source.width || alpha.height !== source.height)
-      throw new RangeError("Alpha plane must match the image size");
+    plane(value);
+    if (value.width !== source.width || value.height !== source.height)
+      throw new RangeError("Channel plane must match the image size");
   }
   for (let i = 0; i < source.width * source.height; i++)
-    out.data[i * 4 + 3] = typeof alpha === "number" ? alpha : alpha.data[i];
+    out.data[i * 4 + index] = typeof value === "number" ? value : value.data[i];
   return out;
 }
 
-/** image with each channel mapped through its 256-entry table of bytes (Pillow Image.point). */
-export function pointLut(
+/** A new image with red, green, blue and alpha each mapped through its own 256-byte table. */
+export function mapChannels(
   luts: readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>, ArrayLike<number>],
   source: RgbaImage,
 ): RgbaImage {
-  if (luts.length !== 4) throw new RangeError("Point requires four tables");
+  if (luts.length !== 4) throw new RangeError("Four channel tables are required");
   for (const lut of luts) {
-    if (lut.length !== 256) throw new RangeError("Point tables must have 256 entries");
-    for (let i = 0; i < 256; i++) byte(lut[i], "Point table entry");
+    if (lut.length !== 256) throw new RangeError("Channel tables must have 256 entries");
+    for (let i = 0; i < 256; i++) byte(lut[i], "Channel table entry");
   }
-  const out = copy(source);
+  const out = clone(source);
   for (let i = 0; i < out.data.length; i++) out.data[i] = luts[i & 3][out.data[i]];
   return out;
 }
 
 /**
- * An opaque preview with one row per sprite and ground, tags flattened in order, as an RgbaImage
- * so that the size is not limited by a canvas. "all-frames" reproduces frames.renderContactSheet;
- * "first-frame" reproduces Python art_kit 0.5.0 frames.contact_sheet, whose cell width comes from
- * the widest first frame and row height from each row's first frame, with later frames painted
- * over earlier overflow.
+ * An opaque preview with one row per sprite and ground, tags flattened in order, built in memory
+ * so that its size is not limited by a canvas. Cells are separated by gap and scaled by scale.
+ * "largest-frame" sizes every cell from the largest frame (row height from the row's tallest) and
+ * draws each frame over its ground, matching frames.renderContactSheet. "row-first-frame" sizes
+ * cell width from the widest first frame and row height from each row's first frame, paints every
+ * frame cell (empty cells in the ground colour) and lets later frames overwrite earlier overflow.
  */
 export function composeContactSheet(
-  { resolveRgb, background, cells, scale = 3, gap = 4 }: ContactSheetOptions,
+  { resolveRgb, background, cellSize, scale = 3, gap = 4 }: ContactSheetOptions,
   sprites: readonly Sprite[],
   grounds: readonly string[],
 ): RgbaImage {
   positive(scale, "Preview scale");
   size(gap, "Gap");
-  if (cells !== "first-frame" && cells !== "all-frames")
-    throw new RangeError('Cells must be "first-frame" or "all-frames"');
+  if (cellSize !== "row-first-frame" && cellSize !== "largest-frame")
+    throw new RangeError('Cell size must be "row-first-frame" or "largest-frame"');
   colour(background, 3);
   const rows = sprites.flatMap(([, tags]) => {
     const frames = tags.flatMap(([, frames]) => frames);
@@ -521,7 +515,7 @@ export function composeContactSheet(
     colour(value, 3);
     return [value[0], value[1], value[2], 255];
   };
-  const first = cells === "first-frame";
+  const first = cellSize === "row-first-frame";
   let cellWidth = 0,
     columns = 0;
   const heights = rows.map(({ frames }) => {
@@ -545,17 +539,18 @@ export function composeContactSheet(
       const x0 = column * pitch * scale,
         y0 = top * scale;
       if (first) {
-        // Python paints every cell, resolving empty cells to the ground colour.
-        frame.forEach((cells, y) =>
-          cells.forEach((name, x) =>
-            fillRect(name ? ink(name) : under, { height: scale, width: scale, x: x0 + x * scale, y: y0 + y * scale }, sheet),
+        // Every frame cell is painted, empty cells in the ground colour.
+        frame.forEach((row, y) =>
+          row.forEach((name, x) =>
+            fill({ rect: { height: scale, width: scale, x: x0 + x * scale, y: y0 + y * scale } }, name ? ink(name) : under, sheet),
           ),
         );
         return;
       }
-      const pixels = scaleNearest(scale, frameToRgba({ resolveRgb }, frame));
-      fillRect(under, { height: pixels.height, width: pixels.width, x: x0, y: y0 }, sheet);
-      pasteMasked({ x: x0, y: y0 }, pixels, "alpha", sheet);
+      const cell = frameToRgba({ resolveRgb }, frame);
+      const pixels = resizeNearest(cell.width * scale, cell.height * scale, cell);
+      fill({ rect: { height: pixels.height, width: pixels.width, x: x0, y: y0 } }, under, sheet);
+      paste({ at: { x: x0, y: y0 }, mask: "alpha" }, pixels, sheet);
     });
     top += heights[row];
   });

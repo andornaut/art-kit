@@ -75,56 +75,57 @@ for x, y in ((1, 1), (-1, 2), (4, 3)):
     case("paste", out, at=[x, y], source="rgbSource", target="rgb")
     out = inputs["target"].copy()
     out.paste(inputs["b"], (x, y), inputs["mask"])
-    case("pasteMasked", out, at=[x, y], source="b", mask="mask", target="target")
+    case("paste", out, at=[x, y], source="b", mask="mask", target="target")
     out = inputs["target"].copy()
     out.paste(inputs["b"], (x, y), inputs["b"])
-    case("pasteMasked", out, at=[x, y], source="b", mask="alpha", target="target")
+    case("paste", out, at=[x, y], source="b", mask="alpha", target="target")
     out = inputs["rgb"].copy()
     out.paste(inputs["b"], (x, y), inputs["b"])
-    case("pasteMaskedRgb", out, at=[x, y], source="b", mask="alpha", target="rgb")
+    case("paste", out, at=[x, y], source="b", mask="alpha", keepAlpha=True, target="rgb")
     out = inputs["rgb"].copy()
     out.paste(inputs["b"], (x, y), inputs["mask"])
-    case("pasteMaskedRgb", out, at=[x, y], source="b", mask="mask", target="rgb")
+    case("paste", out, at=[x, y], source="b", mask="mask", keepAlpha=True, target="rgb")
     for colour in ((200, 10, 50, 128), (0, 0, 0, 0), (9, 99, 199, 255)):
         out = inputs["target"].copy()
         out.paste(colour, (x, y), inputs["mask"])
-        case("pasteColour", out, rgba=list(colour), at=[x, y], mask="mask", target="target")
+        rect = [x, y, inputs["mask"].width, inputs["mask"].height]
+        case("fill", out, rgba=list(colour), rect=rect, mask="mask", target="target")
     out = inputs["target"].copy()
     out.alpha_composite(inputs["b"], (x, y))
-    case("alphaComposite", out, at=[x, y], source="b", target="target")
+    case("composite", out, at=[x, y], source="b", target="target")
     out = inputs["target"].copy()
     out.alpha_composite(inputs["a"], (x, y))
-    case("alphaComposite", out, at=[x, y], source="a", target="target")
+    case("composite", out, at=[x, y], source="a", target="target")
 
 for box, colour in (((1, 1, 4, 3), (10, 20, 30, 255)), ((3, 2, 9, 9), (0, 0, 0, 0)), ((-2, -1, 2, 2), (5, 6, 7, 100))):
     out = inputs["target"].copy()
     out.paste(colour, box)
     rect = [box[0], box[1], box[2] - box[0], box[3] - box[1]]
-    case("fillRect", out, rgba=list(colour), rect=rect, target="target")
+    case("fill", out, rgba=list(colour), rect=rect, target="target")
 
 for box in ((-1, -1, 4, 3), (3, 2, 8, 7), (1, 0, 4, 4)):
     case("crop", inputs["a"].crop(box), rect=[box[0], box[1], box[2] - box[0], box[3] - box[1]], source="a")
 case("flipX", inputs["a"].transpose(Image.Transpose.FLIP_LEFT_RIGHT), source="a")
 for factor in (1, 3):
     size = (inputs["a"].width * factor, inputs["a"].height * factor)
-    case("scaleNearest", inputs["a"].resize(size, Image.Resampling.NEAREST), factor=factor, source="a")
+    case("resizeNearest", inputs["a"].resize(size, Image.Resampling.NEAREST), size=list(size), source="a")
 for size in ((7, 5), (3, 3), (4, 6), (6, 2), (11, 9), (2, 1), (13, 3)):
     case("resizeNearest", inputs["a"].resize(size, Image.Resampling.NEAREST), size=list(size), source="a")
-case("withoutAlpha", inputs["a"].convert("RGB"), source="a")
-case("toGrayscale", inputs["a"].convert("L"), source="a")
+case("opaque", inputs["a"].convert("RGB"), source="a")
+case("grayscale", inputs["a"].convert("L"), source="a")
 assert ImageOps.grayscale(inputs["a"]).tobytes() == inputs["a"].convert("L").tobytes()  # noqa: S101
 for index in range(4):
-    case("getChannel", inputs["a"].getchannel(index), index=index, source="a")
+    case("channel", inputs["a"].getchannel(index), index=index, source="a")
 for index, band in enumerate(inputs["a"].split()):
-    case("split", band, index=index, source="a")
+    case("channel", band, index=index, source="a")
 out = inputs["a"].copy()
 out.putalpha(inputs["alpha"])
-case("putAlpha", out, alpha="alpha", source="a")
+case("withChannel", out, index=3, value="alpha", source="a")
 out = inputs["a"].copy()
 out.putalpha(77)
-case("putAlpha", out, alpha=77, source="a")
+case("withChannel", out, index=3, value=77, source="a")
 luts = [[rng.byte() for _ in range(256)] for _ in range(4)]
-case("pointLut", inputs["a"].point([value for lut in luts for value in lut]), luts=luts, source="a")
+case("mapChannels", inputs["a"].point([value for lut in luts for value in lut]), luts=luts, source="a")
 case("copy", inputs["a"].copy(), source="a")
 
 rotation_rng = Lcg(20)
@@ -164,13 +165,19 @@ for scale, gap in ((1, 0), (2, 1), (3, 4)):
     case(
         "composeContactSheet",
         sheet,
-        cells="first-frame",
+        cellSize="row-first-frame",
         scale=scale,
         gap=gap,
         background=[1, 2, 3],
         sprites=sprites,
         grounds=ground_names,
     )
+
+# A mode "RGB" target keeps its alpha when an RGBA source is pasted without a mask.
+for x, y in ((1, 1), (-1, 2), (4, 3)):
+    out = inputs["rgb"].copy()
+    out.paste(inputs["b"], (x, y))
+    case("paste", out, at=[x, y], source="b", keepAlpha=True, target="rgb")
 
 document = {
     "pillow": PIL.__version__,

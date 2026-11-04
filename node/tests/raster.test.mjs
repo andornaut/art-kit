@@ -22,51 +22,42 @@ const resolveRgb = (name) => reference.palette[name];
 function apply(c, all) {
   const target = all[c.target];
   switch (c.op) {
+    case "fill":
+      raster.fill({ rect: rect(c.rect), ...(c.mask && { mask: all[c.mask] }) }, c.rgba, target);
+      return target;
     case "paste":
-      raster.paste(point(c.at), all[c.source], target);
+      raster.paste(
+        { at: point(c.at), ...(c.mask && { mask: mask(all, c.mask) }), ...(c.keepAlpha && { keepAlpha: true }) },
+        all[c.source],
+        target,
+      );
       return target;
-    case "pasteMasked":
-      raster.pasteMasked(point(c.at), all[c.source], mask(all, c.mask), target);
-      return target;
-    case "pasteMaskedRgb":
-      raster.pasteMaskedRgb(point(c.at), all[c.source], mask(all, c.mask), target);
-      return target;
-    case "pasteColour":
-      raster.pasteColour(c.rgba, point(c.at), all[c.mask], target);
-      return target;
-    case "alphaComposite":
-      raster.alphaComposite(point(c.at), all[c.source], target);
-      return target;
-    case "fillRect":
-      raster.fillRect(c.rgba, rect(c.rect), target);
+    case "composite":
+      raster.composite(point(c.at), all[c.source], target);
       return target;
     case "crop":
       return raster.crop(rect(c.rect), all[c.source]);
     case "flipX":
       return raster.flipX(all[c.source]);
-    case "scaleNearest":
-      return raster.scaleNearest(c.factor, all[c.source]);
     case "resizeNearest":
       return raster.resizeNearest(c.size[0], c.size[1], all[c.source]);
-    case "withoutAlpha":
-      return raster.withoutAlpha(all[c.source]);
-    case "toGrayscale":
-      return raster.toGrayscale(all[c.source]);
-    case "getChannel":
-      return raster.getChannel(c.index, all[c.source]);
-    case "split":
-      return raster.split(all[c.source])[c.index];
-    case "putAlpha":
-      return raster.putAlpha(typeof c.alpha === "number" ? c.alpha : all[c.alpha], all[c.source]);
-    case "pointLut":
-      return raster.pointLut(c.luts, all[c.source]);
     case "rotateNearest":
       return raster.rotateNearest(c.angle, all[c.source]);
+    case "opaque":
+      return raster.opaque(all[c.source]);
+    case "grayscale":
+      return raster.grayscale(all[c.source]);
+    case "channel":
+      return raster.channel(c.index, all[c.source]);
+    case "withChannel":
+      return raster.withChannel(c.index, typeof c.value === "number" ? c.value : all[c.value], all[c.source]);
+    case "mapChannels":
+      return raster.mapChannels(c.luts, all[c.source]);
     case "copy":
-      return raster.copy(all[c.source]);
+      return { ...all[c.source], data: all[c.source].data.slice() };
     case "composeContactSheet":
       return raster.composeContactSheet(
-        { resolveRgb, background: c.background, cells: c.cells, scale: c.scale, gap: c.gap },
+        { resolveRgb, background: c.background, cellSize: c.cellSize, scale: c.scale, gap: c.gap },
         c.sprites,
         c.grounds,
       );
@@ -78,7 +69,7 @@ function apply(c, all) {
 test("raster output is byte-equal to Pillow 13.0.0 references, including partial alpha", () => {
   assert.equal(reference.pillow, "13.0.0");
   const ops = new Set(reference.cases.map(({ op }) => op));
-  for (const op of ["alphaComposite", "pasteMasked", "pasteMaskedRgb", "pasteColour", "composeContactSheet", "rotateNearest"])
+  for (const op of ["fill", "paste", "composite", "composeContactSheet", "rotateNearest", "withChannel", "mapChannels"])
     assert.ok(ops.has(op), op);
   reference.cases.forEach((c, i) => {
     const all = inputs();
@@ -129,7 +120,7 @@ test("frameToRgba resolves colours as renderFrame does", () => {
   assert.throws(() => raster.frameToRgba(palette, [["a"], []]), RangeError);
 });
 
-test("all-frames contact sheets equal renderContactSheet pixels", () => {
+test("largest-frame contact sheets equal renderContactSheet pixels", () => {
   const palette = { r: [200, 30, 40], g: [20, 180, 60], b: [30, 40, 220], s: [90, 80, 70], t: [250, 240, 200] };
   const sprites = [
     ["mixed", [["idle", [[["r", null, "g"], [null, "b", null]], [["g", "g"], ["r", null], [null, "b"], ["b", "b"]]], 1]]],
@@ -139,22 +130,45 @@ test("all-frames contact sheets equal renderContactSheet pixels", () => {
   for (const [scale, gap] of [[1, 0], [2, 1], [3, 4]]) {
     const options = { resolveRgb: resolve, background: [1, 2, 3], scale, gap };
     const canvas = renderContactSheet(options, sprites, ["s", "t"]);
-    const sheet = raster.composeContactSheet({ ...options, cells: "all-frames" }, sprites, ["s", "t"]);
+    const sheet = raster.composeContactSheet({ ...options, cellSize: "largest-frame" }, sprites, ["s", "t"]);
     assert.deepEqual([sheet.width, sheet.height], [canvas.width, canvas.height]);
     assert.deepEqual([...sheet.data], pixels(canvas));
   }
   assert.throws(() => raster.composeContactSheet({ resolveRgb: resolve, background: [0, 0, 0] }, sprites, ["s"]), RangeError);
 });
 
-test("fill and paste mutate in place; other operations return new images", () => {
+test("integer-factor nearest resize replicates every pixel, including RGB under clear alpha", () => {
+  const all = inputs();
+  for (const source of [all.a, all.b, all.rotateWide])
+    for (const factor of [1, 2, 3, 5]) {
+      const expected = new Uint8Array(source.width * factor * source.height * factor * 4);
+      for (let y = 0; y < source.height * factor; y++)
+        for (let x = 0; x < source.width * factor; x++) {
+          const read = (Math.floor(y / factor) * source.width + Math.floor(x / factor)) * 4;
+          expected.set(source.data.subarray(read, read + 4), (y * source.width * factor + x) * 4);
+        }
+      const out = raster.resizeNearest(source.width * factor, source.height * factor, source);
+      assert.deepEqual(Buffer.from(out.data), Buffer.from(expected));
+    }
+});
+
+test("fill, paste and composite mutate in place; other operations return new images", () => {
   const image = raster.filledImage([1, 2, 3, 0], 2, 2);
-  raster.fillRect([9, 9, 9, 255], { x: 1, y: 1, width: 5, height: 5 }, image);
+  raster.fill({ rect: { x: 1, y: 1, width: 5, height: 5 } }, [9, 9, 9, 255], image);
   assert.deepEqual([...image.data], [1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 9, 9, 9, 255]);
-  assert.notEqual(raster.copy(image).data, image.data);
-  assert.deepEqual([...raster.withoutAlpha(image).data.subarray(0, 4)], [1, 2, 3, 255]);
-  assert.deepEqual([...raster.scaleNearest(2, image).data.subarray(0, 4)], [1, 2, 3, 0]);
-  raster.paste({ x: -1, y: 0 }, image, image);
+  assert.deepEqual([...raster.opaque(image).data.subarray(0, 4)], [1, 2, 3, 255]);
+  assert.deepEqual([...image.data.subarray(0, 4)], [1, 2, 3, 0]);
+  raster.paste({ at: { x: -1, y: 0 } }, image, image);
   assert.deepEqual([...image.data], [1, 2, 3, 0, 1, 2, 3, 0, 9, 9, 9, 255, 9, 9, 9, 255]);
+  const target = raster.filledImage([5, 5, 5, 200], 1, 1);
+  raster.paste({ at: { x: 0, y: 0 }, keepAlpha: true }, raster.filledImage([7, 8, 9, 10], 1, 1), target);
+  assert.deepEqual([...target.data], [7, 8, 9, 200]);
+  raster.composite({ x: 0, y: 0 }, raster.filledImage([0, 0, 0, 0], 1, 1), target);
+  assert.deepEqual([...target.data], [7, 8, 9, 200]);
+  assert.deepEqual(Object.keys(raster).sort(), [
+    "channel", "composeContactSheet", "composite", "crop", "fill", "filledImage", "flipX", "frameToRgba",
+    "grayscale", "mapChannels", "opaque", "paste", "resizeNearest", "rotateNearest", "withChannel",
+  ]);
 });
 
 test("invalid geometry and plane sizes throw RangeError", () => {
@@ -164,17 +178,18 @@ test("invalid geometry and plane sizes throw RangeError", () => {
     () => raster.filledImage([0, 0, 0, 0], 1.5, 2),
     () => raster.filledImage([0, 0, 0, 0], -1, 2),
     () => raster.filledImage([0, 0, 0, 256], 1, 1),
-    () => raster.fillRect([0, 0, 0, 0], { x: 0.5, y: 0, width: 1, height: 1 }, image),
-    () => raster.paste({ x: 0, y: 0 }, { width: 2, height: 2, data: new Uint8Array(3) }, image),
-    () => raster.pasteMasked({ x: 0, y: 0 }, image, { width: 1, height: 2, data: new Uint8Array(2) }, image),
-    () => raster.pasteColour([0, 0, 0, 0], { x: 0, y: 0 }, { width: 2, height: 2, data: new Uint8Array(3) }, image),
+    () => raster.fill({ rect: { x: 0.5, y: 0, width: 1, height: 1 } }, [0, 0, 0, 0], image),
+    () => raster.fill({ rect: { x: 0, y: 0, width: 1, height: 2 }, mask: plane }, [0, 0, 0, 0], image),
+    () => raster.paste({ at: { x: 0, y: 0 } }, { width: 2, height: 2, data: new Uint8Array(3) }, image),
+    () => raster.paste({ at: { x: 0, y: 0 }, mask: { width: 1, height: 2, data: new Uint8Array(2) } }, image, image),
+    () => raster.fill({ rect: { x: 0, y: 0, width: 2, height: 2 }, mask: { width: 2, height: 2, data: new Uint8Array(3) } }, [0, 0, 0, 0], image),
     () => raster.crop({ x: 0, y: 0, width: -1, height: 1 }, image),
-    () => raster.scaleNearest(0, image),
     () => raster.resizeNearest(2.5, 1, image),
-    () => raster.getChannel(4, image),
-    () => raster.putAlpha({ width: 1, height: 1, data: new Uint8Array(1) }, image),
-    () => raster.pointLut([[], [], [], []], image),
+    () => raster.channel(4, image),
+    () => raster.withChannel(3, { width: 1, height: 1, data: new Uint8Array(1) }, image),
+    () => raster.withChannel(0, 256, image),
+    () => raster.mapChannels([[], [], [], []], image),
   ])
     assert.throws(call, RangeError);
-  raster.pasteMasked({ x: 0, y: 0 }, image, plane, image);
+  raster.paste({ at: { x: 0, y: 0 }, mask: plane }, image, image);
 });
