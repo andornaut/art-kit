@@ -1,0 +1,39 @@
+{
+ "maxColours": 5,
+ "palette": [
+  [
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   53,
+   59,
+   13,
+   255
+  ],
+  [
+   206,
+   32,
+   20,
+   255
+  ],
+  [
+   122,
+   107,
+   59,
+   255
+  ],
+  [
+   160,
+   173,
+   160,
+   255
+  ]
+ ],
+ "frames": [
+  "00000000353b0dff353b0dff353b0dff353b0dffce2014ffce2014ffce2014ff00000000353b0dff353b0dff353b0dff353b0dffce2014ffce2014ffce2014ff00000000353b0dffce2014ffce2014ffce2014ff7a6b3bff7a6b3bffce2014ff00000000353b0dffce2014ffce2014ffce2014ff7a6b3bffa0ada0ffa0ada0ff00000000353b0dff7a6b3bff7a6b3bffa0ada0ffa0ada0ffa0ada0ffa0ada0ff000000007a6b3bff7a6b3bffa0ada0ffa0ada0ffa0ada0ffa0ada0ffa0ada0ff",
+  "00000000353b0dff353b0dff353b0dff353b0dffce2014ffce2014ffce2014ff00000000353b0dff353b0dff353b0dff353b0dffce2014ffce2014ffce2014ff00000000353b0dff353b0dff7a6b3bff7a6b3bffce2014ffce2014ffce2014ff00000000353b0dff7a6b3bff7a6b3bff7a6b3bffce2014ffce2014ffce2014ff00000000353b0dff7a6b3bff7a6b3bffa0ada0ffa0ada0ffa0ada0ffa0ada0ff000000007a6b3bff7a6b3bffa0ada0ffa0ada0ffa0ada0ffa0ada0ffa0ada0ff"
+ ]
+}

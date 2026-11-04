@@ -49,6 +49,7 @@ The compiled ESM package `@andornaut/art-kit` includes TypeScript declarations a
 | `webp` | Lossless WebP encoding, decoding and RGBA comparison | Images or encoded bytes |
 | `gif` | Animated GIF encoding with exact palettes and binary alpha | Frames, durations, loop and disposal |
 | `ico` | ICO encoding with PNG entries | One pre-sized RGBA image per entry |
+| `quantise` | Deterministic median-cut reduction to one shared palette | Frames and the colour limit |
 
 Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geometry and RGBA interfaces are local structural types; the package has no `game-kit` dependency. Callers own manifests, tile sizes, frame tags, grouping, ordering policy, paths, filenames and Vite asset emission. Node helpers run without a Python subprocess.
 
