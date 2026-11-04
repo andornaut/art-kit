@@ -1,13 +1,13 @@
 """Pillow 13.0.0 references for the Node GIF and ICO encoders.
 
-Run with python:3.12 and Pillow==13.0.0, without network access:
+node/tests/fixtures/gif-ico/pillow.sh runs both commands inside python:3.12 with Pillow 13.0.0:
 
-    python -I pillow_reference.py generate gif-ico.json
-    python -I pillow_reference.py crosscheck gif-ico.json <directory>
+    python tests/gif_ico_reference.py generate node/tests/fixtures/gif-ico/pillow.json
+    python tests/gif_ico_reference.py crosscheck node/tests/fixtures/gif-ico/pillow.json <directory>
 
 generate builds deterministic inputs, saves them with the Pillow options each case names and
 records what Pillow decodes from its own files. crosscheck decodes the <case>.gif and <case>.ico
-files the Node encoder wrote (see encode.mjs) and compares them with that record.
+files node/tests/fixtures/gif-ico/encode.mjs wrote and compares them with that record.
 """
 
 import base64
@@ -15,9 +15,12 @@ import io
 import json
 import sys
 import zlib
+from pathlib import Path
 
 import PIL
 from PIL import Image
+
+assert PIL.__version__ == "13.0.0", PIL.__version__  # noqa: S101
 
 PURPLE = (74, 52, 110, 255)
 CLEAR = (0, 0, 0, 0)
@@ -143,19 +146,18 @@ def generate(path):
         if [entry["image"] for entry in reference] != inputs:
             raise AssertionError(f"Pillow resized or altered ICO case {name}")
         fixture["ico"][name] = {"images": [encode(im) for im in images], "pillow": reference}
-    with open(path, "w") as f:
+    with Path(path).open("w") as f:
         json.dump(fixture, f, indent=1)
         f.write("\n")
 
 
 def crosscheck(path, directory):
-    with open(path) as f:
+    with Path(path).open() as f:
         fixture = json.load(f)
     failures = 0
     for kind, decode in (("gif", decode_gif), ("ico", decode_ico)):
         for name, case in fixture[kind].items():
-            with open(f"{directory}/{name}.{kind}", "rb") as f:
-                actual = decode(f.read())
+            actual = decode(Path(directory, f"{name}.{kind}").read_bytes())
             same = actual == case["pillow"]
             failures += not same
             print(f"{kind} {name}: {'match' if same else 'MISMATCH'}")

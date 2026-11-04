@@ -41,15 +41,15 @@ The compiled ESM package `@andornaut/art-kit` includes TypeScript declarations a
 | --- | --- | --- |
 | `atlasBuild` | Atlas drawing and encoded page assembly | Read/decode/encode functions, blits, extrusion and metadata |
 | `atlasLayout` | Shelf packing and candidate selection | Items, grouping, order comparator, candidate widths and size limits |
-| `draw` | Pillow 13.0.0 `ImageDraw` shapes written into RGBA buffers | Colours, coordinates, widths and the target image |
+| `draw` | Polygon, ellipse, line, arc, point, rectangle and rounded-rectangle drawing into RGBA buffers, pixel-exact with Pillow 13.0.0 | Colours, points, bounds, widths and the target image |
+| `gif` | Animated GIF encoding with exact palettes and binary alpha | Frames, durations, loop and disposal |
+| `ico` | ICO encoding with PNG entries | One pre-sized RGBA image per entry |
 | `indexedPng` | Indexed PNG encoding | RGBA image and compression options |
 | `png` | PNG decoding to RGBA, RGBA PNG encoding and opaque RGB PNG encoding | Encoded bytes or an RGBA image and compression options |
+| `quantise` | Deterministic median-cut reduction to one shared palette | Frames and the colour limit |
 | `raster` | Straight-alpha RGBA fill, paste, compositing, crop, flip, nearest resize and rotation, channel operations and contact sheets | Images, planes, colours, positions, rectangles, sizes, angles and channel tables |
 | `rgbaImage` | RGBA allocation, alpha bounds and extruded blitting | Image dimensions, pixels, rectangles and bounds |
 | `webp` | Lossless WebP encoding, decoding and RGBA comparison | Images or encoded bytes |
-| `gif` | Animated GIF encoding with exact palettes and binary alpha | Frames, durations, loop and disposal |
-| `ico` | ICO encoding with PNG entries | One pre-sized RGBA image per entry |
-| `quantise` | Deterministic median-cut reduction to one shared palette | Frames and the colour limit |
 
 Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geometry and RGBA interfaces are local structural types; the package has no `game-kit` dependency. Callers own manifests, tile sizes, frame tags, grouping, ordering policy, paths, filenames and Vite asset emission. Node helpers run without a Python subprocess.
 

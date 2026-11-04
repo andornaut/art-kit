@@ -1,18 +1,17 @@
 // Deterministic palette reduction shared across animation frames.
+import type { Rgba } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
-
-export type PaletteEntry = [number, number, number, number];
 
 export interface QuantiseOptions {
   maxColours: number;
 }
 
 export interface Quantised {
-  palette: PaletteEntry[];
+  palette: Rgba[];
   frames: RgbaImage[];
 }
 
-const TRANSPARENT: PaletteEntry = [0, 0, 0, 0];
+const TRANSPARENT: Rgba = [0, 0, 0, 0];
 
 // Opaque colours as 0xRRGGBB with pixel counts, ordered by value.
 interface Colour {
@@ -66,7 +65,7 @@ function medianCut(budget: number, colours: Colour[]): Colour[][] {
 }
 
 // Weighted mean per channel, rounded half up in integer arithmetic.
-function meanOf(box: readonly Colour[]): PaletteEntry {
+function meanOf(box: readonly Colour[]): Rgba {
   const total = box.reduce((sum, { weight }) => sum + weight, 0);
   const mean = [0, 1, 2].map((c) => {
     const sum = box.reduce((acc, { rgb, weight }) => acc + channel(rgb, c) * weight, 0);
@@ -75,7 +74,7 @@ function meanOf(box: readonly Colour[]): PaletteEntry {
   return [mean[0], mean[1], mean[2], 255];
 }
 
-function nearest(palette: readonly PaletteEntry[], first: number, rgb: number): number {
+function nearest(palette: readonly Rgba[], first: number, rgb: number): number {
   let best = first;
   let bestDistance = Infinity;
   for (let i = first; i < palette.length; i++) {
@@ -117,17 +116,17 @@ export function quantise(options: QuantiseOptions, frames: readonly RgbaImage[])
     }
   });
   const colours = [...counts].map(([rgb, weight]) => ({ rgb, weight })).sort((a, b) => a.rgb - b.rgb);
-  const entry = (rgb: number): PaletteEntry => [channel(rgb, 0), channel(rgb, 1), channel(rgb, 2), 255];
+  const entry = (rgb: number): Rgba => [channel(rgb, 0), channel(rgb, 1), channel(rgb, 2), 255];
   const reserved = transparent.size > 0 ? 1 : 0;
   if (transparent.size <= 1 && colours.length + reserved <= maxColours) {
-    const clear = [...transparent].map((value): PaletteEntry => [value >>> 24, (value >>> 16) & 0xff, (value >>> 8) & 0xff, 0]);
+    const clear = [...transparent].map((value): Rgba => [value >>> 24, (value >>> 16) & 0xff, (value >>> 8) & 0xff, 0]);
     return { frames: [...frames], palette: [...clear, ...colours.map(({ rgb }) => entry(rgb))] };
   }
   const budget = maxColours - reserved;
   if (budget < 1 && colours.length > 0) {
     throw new RangeError("maxColours leaves no entry for opaque colours");
   }
-  const palette: PaletteEntry[] = [
+  const palette: Rgba[] = [
     ...(reserved ? [TRANSPARENT] : []),
     ...(colours.length > 0 ? medianCut(budget, colours).map(meanOf) : []),
   ];
