@@ -33,4 +33,4 @@ Version 0.8 deliberately replaces the 0.7 TypeScript generation interfaces and C
 
 ## Verification
 
-The isolated local gates pass 19 Python and 65 Node tests with zero skips, plus lint, declarations, installed-package imports and builds. The Node gate requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.
+The isolated local gates pass 19 Python and 93 Node tests with zero skips, plus lint, declarations, installed-package imports and builds. The Node gate requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.
