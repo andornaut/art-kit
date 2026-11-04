@@ -3,11 +3,11 @@
 // `--list-slices` when margins are given and `--sheet-columns` when columns are given.
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname } from "node:path";
-import { crc32 } from "node:zlib";
 
 import { rgb } from "./colour.js";
 import { deflateChunks } from "./deflate.js";
 import type { Frame } from "./grid.js";
+import { pngFile } from "./pngChunks.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
 // A tag's name, frames and duration in milliseconds: one for every frame, or one each.
@@ -35,7 +35,6 @@ export interface SpriteSheet {
 
 const APP = "http://www.aseprite.org/";
 const VERSION = "1.2.30-x64";
-const PNG_SIGNATURE = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
 // libpng's default compression buffer, which sizes every IDAT chunk but the last.
 const IDAT_SIZE = 8192;
 
@@ -263,18 +262,6 @@ function idat(rows: readonly Uint8Array[]): Uint8Array {
   return stream;
 }
 
-function chunk(type: string, data: Uint8Array): Uint8Array {
-  const out = new Uint8Array(12 + data.length);
-  const view = new DataView(out.buffer);
-  view.setUint32(0, data.length);
-  for (let i = 0; i < 4; i++) {
-    out[4 + i] = type.charCodeAt(i);
-  }
-  out.set(data, 8);
-  view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
-  return out;
-}
-
 function png(image: RgbaImage): Uint8Array {
   const header = new Uint8Array(13);
   const view = new DataView(header.buffer);
@@ -282,19 +269,15 @@ function png(image: RgbaImage): Uint8Array {
   view.setUint32(4, image.height);
   header.set([8, 6, 0, 0, 0], 8);
   const stream = idat(filteredRows(image));
-  const chunks = [chunk("IHDR", header), chunk("sRGB", Uint8Array.of(0))];
+  const chunks: [string, Uint8Array[]][] = [
+    ["IHDR", [header]],
+    ["sRGB", [Uint8Array.of(0)]],
+  ];
   for (let at = 0; at < stream.length; at += IDAT_SIZE) {
-    chunks.push(chunk("IDAT", stream.subarray(at, at + IDAT_SIZE)));
+    chunks.push(["IDAT", [stream.subarray(at, at + IDAT_SIZE)]]);
   }
-  chunks.push(chunk("IEND", new Uint8Array(0)));
-  const out = new Uint8Array(PNG_SIGNATURE.length + chunks.reduce((total, c) => total + c.length, 0));
-  out.set(PNG_SIGNATURE, 0);
-  let at = PNG_SIGNATURE.length;
-  for (const c of chunks) {
-    out.set(c, at);
-    at += c.length;
-  }
-  return out;
+  chunks.push(["IEND", []]);
+  return pngFile(chunks);
 }
 
 // ---------- public interface ----------

@@ -1,12 +1,12 @@
-import { crc32, deflateSync } from "node:zlib";
+import { deflateSync } from "node:zlib";
 
+import { pngFile } from "./pngChunks.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
 // An 8-bit indexed PNG holds at most this many colours, each an RGBA value: PLTE holds the RGB
 // and tRNS the alpha.
 const MAX_PALETTE = 256;
 
-const SIGNATURE = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
 const COLOUR_TYPE_INDEXED = 3;
 const FILTER_NONE = 0;
 
@@ -46,16 +46,6 @@ function paletteOf(
   return { indices, palette };
 }
 
-function chunk(type: string, data: Uint8Array): Uint8Array {
-  const out = new Uint8Array(12 + data.length);
-  const view = new DataView(out.buffer);
-  view.setUint32(0, data.length);
-  out.set(new TextEncoder().encode(type), 4);
-  out.set(data, 8);
-  view.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
-  return out;
-}
-
 export interface IndexedPngOptions {
   level: number;
   memLevel: number;
@@ -92,19 +82,11 @@ export function encodeIndexedPng(
   const trns = new Uint8Array(
     palette.filter((rgba) => (rgba & 0xff) !== 0xff).map((rgba) => rgba & 0xff),
   );
-  const parts = [
-    SIGNATURE,
-    chunk("IHDR", header),
-    chunk("PLTE", plte),
-    ...(trns.length > 0 ? [chunk("tRNS", trns)] : []),
-    chunk("IDAT", deflateSync(rows, options)),
-    chunk("IEND", new Uint8Array()),
-  ];
-  const out = new Uint8Array(parts.reduce((sum, part) => sum + part.length, 0));
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
+  return pngFile([
+    ["IHDR", [header]],
+    ["PLTE", [plte]],
+    ...(trns.length > 0 ? [["tRNS", [trns]] as const] : []),
+    ["IDAT", [deflateSync(rows, options)]],
+    ["IEND", []],
+  ]);
 }

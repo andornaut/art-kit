@@ -1,8 +1,9 @@
 // PNG decoding and encoding for Node build tools.
 import { Buffer } from "node:buffer";
-import { constants, crc32, createDeflate, type Deflate } from "node:zlib";
+import { constants, createDeflate, type Deflate } from "node:zlib";
 import { PNG } from "pngjs";
 
+import { pngFile } from "./pngChunks.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
 // A PNG's pixels, whatever its colour type, as 8-bit RGBA.
@@ -25,7 +26,6 @@ export interface RgbaPngOptions {
 // rejects, non-integer dimensions, too few pixels and deflate level 0, whose stored blocks are
 // sized by how much input each zlib call receives.
 
-const SIGNATURE = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
 const COLOUR_TYPE_RGB = 2;
 const COLOUR_TYPE_RGBA = 6;
 const BIT_DEPTH = 8;
@@ -249,35 +249,15 @@ function assemble(
   deflater: SyncDeflater,
   image: RgbaImage,
 ): Uint8Array {
-  const out = Buffer.allocUnsafe(SIGNATURE.length + 25 + 12 + deflater.length + 12);
-  out.set(SIGNATURE, 0);
-  let at = SIGNATURE.length;
   const header = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, BIT_DEPTH, colourType, 0, 0, 0);
   const view = new DataView(header.buffer);
   view.setUint32(0, image.width);
   view.setUint32(4, image.height);
-  at = writeChunk(out, at, "IHDR", [header]);
-  at = writeChunk(out, at, "IDAT", deflater.pieces);
-  writeChunk(out, at, "IEND", []);
-  return out;
-}
-
-// Writes a chunk holding pieces in order at out[at] and returns the offset after it.
-function writeChunk(
-  out: Buffer,
-  at: number,
-  type: string,
-  pieces: readonly Uint8Array[],
-): number {
-  let end = at + 8;
-  for (const piece of pieces) {
-    out.set(piece, end);
-    end += piece.length;
-  }
-  out.writeUInt32BE(end - at - 8, at);
-  out.write(type, at + 4, "latin1");
-  out.writeUInt32BE(crc32(out.subarray(at + 4, end)), end);
-  return end + 4;
+  return pngFile([
+    ["IHDR", [header]],
+    ["IDAT", deflater.pieces],
+    ["IEND", []],
+  ]);
 }
 
 interface ZlibHandle {
