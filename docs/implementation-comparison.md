@@ -1,19 +1,19 @@
 # Generation implementation
 
-The `frames` and `fonts` generation modules render with CPU Skia canvases; `raster`, `draw` and the codecs are the canvas-free paths with exact RGBA arithmetic. Since 0.14.0 the package is TypeScript only. The Python and Pillow implementation that preceded the Skia generation API remains in tags up to v0.13.0, and Pillow 13.0.0 remains the parity reference for the frozen fixtures.
+The `frames` and `fonts` generation modules render with CPU Skia canvases; `raster`, `draw` and the codecs are the canvas-free paths with exact RGBA arithmetic. Pillow 13.0.0 is the parity reference for the frozen `raster`, `draw`, GIF and ICO fixtures.
 
 ## Maintained code and API
 
 | Area | TypeScript source lines |
 | --- | ---: |
-| Colour | 123 |
+| Colour | 117 |
 | Grid | 185 |
 | Frames and composition | 183 |
 | Fonts, packing and coverage | 419 |
 | Aseprite | 109 |
-| Total | 1019 |
+| Total | 1013 |
 
-These are physical lines including types, comments and whitespace, excluding tests, the atlas/codec modules and packaging. The fonts total includes rasterization (253), strict coverage (42) and supplied-glyph assembly (124). The consolidated generation entry and one-call font export add another 124 lines. The numbers are not a complexity score. The rendering path has no custom alpha arithmetic, manually scaled pixel writes, intermediate glyph RGBA buffers or Pillow-specific rounding. TypeScript owns typed options, input/bounds validation, packing and XML. Font construction adds native pair-kerning derivation and structured metadata.
+These are physical lines including types, comments and whitespace, excluding tests, the atlas/codec modules and packaging. The fonts total includes rasterization (253), strict coverage (42) and supplied-glyph assembly (125). The consolidated generation entry adds another 12 lines. The numbers are not a complexity score. The rendering path has no custom alpha arithmetic, manually scaled pixel writes, intermediate glyph RGBA buffers or Pillow-specific rounding. TypeScript owns typed options, input/bounds validation, packing and XML. Font construction adds native pair-kerning derivation and structured metadata.
 
 Generation exposes renderFrame, composeSheet and renderContactSheet returning CPU Canvas objects. Keep those surfaces through composition and encode at the boundary. buildBitmapFont is one font-and-atlas operation in place of separate rasterize, pack and XML calls. Exact-copy buffer utilities and codecs remain separate. This reduces caller assembly and renderer-specific buffer handling.
 
@@ -31,4 +31,4 @@ Skia Canvas 4.0.0 is an exact optional peer for generation modules. Strict cover
 
 ## Verification
 
-The isolated local gate passes 98 Node tests with zero skips, plus declarations, installed-package imports and the build. It requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.
+The isolated local gate passes 93 Node tests with zero skips, plus declarations, installed-package imports and the build. It requires native licensed-font rendering; its codec-only smoke checks omit both optional Skia and fontkit peers. Checks validate library mechanisms, not every consumer asset. Exact release-commit CI and installed/public release payloads remain mandatory publication gates.
