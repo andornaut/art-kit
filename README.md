@@ -42,7 +42,7 @@ The compiled ESM package `@andornaut/art-kit` includes TypeScript declarations a
 | `atlasBuild` | Atlas drawing and encoded page assembly | Read/decode/encode functions, blits, extrusion and metadata |
 | `atlasLayout` | Shelf packing and candidate selection | Items, grouping, order comparator, candidate widths and size limits |
 | `indexedPng` | Indexed PNG encoding | RGBA image and compression options |
-| `png` | PNG decoding to RGBA and RGBA PNG encoding | Encoded bytes or an RGBA image and compression options |
+| `png` | PNG decoding to RGBA, RGBA PNG encoding and opaque RGB PNG encoding | Encoded bytes or an RGBA image and compression options |
 | `rgbaImage` | RGBA allocation, alpha bounds and extruded blitting | Image dimensions, pixels, rectangles and bounds |
 | `webp` | Lossless WebP encoding, decoding and RGBA comparison | Images or encoded bytes |
 
@@ -50,7 +50,7 @@ Import subpaths explicitly, for example `@andornaut/art-kit/atlasLayout`. Geomet
 
 `rgbaImage.opaqueRect(within, image)` returns the alpha bounds within the supplied rectangle, or `undefined` when that region is clear. Callers choose trimming and clear-frame handling.
 
-`indexedPng.encodeIndexedPng({ level, memLevel }, image)` returns encoded bytes, or `undefined` when the image has more than 256 distinct RGBA colours. The subpath also exports `MAX_PALETTE` and `COLOUR_TYPE_INDEXED`. `png.encodeRgbaPng({ deflateLevel, deflateStrategy, filterType }, image)` returns RGBA PNG bytes. Compression context precedes the image; callers choose indexed-first fallback, PNG versus WebP and output metadata.
+`indexedPng.encodeIndexedPng({ level, memLevel }, image)` returns encoded bytes, or `undefined` when the image has more than 256 distinct RGBA colours. The subpath also exports `MAX_PALETTE` and `COLOUR_TYPE_INDEXED`. `png.encodeRgbaPng({ deflateLevel, deflateStrategy, filterType }, image)` returns RGBA PNG bytes. `png.encodeRgbPng` takes the same options and returns colour type 2 bytes that decode to the image, throwing `RangeError` when any alpha is not 255; bytes are not matched to Pillow. Compression context precedes the image; callers choose indexed-first fallback, PNG versus WebP and output metadata.
 
 `colour.srgb_to_oklab(rgb_bytes)` and `srgb_to_oklch(rgb_bytes)` return Oklab and OKLCH triples. `oklab_to_srgb(lab)` clamps linear channels on conversion to bytes. `oklch_to_srgb(lch)` clamps lightness to 0..1, limits chroma to the search bound, wraps hue in degrees and reduces out-of-gamut chroma at fixed lightness and hue before byte quantization. Neutral hue is zero. Node exports the corresponding camelCase functions. Palette targets and perceptual contrast policy remain caller-owned.
 

@@ -6,7 +6,7 @@ import {
   MAX_PALETTE,
   encodeIndexedPng,
 } from "@andornaut/art-kit/indexedPng";
-import { decodePng, encodeRgbaPng } from "@andornaut/art-kit/png";
+import { decodePng, encodeRgbPng, encodeRgbaPng } from "@andornaut/art-kit/png";
 import { blankImage, opaqueRect } from "@andornaut/art-kit/rgbaImage";
 
 const indexedOptions = { level: 9, memLevel: 9 };
@@ -73,3 +73,44 @@ test("RGBA PNG preserves transparent RGB, alpha and pinned explicit compression 
     "7dea245da66c077a0d2cc763057b15c24af98c609bd06a680d57978f0a1a893b",
   );
 });
+
+const opaque = {
+  ...image,
+  data: image.data.map((value, i) => (i % 4 === 3 ? 255 : value)),
+};
+// IHDR data starts at byte 16; colour type follows width, height and bit depth.
+const COLOUR_TYPE_OFFSET = 25;
+
+test("RGB PNG writes colour type 2 and decodes to the opaque input", () => {
+  const bytes = encodeRgbPng(rgbaOptions, opaque);
+  assert.equal(Buffer.from(bytes.subarray(12, 16)).toString("latin1"), "IHDR");
+  assert.equal(bytes[COLOUR_TYPE_OFFSET - 1], 8);
+  assert.equal(bytes[COLOUR_TYPE_OFFSET], 2);
+  assert.deepEqual(decodePng(bytes), opaque);
+});
+
+for (const alpha of [0, 128, 254]) {
+  test(`RGB PNG rejects alpha ${alpha}`, () => {
+    const data = opaque.data.slice();
+    data[4 * 4 + 3] = alpha;
+    assert.throws(() => encodeRgbPng(rgbaOptions, { ...opaque, data }), {
+      name: "RangeError",
+      message: `Pixel 4 has alpha ${alpha}, not 255`,
+    });
+  });
+}
+
+for (const [width, height] of [
+  [0, 0],
+  [0, 2],
+  [2, 0],
+]) {
+  test(`RGB PNG encodes ${width}x${height} like RGBA PNG`, () => {
+    const empty = { width, height, data: new Uint8Array(0) };
+    const rgb = encodeRgbPng(rgbaOptions, empty);
+    const rgba = encodeRgbaPng(rgbaOptions, empty);
+    assert.deepEqual(rgb.subarray(16, 24), rgba.subarray(16, 24));
+    assert.equal(rgb[COLOUR_TYPE_OFFSET], 2);
+    assert.equal(rgba[COLOUR_TYPE_OFFSET], 6);
+  });
+}
