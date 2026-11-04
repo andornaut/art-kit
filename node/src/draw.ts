@@ -1,3 +1,5 @@
+import type { Point } from "./geometry.js";
+import type { Rgba } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
 // Pillow 13.0.0 ImageDraw.Draw(image) on an RGBA image: every operation writes its ink bytes
@@ -5,27 +7,41 @@ import type { RgbaImage } from "./rgbaImage.js";
 // rounded rectangles round their box first, as Pillow's Python layer does. Float arithmetic that
 // Pillow performs in single precision is reproduced with Math.fround.
 
-export type Colour = readonly [red: number, green: number, blue: number, alpha: number];
-export type DrawPoint = readonly [x: number, y: number];
-// Inclusive corners: x1 >= x0 and y1 >= y0.
-export type Box = readonly [x0: number, y0: number, x1: number, y1: number];
+// Inclusive corner pixels of a shape's box: x1 >= x0 and y1 >= y0, so a box with x0 = x1 is one
+// pixel wide.
+export interface Bounds {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+type XY = readonly [x: number, y: number];
+
+function xy(points: readonly Point[]): XY[] {
+  return points.map(({ x, y }) => [x, y] as const);
+}
+
+function boxOf({ x0, y0, x1, y1 }: Bounds): [number, number, number, number] {
+  return [x0, y0, x1, y1];
+}
 
 export interface ShapeStyle {
-  fill?: Colour;
-  outline?: Colour;
+  fill?: Rgba;
+  outline?: Rgba;
   // Outline width; 0 skips the outline. Defaults to 1.
   width?: number;
 }
 
 export interface LineStyle {
-  fill: Colour;
+  fill: Rgba;
   width?: number;
   // "curve" rounds joints between segments wider than 4 pixels.
   joint?: "curve";
 }
 
 export interface ArcStyle {
-  fill: Colour;
+  fill: Rgba;
   width?: number;
 }
 
@@ -36,7 +52,7 @@ export interface RoundedRectangleStyle extends ShapeStyle {
 }
 
 // Pillow's default ink when neither fill nor outline is given.
-const WHITE: Colour = [255, 255, 255, 255];
+const WHITE: Rgba = [255, 255, 255, 255];
 // Quarter-ellipse deviations stay exact in doubles below this span.
 const MAX_ELLIPSE_SPAN = 8192;
 
@@ -45,19 +61,19 @@ const f32 = Math.fround;
 const RAD_TO_DEG = 180 / Math.PI;
 const DEG_TO_RAD = Math.PI / 180;
 
-function checkColour(colour: Colour): Colour {
+function checkColour(colour: Rgba): Rgba {
   if (colour.length !== 4 || colour.some((v) => !Number.isInteger(v) || v < 0 || v > 255)) {
     throw new RangeError(`Colour must be four integers in 0..255: ${String(colour)}`);
   }
   return colour;
 }
 
-function sameInk(a: Colour | undefined, b: Colour | undefined): boolean {
+function sameInk(a: Rgba | undefined, b: Rgba | undefined): boolean {
   return a !== undefined && b !== undefined && a.every((v, i) => v === b[i]);
 }
 
 // Pillow's (outline, fill) ink resolution: neither supplied means a white outline.
-function inks(style: ShapeStyle): [Colour | undefined, Colour | undefined] {
+function inks(style: ShapeStyle): [Rgba | undefined, Rgba | undefined] {
   if (style.fill === undefined && style.outline === undefined) return [WHITE, undefined];
   return [
     style.outline === undefined ? undefined : checkColour(style.outline),
@@ -114,13 +130,13 @@ function pyRound(v: number): number {
 
 type Mask = Uint8Array | undefined;
 
-function plot(image: RgbaImage, x: number, y: number, ink: Colour): void {
+function plot(image: RgbaImage, x: number, y: number, ink: Rgba): void {
   if (x >= 0 && x < image.width && y >= 0 && y < image.height) {
     image.data.set(ink, (y * image.width + x) * 4);
   }
 }
 
-function hline(image: RgbaImage, x0: number, y0: number, x1: number, ink: Colour, mask: Mask): void {
+function hline(image: RgbaImage, x0: number, y0: number, x1: number, ink: Rgba, mask: Mask): void {
   if (y0 < 0 || y0 >= image.height) return;
   if (x0 < 0) x0 = 0;
   else if (x0 >= image.width) return;
@@ -133,7 +149,7 @@ function hline(image: RgbaImage, x0: number, y0: number, x1: number, ink: Colour
 }
 
 // Bresenham segment without its end point.
-function segment(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, ink: Colour): void {
+function segment(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, ink: Rgba): void {
   let dy = y1 - y0;
   let ys: number;
   if (dy < 0) {
@@ -213,7 +229,7 @@ function edgeX(e: Edge, y: number): number {
   return f32(f32((y - e.y0) * e.dx) + e.x0);
 }
 
-function polygonGeneric(image: RgbaImage, edges: readonly Edge[], ink: Colour, mask: Mask): void {
+function polygonGeneric(image: RgbaImage, edges: readonly Edge[], ink: Rgba, mask: Mask): void {
   if (edges.length === 0) return;
   let ymin = image.height - 1;
   let ymax = 0;
@@ -272,7 +288,7 @@ function wideLine(
   y0: number,
   x1: number,
   y1: number,
-  ink: Colour,
+  ink: Rgba,
   width: number,
   mask: Mask,
 ): void {
@@ -307,7 +323,7 @@ function rectanglePrimitive(
   y0: number,
   x1: number,
   y1: number,
-  ink: Colour,
+  ink: Rgba,
   fill: boolean,
   width: number,
 ): void {
@@ -333,7 +349,7 @@ function rectanglePrimitive(
 function polygonPrimitive(
   image: RgbaImage,
   xy: readonly number[],
-  ink: Colour,
+  ink: Rgba,
   fill: boolean,
   width: number,
   mask: Mask,
@@ -632,7 +648,7 @@ function pieInit(a: number, b: number, w: number, al: number, ar: number): Clipp
   return { spans, root };
 }
 
-function drawClipped(image: RgbaImage, x0: number, y0: number, a: number, b: number, shape: ClippedEllipse, ink: Colour): void {
+function drawClipped(image: RgbaImage, x0: number, y0: number, a: number, b: number, shape: ClippedEllipse, ink: Rgba): void {
   let span: Span | undefined;
   while ((span = shape.spans.next()) !== undefined) {
     const [sx0, sy, sx1] = span;
@@ -648,7 +664,7 @@ function checkSpan(a: number, b: number): void {
   if (a >= MAX_ELLIPSE_SPAN || b >= MAX_ELLIPSE_SPAN) throw new RangeError(`Ellipse box spans must be below ${MAX_ELLIPSE_SPAN}`);
 }
 
-function ellipsePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, ink: Colour, fill: boolean, width: number): void {
+function ellipsePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, ink: Rgba, fill: boolean, width: number): void {
   const a = x1 - x0;
   const b = y1 - y0;
   if (a < 0 || b < 0) return;
@@ -661,7 +677,7 @@ function ellipsePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, 
   }
 }
 
-function arcPrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, start: number, end: number, ink: Colour, width: number): void {
+function arcPrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, start: number, end: number, ink: Rgba, width: number): void {
   [start, end] = normalizeAngles(start, end);
   if (f32(start + 360) === end) {
     ellipsePrimitive(image, x0, y0, x1, y1, ink, false, width);
@@ -676,7 +692,7 @@ function arcPrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: 
 }
 
 // Filled pie slice only.
-function pieslicePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, start: number, end: number, ink: Colour): void {
+function pieslicePrimitive(image: RgbaImage, x0: number, y0: number, x1: number, y1: number, start: number, end: number, ink: Rgba): void {
   [start, end] = normalizeAngles(start, end);
   if (f32(start + 360) === end) {
     ellipsePrimitive(image, x0, y0, x1, y1, ink, true, 0);
@@ -697,32 +713,32 @@ function boxInts(box: readonly number[]): [number, number, number, number] {
   return [Math.trunc(box[0]!), Math.trunc(box[1]!), Math.trunc(box[2]!), Math.trunc(box[3]!)];
 }
 
-function drawRectangle(image: RgbaImage, box: readonly number[], ink: Colour, fill: boolean, width = 0): void {
+function drawRectangle(image: RgbaImage, box: readonly number[], ink: Rgba, fill: boolean, width = 0): void {
   const [x0, y0, x1, y1] = boxInts(box);
   rectanglePrimitive(image, x0, y0, x1, y1, ink, fill, width);
 }
 
-function drawEllipse(image: RgbaImage, box: readonly number[], ink: Colour, fill: boolean, width = 0): void {
+function drawEllipse(image: RgbaImage, box: readonly number[], ink: Rgba, fill: boolean, width = 0): void {
   const [x0, y0, x1, y1] = boxInts(box);
   ellipsePrimitive(image, x0, y0, x1, y1, ink, fill, width);
 }
 
-function drawArc(image: RgbaImage, box: readonly number[], start: number, end: number, ink: Colour, width: number): void {
+function drawArc(image: RgbaImage, box: readonly number[], start: number, end: number, ink: Rgba, width: number): void {
   const [x0, y0, x1, y1] = boxInts(box);
   arcPrimitive(image, x0, y0, x1, y1, f32(start), f32(end), ink, width);
 }
 
-function drawPieslice(image: RgbaImage, box: readonly number[], start: number, end: number, ink: Colour): void {
+function drawPieslice(image: RgbaImage, box: readonly number[], start: number, end: number, ink: Rgba): void {
   const [x0, y0, x1, y1] = boxInts(box);
   pieslicePrimitive(image, x0, y0, x1, y1, f32(start), f32(end), ink);
 }
 
-function drawPolygon(image: RgbaImage, points: readonly DrawPoint[], ink: Colour, fill: boolean, width = 0, mask?: Uint8Array): void {
+function drawPolygon(image: RgbaImage, points: readonly XY[], ink: Rgba, fill: boolean, width = 0, mask?: Uint8Array): void {
   if (points.length < 2) throw new TypeError("Coordinate list must contain at least 2 coordinates");
   polygonPrimitive(image, points.flatMap(([x, y]) => [Math.trunc(x), Math.trunc(y)]), ink, fill, width, mask);
 }
 
-function drawLines(image: RgbaImage, points: readonly DrawPoint[], ink: Colour, width: number): void {
+function drawLines(image: RgbaImage, points: readonly XY[], ink: Rgba, width: number): void {
   const xy = points.map(([x, y]) => [Math.trunc(x), Math.trunc(y)] as const);
   for (let i = 0; i + 1 < xy.length; i++) {
     const [x0, y0] = xy[i]!;
@@ -736,13 +752,17 @@ function drawLines(image: RgbaImage, points: readonly DrawPoint[], ink: Colour, 
 /* Public operations: Pillow's ImageDraw methods */
 
 // Pillow ImageDraw.point: one pixel per point.
-export function point(fill: Colour, points: readonly DrawPoint[], image: RgbaImage): void {
+export function point(fill: Rgba, points: readonly Point[], image: RgbaImage): void {
   checkColour(fill);
-  for (const [x, y] of points) plot(image, Math.trunc(x), Math.trunc(y), fill);
+  for (const { x, y } of points) plot(image, Math.trunc(x), Math.trunc(y), fill);
 }
 
 // Pillow ImageDraw.line: a polyline; width 1 includes the final point.
-export function line(style: LineStyle, points: readonly DrawPoint[], image: RgbaImage): void {
+export function line(style: LineStyle, points: readonly Point[], image: RgbaImage): void {
+  lineXY(style, xy(points), image);
+}
+
+function lineXY(style: LineStyle, points: readonly XY[], image: RgbaImage): void {
   const fill = checkColour(style.fill);
   const width = style.width ?? 1;
   if (width === 0) return;
@@ -755,7 +775,7 @@ export function line(style: LineStyle, points: readonly DrawPoint[], image: Rgba
       [p, points[i + 1]!],
     ].map(([s, e]) => pyMod(RAD_TO_DEG * Math.atan2(e![0] - s![0], s![1] - e![1]), 360)) as [number, number];
     if (angles[0] === angles[1]) continue;
-    const coordAtAngle = ([x, y]: DrawPoint, angle: number): DrawPoint => {
+    const coordAtAngle = ([x, y]: XY, angle: number): XY => {
       angle -= 90;
       const distance = width / 2 - 1;
       const offset = (d: number) => (d > 0 ? Math.floor(d) : Math.ceil(d));
@@ -769,13 +789,14 @@ export function line(style: LineStyle, points: readonly DrawPoint[], image: Rgba
     if (width > 8) {
       // Cover potential gaps between the line and the joint.
       const turn = flipped ? 90 : -90;
-      line({ fill, width: 3 }, [coordAtAngle(p, angles[0] + turn), p, coordAtAngle(p, angles[1] + turn)], image);
+      lineXY({ fill, width: 3 }, [coordAtAngle(p, angles[0] + turn), p, coordAtAngle(p, angles[1] + turn)], image);
     }
   }
 }
 
 // Pillow ImageDraw.polygon. A wider outline stays inside the filled area.
-export function polygon(style: ShapeStyle, points: readonly DrawPoint[], image: RgbaImage): void {
+export function polygon(style: ShapeStyle, vertices: readonly Point[], image: RgbaImage): void {
+  const points = xy(vertices);
   const [ink, fillInk] = inks(style);
   const width = style.width ?? 1;
   if (fillInk !== undefined) drawPolygon(image, points, fillInk, true);
@@ -791,8 +812,9 @@ export function polygon(style: ShapeStyle, points: readonly DrawPoint[], image: 
   drawPolygon(image, points, ink, false, width * 2 - 1, mask);
 }
 
-// Pillow ImageDraw.ellipse within the inclusive box.
-export function ellipse(style: ShapeStyle, box: Box, image: RgbaImage): void {
+// Pillow ImageDraw.ellipse within the inclusive bounds.
+export function ellipse(style: ShapeStyle, bounds: Bounds, image: RgbaImage): void {
+  const box = boxOf(bounds);
   const [ink, fillInk] = inks(style);
   const width = style.width ?? 1;
   if (fillInk !== undefined) drawEllipse(image, box, fillInk, true);
@@ -800,14 +822,16 @@ export function ellipse(style: ShapeStyle, box: Box, image: RgbaImage): void {
 }
 
 // Pillow ImageDraw.arc: degrees clockwise from three o'clock.
-export function arc(style: ArcStyle, box: Box, start: number, end: number, image: RgbaImage): void {
+export function arc(style: ArcStyle, bounds: Bounds, start: number, end: number, image: RgbaImage): void {
+  const box = boxOf(bounds);
   const fill = checkColour(style.fill);
   const width = style.width ?? 1;
   if (width !== 0) drawArc(image, box, start, end, fill, width);
 }
 
-// Pillow ImageDraw.rectangle; the outline is drawn inside the box.
-export function rectangle(style: ShapeStyle, box: Box, image: RgbaImage): void {
+// Pillow ImageDraw.rectangle; the outline is drawn inside the bounds.
+export function rectangle(style: ShapeStyle, bounds: Bounds, image: RgbaImage): void {
+  const box = boxOf(bounds);
   const [ink, fillInk] = inks(style);
   const width = style.width ?? 1;
   if (fillInk !== undefined) drawRectangle(image, box, fillInk, true);
@@ -815,34 +839,33 @@ export function rectangle(style: ShapeStyle, box: Box, image: RgbaImage): void {
 }
 
 // Pillow ImageDraw.rounded_rectangle, composed of pie slices, arcs and rectangles.
-export function roundedRectangle(style: RoundedRectangleStyle, box: Box, image: RgbaImage): void {
-  if (box.length !== 4) throw new TypeError("Box must contain exactly 4 coordinates");
-  let [x0, y0, x1, y1] = box;
+export function roundedRectangle(style: RoundedRectangleStyle, bounds: Bounds, image: RgbaImage): void {
+  let [x0, y0, x1, y1] = boxOf(bounds);
   if (x1 < x0) throw new RangeError("x1 must be greater than or equal to x0");
   if (y1 < y0) throw new RangeError("y1 must be greater than or equal to y0");
-  const corners = style.corners ?? [true, true, true, true];
+  const rounded = style.corners ?? [true, true, true, true];
   const width = style.width ?? 1;
   let d = Math.min(x1 - x0, y1 - y0, style.radius * 2);
   [x0, y0, x1, y1] = [pyRound(x0), pyRound(y0), pyRound(x1), pyRound(y1)];
   let fullX = false;
   let fullY = false;
-  if (corners.every(Boolean)) {
+  if (rounded.every(Boolean)) {
     fullX = d >= x1 - x0 - 1;
     if (fullX) d = x1 - x0;
     fullY = d >= y1 - y0 - 1;
     if (fullY) d = y1 - y0;
     if (fullX && fullY) {
-      ellipse(style, box, image);
+      ellipse(style, bounds, image);
       return;
     }
   }
-  if (d === 0 || !corners.some(Boolean)) {
-    rectangle(style, box, image);
+  if (d === 0 || !rounded.some(Boolean)) {
+    rectangle(style, bounds, image);
     return;
   }
   const r = Math.trunc(Math.floor(d / 2));
   const [ink, fillInk] = inks(style);
-  const drawCorners = (pieslice: boolean, colour: Colour) => {
+  const drawCorners = (pieslice: boolean, colour: Rgba) => {
     let parts: [number[], number, number][];
     if (fullX) {
       parts = [
@@ -861,7 +884,7 @@ export function roundedRectangle(style: RoundedRectangleStyle, box: Box, image: 
         [[x1 - d, y1 - d, x1, y1], 0, 90],
         [[x0, y1 - d, x0 + d, y1], 90, 180],
       ];
-      parts = all.filter((_, i) => corners[i]);
+      parts = all.filter((_, i) => rounded[i]);
     }
     for (const [part, start, end] of parts) {
       if (pieslice) drawPieslice(image, part, start, end, colour);
@@ -874,12 +897,12 @@ export function roundedRectangle(style: RoundedRectangleStyle, box: Box, image: 
     else if (x1 - r - 1 >= x0 + r + 1) drawRectangle(image, [x0 + r + 1, y0, x1 - r - 1, y1], fillInk, true);
     if (!fullX && !fullY) {
       const left = [x0, y0, x0 + r, y1];
-      if (corners[0]) left[1] += r + 1;
-      if (corners[3]) left[3] -= r + 1;
+      if (rounded[0]) left[1] += r + 1;
+      if (rounded[3]) left[3] -= r + 1;
       drawRectangle(image, left, fillInk, true);
       const right = [x1 - r, y0, x1, y1];
-      if (corners[1]) right[1] += r + 1;
-      if (corners[2]) right[3] -= r + 1;
+      if (rounded[1]) right[1] += r + 1;
+      if (rounded[2]) right[3] -= r + 1;
       drawRectangle(image, right, fillInk, true);
     }
   }
@@ -887,22 +910,22 @@ export function roundedRectangle(style: RoundedRectangleStyle, box: Box, image: 
   drawCorners(false, ink);
   if (!fullX) {
     const top = [x0, y0, x1, y0 + width - 1];
-    if (corners[0]) top[0] += r + 1;
-    if (corners[1]) top[2] -= r + 1;
+    if (rounded[0]) top[0] += r + 1;
+    if (rounded[1]) top[2] -= r + 1;
     drawRectangle(image, top, ink, true);
     const bottom = [x0, y1 - width + 1, x1, y1];
-    if (corners[3]) bottom[0] += r + 1;
-    if (corners[2]) bottom[2] -= r + 1;
+    if (rounded[3]) bottom[0] += r + 1;
+    if (rounded[2]) bottom[2] -= r + 1;
     drawRectangle(image, bottom, ink, true);
   }
   if (!fullY) {
     const left = [x0, y0, x0 + width - 1, y1];
-    if (corners[0]) left[1] += r + 1;
-    if (corners[3]) left[3] -= r + 1;
+    if (rounded[0]) left[1] += r + 1;
+    if (rounded[3]) left[3] -= r + 1;
     drawRectangle(image, left, ink, true);
     const right = [x1 - width + 1, y0, x1, y1];
-    if (corners[1]) right[1] += r + 1;
-    if (corners[2]) right[3] -= r + 1;
+    if (rounded[1]) right[1] += r + 1;
+    if (rounded[2]) right[3] -= r + 1;
     drawRectangle(image, right, ink, true);
   }
 }

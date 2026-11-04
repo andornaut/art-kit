@@ -22,8 +22,13 @@ function background(width, height) {
   return { data, height, width };
 }
 
+// Fixtures record Pillow's argument shapes: [x, y] points and [x0, y0, x1, y1] boxes.
 function draw({ op, args }, image) {
-  const { box, points, start, end, joint, ...rest } = args;
+  const { start, end, joint, ...rest } = args;
+  delete rest.box;
+  delete rest.points;
+  const points = args.points?.map(([x, y]) => ({ x, y }));
+  const box = args.box && { x0: args.box[0], y0: args.box[1], x1: args.box[2], y1: args.box[3] };
   const style = Object.fromEntries(
     Object.entries(rest).map(([key, value]) => [key, key === "fill" || key === "outline" ? fixture.colours[value] : value]),
   );
@@ -87,13 +92,13 @@ for (const op of new Set(fixture.cases.map((c) => c.op))) {
 
 test("drawing writes ink directly, including alpha, without blending", () => {
   const image = { data: new Uint8Array(4 * 4 * 4).fill(200), height: 4, width: 4 };
-  rectangle({ fill: [10, 20, 30, 0] }, [1, 1, 2, 2], image);
+  rectangle({ fill: [10, 20, 30, 0] }, { x0: 1, y0: 1, x1: 2, y1: 2 }, image);
   assert.deepEqual([...image.data.subarray(20, 24)], [10, 20, 30, 0]);
   assert.deepEqual([...image.data.subarray(0, 4)], [200, 200, 200, 200]);
 });
 
 test("colours must be four bytes", () => {
   const image = { data: new Uint8Array(4), height: 1, width: 1 };
-  assert.throws(() => point([255, 255, 255], [[0, 0]], image), RangeError);
-  assert.throws(() => point([256, 0, 0, 255], [[0, 0]], image), RangeError);
+  assert.throws(() => point([255, 255, 255], [{ x: 0, y: 0 }], image), RangeError);
+  assert.throws(() => point([256, 0, 0, 255], [{ x: 0, y: 0 }], image), RangeError);
 });
