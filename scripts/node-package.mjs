@@ -51,7 +51,7 @@ if (readdirSync(`${install}/node_modules/@andornaut/art-kit`, { recursive: true 
 if (installedManifest.version !== version || existsSync(`${install}/node_modules/@andornaut/art-kit/src`)) throw new Error('Invalid compiled package');
 // Existing image-codec consumers do not need optional rendering or font parsing.
 for (const name of ['skia-canvas', 'fontkit']) unlinkSync(`${install}/node_modules/${name}`);
-for (const subpath of ['atlasBuild', 'atlasLayout', 'indexedPng', 'png', 'rgbaImage', 'webp']) {
+for (const subpath of ['atlasBuild', 'atlasLayout', 'indexedPng', 'png', 'raster', 'rgbaImage', 'webp']) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`], { cwd: install, stdio: 'inherit' });
 }
 for (const name of ['skia-canvas', 'fontkit']) symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);
