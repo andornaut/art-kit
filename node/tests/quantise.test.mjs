@@ -4,8 +4,8 @@ import { test } from "node:test";
 import { encodeGif } from "@andornaut/art-kit/gif";
 import { quantise } from "@andornaut/art-kit/quantise";
 
-const fixtures = process.env.ART_KIT_TEST_FONTS;
-assert.ok(fixtures, "Required ART_KIT_TEST_FONTS fixture directory");
+const fixtures = process.env.ART_KIT_TEST_FIXTURES;
+assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
 
 // Two 8x6 frames of a gradient, a moving block and a clear border column.
 function goldenInput() {

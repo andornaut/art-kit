@@ -7,7 +7,7 @@ import test from "node:test";
 import { decodePng } from "@andornaut/art-kit/png";
 import { spriteSheet, writeSpriteSheet } from "@andornaut/art-kit/spriteSheet";
 
-const fixtures = process.env.ART_KIT_TEST_FONTS;
+const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required fixture directory");
 // Frozen Aseprite 1.2.30 exports; see fixtures/README.md.
 const directory = join(fixtures, "sprite-sheet");

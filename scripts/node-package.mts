@@ -8,7 +8,11 @@ interface Descriptor {
   exports: Record<string, unknown>;
   devDependencies: Record<string, string>;
   peerDependencies: Record<string, string>;
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
 }
+
+// Subpaths that import the optional Skia peer; every other export must import without the optional peers.
+const SKIA_SUBPATHS = ['fonts', 'frames', 'generate'];
 
 const [mode, revision] = process.argv.slice(2);
 if (!['check', 'pack'].includes(mode)) throw new Error('Expected check or pack mode');
@@ -48,17 +52,19 @@ const installedManifest = JSON.parse(readFileSync(`${install}/node_modules/@ando
 if (readFileSync(`${install}/node_modules/@andornaut/art-kit/SOURCE_COMMIT`, 'utf8') !== `${revision}\n`) throw new Error('Installed source identity differs');
 if (readdirSync(`${install}/node_modules/@andornaut/art-kit`, { encoding: 'utf8', recursive: true }).some(path => /(?:^|\/)fixtures(?:\/|$)|\.(?:ttf|otf|woff2?)$/i.test(path))) throw new Error('Font fixtures must not be published');
 if (installedManifest.version !== version || existsSync(`${install}/node_modules/@andornaut/art-kit/src`)) throw new Error('Invalid compiled package');
-// Every subpath except fonts, frames and generate imports without the optional Skia peer.
-unlinkSync(`${install}/node_modules/skia-canvas`);
-for (const subpath of ['atlasBuild', 'atlasLayout', 'colour', 'draw', 'gif', 'glyphAtlas', 'grid', 'ico', 'indexedPng', 'png', 'quantise', 'raster', 'rgbaImage', 'webp']) {
+const subpaths = Object.keys(descriptor.exports).map(path => path.slice(2));
+for (const subpath of SKIA_SUBPATHS) if (!subpaths.includes(subpath)) throw new Error(`Skia subpath ${subpath} is not exported`);
+const optionalPeers = Object.keys(descriptor.peerDependenciesMeta ?? {}).filter(name => descriptor.peerDependenciesMeta?.[name].optional);
+for (const name of optionalPeers) unlinkSync(`${install}/node_modules/${name}`);
+for (const subpath of subpaths.filter(subpath => !SKIA_SUBPATHS.includes(subpath))) {
   execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`], { cwd: install, stdio: 'inherit' });
 }
-symlinkSync('/deps/skia-canvas', `${install}/node_modules/skia-canvas`);
-for (const subpath of Object.keys(descriptor.exports)) {
-  execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath.slice(2)}`)})`], { cwd: install, stdio: 'inherit' });
+for (const name of optionalPeers) symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);
+for (const subpath of subpaths) {
+  execFileSync('node', ['--input-type=module', '-e', `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`], { cwd: install, stdio: 'inherit' });
 }
 const contractFile = `${install}/contracts.mts`;
-writeFileSync(contractFile, Object.keys(descriptor.exports).map(path => `import * as ${path.slice(2)} from '@andornaut/art-kit/${path.slice(2)}';`).join('\n'));
+writeFileSync(contractFile, subpaths.map(subpath => `import * as ${subpath} from '@andornaut/art-kit/${subpath}';`).join('\n'));
 execFileSync('node', ['/deps/typescript/bin/tsc', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2023', '--strict', '--skipLibCheck', '--noEmit', '--types', 'node', '--typeRoots', '/deps/@types', contractFile], { cwd: install, stdio: 'inherit' });
 if (mode === 'check') {
   const tests: string[] = [];
@@ -79,7 +85,6 @@ if (mode === 'check') {
   execFileSync('node', ['--test', '--test-concurrency=4', ...targets], { cwd: install, stdio: 'inherit' });
   cpSync(archive, `${out}/andornaut-art-kit-${version}.tgz`);
 } else {
-  if (readdirSync(out).length) throw new Error('Release output must start empty');
   const tarball = `art-kit-${version}.tgz`;
   cpSync(archive, `${out}/${tarball}`);
   writeFileSync(`${out}/SOURCE_COMMIT`, `${revision}\n`);

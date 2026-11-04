@@ -222,7 +222,7 @@ async function check(dependencyPath: string): Promise<void> {
   const commit = revision();
   const spec: ContainerSpec = {
     network: 'none', mounts: [[root, '/app'], [dependencies, '/deps']],
-    env: { npm_config_cache: '/tmp/npm-cache', ART_KIT_TEST_FONTS: '/tmp/work/source/node/tests/fixtures' },
+    env: { npm_config_cache: '/tmp/npm-cache', ART_KIT_TEST_FIXTURES: '/tmp/work/source/node/tests/fixtures' },
   };
   await withContainer(spec, 'art-kit-check', NODE_IMAGE, async container => {
     await exec({}, container, ['mkdir', '-p', '/tmp/work/source', '/tmp/out']);

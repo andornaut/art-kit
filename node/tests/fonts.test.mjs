@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { Canvas, FontLibrary } from "skia-canvas";
 import { buildBitmapFont } from "@andornaut/art-kit/fonts";
 
-const fonts = process.env.ART_KIT_TEST_FONTS;
-assert.ok(fonts, "Required ART_KIT_TEST_FONTS fixture directory");
+const fonts = process.env.ART_KIT_TEST_FIXTURES;
+assert.ok(fonts, "Required ART_KIT_TEST_FIXTURES fixture directory");
 const options = (weight = "Regular", size = 16) => ({
   path: `${fonts}/LiberationSans-${weight}.ttf`,
   size,

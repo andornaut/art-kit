@@ -5,7 +5,7 @@ import test from 'node:test';
 import { buildBitmapFontFromGlyphs as build } from '@andornaut/art-kit/glyphAtlas';
 
 // Frozen packed-layout references; see fixtures/README.md.
-const fixtures = JSON.parse(readFileSync(`${process.env.ART_KIT_TEST_FONTS}/bmfont-packed.json`, 'utf8'));
+const fixtures = JSON.parse(readFileSync(`${process.env.ART_KIT_TEST_FIXTURES}/bmfont-packed.json`, 'utf8'));
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 function inputs(fixture) {
   const glyphs = new Map(fixture.glyphs.map(({ char, image, ...metrics }) => [char, {

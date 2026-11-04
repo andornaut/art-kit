@@ -5,8 +5,8 @@ import { join } from "node:path";
 import test from "node:test";
 import { arc, ellipse, line, point, polygon, rectangle, roundedRectangle } from "@andornaut/art-kit/draw";
 
-const fixtures = process.env.ART_KIT_TEST_FONTS;
-assert.ok(fixtures, "Required ART_KIT_TEST_FONTS fixture directory");
+const fixtures = process.env.ART_KIT_TEST_FIXTURES;
+assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
 const fixture = JSON.parse(readFileSync(join(fixtures, "draw.json"), "utf8"));
 
 function background(width, height) {

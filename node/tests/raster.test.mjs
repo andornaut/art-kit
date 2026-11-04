@@ -5,7 +5,7 @@ import test from "node:test";
 import { renderContactSheet, renderFrame } from "@andornaut/art-kit/frames";
 import * as raster from "@andornaut/art-kit/raster";
 
-const fixtures = process.env.ART_KIT_TEST_FONTS;
+const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required fixture directory");
 // Frozen Pillow 13.0.0 references; see fixtures/README.md.
 const reference = JSON.parse(readFileSync(join(fixtures, "raster", "pillow.json"), "utf8"));

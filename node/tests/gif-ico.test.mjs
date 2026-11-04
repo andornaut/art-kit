@@ -6,8 +6,8 @@ import { encodeGif } from "@andornaut/art-kit/gif";
 import { encodeIco } from "@andornaut/art-kit/ico";
 import { decodePng } from "@andornaut/art-kit/png";
 
-const fixtures = process.env.ART_KIT_TEST_FONTS;
-assert.ok(fixtures, "Required ART_KIT_TEST_FONTS fixture directory");
+const fixtures = process.env.ART_KIT_TEST_FIXTURES;
+assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
 // Frozen inputs and Pillow 13.0.0 decodes; see fixtures/README.md.
 const reference = JSON.parse(readFileSync(`${fixtures}/gif-ico/pillow.json`, "utf8"));
 const image = ({ width, height, rgba }) => ({
