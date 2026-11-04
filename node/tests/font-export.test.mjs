@@ -65,14 +65,19 @@ test("filesystem errors propagate and preserve pre-existing outputs", async () =
 });
 
 
-test("existing output symlink aliases are rejected before writing", async () => {
-  const root = await mkdtemp(join(tmpdir(), "font-export-alias-"));
-  const png = join(root, "body.png");
-  const fnt = join(root, "body.fnt");
-  await writeFile(png, "preserved");
-  await symlink(png, fnt);
-  await assert.rejects(exportBitmapFont({font, output: {png, fnt}}), /distinct/);
-  assert.equal(await readFile(png, "utf8"), "preserved");
+test("output symlinks to the other output are rejected before writing", async () => {
+  for (const [name, existing, message, check] of [
+    ["existing target", "preserved", /distinct/, async (png) => assert.equal(await readFile(png, "utf8"), "preserved", "existing target preserved")],
+    ["dangling target", undefined, /dangling symbolic link/, (png) => assert.rejects(readFile(png), { code: "ENOENT" }, "dangling target not created")],
+  ]) {
+    const root = await mkdtemp(join(tmpdir(), "font-export-symlink-"));
+    const png = join(root, "body.png");
+    const fnt = join(root, "body.fnt");
+    if (existing !== undefined) await writeFile(png, existing);
+    await symlink(png, fnt);
+    await assert.rejects(exportBitmapFont({ font, output: { png, fnt } }), message, name);
+    await check(png);
+  }
 });
 
 
@@ -98,16 +103,6 @@ test("hard links and missing destinations under directory aliases are rejected",
   await assert.rejects(exportBitmapFont({font, output: {
     png: join(dir, "new", "body.png"), fnt: join(alias, "new", "body.png")}}), /distinct/);
   assert.deepEqual(await readdir(dir), []);
-});
-
-
-test("dangling output links are rejected before creating their targets", async () => {
-  const root = await mkdtemp(join(tmpdir(), "font-export-dangling-"));
-  const png = join(root, "body.png");
-  const fnt = join(root, "body.fnt");
-  await symlink(png, fnt);
-  await assert.rejects(exportBitmapFont({ font, output: { png, fnt } }), /dangling symbolic link/);
-  await assert.rejects(readFile(png), { code: "ENOENT" });
 });
 
 

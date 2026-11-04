@@ -148,27 +148,27 @@ test("GIF rejects input it cannot encode exactly", () => {
   assert.throws(() => encodeGif({ durations: 10 }, [many]), RangeError);
 });
 
-for (const [name, { images, pillow }] of Object.entries(reference.ico)) {
-  test(`ICO ${name} holds each supplied size as an exact PNG entry`, () => {
+test("ICO favicon and large sets hold each supplied size as an exact PNG entry", () => {
+  for (const [name, { images, pillow }] of Object.entries(reference.ico)) {
     const inputs = images.map(image);
     const bytes = encodeIco(inputs);
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    assert.deepEqual([view.getUint16(0, true), view.getUint16(2, true), view.getUint16(4, true)], [0, 1, inputs.length]);
-    const entries = pillow.map((_, i) => {
+    assert.deepEqual(
+      [view.getUint16(0, true), view.getUint16(2, true), view.getUint16(4, true)],
+      [0, 1, inputs.length],
+      `${name} header`,
+    );
+    pillow.forEach((expected, i) => {
       const at = 6 + 16 * i;
       const size = view.getUint32(at + 8, true);
       const offset = view.getUint32(at + 12, true);
-      return {
-        header: [bytes[at] || 256, bytes[at + 1] || 256, view.getUint16(at + 4, true), view.getUint16(at + 6, true)],
-        image: decodePng(bytes.subarray(offset, offset + size)),
-      };
+      const header = [bytes[at] || 256, bytes[at + 1] || 256, view.getUint16(at + 4, true), view.getUint16(at + 6, true)];
+      assert.deepEqual(header, [...expected.size, 1, 32], `${name} entry ${i} directory`);
+      assert.deepEqual(decodePng(bytes.subarray(offset, offset + size)), image(expected.image), `${name} entry ${i} image`);
     });
-    entries.forEach((entry, i) => {
-      assert.deepEqual(entry.header, [...pillow[i].size, 1, 32]);
-      assert.deepEqual(entry.image, image(pillow[i].image));
-    });
-  });
-}
+  }
+  assert.deepEqual(Object.keys(reference.ico).sort(), ["favicon", "large"]);
+});
 
 test("ICO rejects duplicate and oversized entries", () => {
   const blank = (side) => ({ width: side, height: side, data: new Uint8Array(side * side * 4) });

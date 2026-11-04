@@ -9,27 +9,21 @@ import {
   webpDecodesTo,
 } from "@andornaut/art-kit/webp";
 
-for (const colorType of [2, 6]) {
-  test(`PNG colour type ${colorType} decodes to RGBA`, () => {
+test("PNG colour types 2 and 6 decode to RGBA", () => {
+  for (const [name, colorType, alphas] of [
+    ["RGB", 2, [255, 255]],
+    ["RGBA", 6, [0, 128]],
+  ]) {
     const image = new PNG({ width: 2, height: 1 });
-    const data = Uint8Array.from([
-      1,
-      2,
-      3,
-      colorType === 2 ? 255 : 0,
-      250,
-      251,
-      252,
-      colorType === 2 ? 255 : 128,
-    ]);
+    const data = Uint8Array.from([1, 2, 3, alphas[0], 250, 251, 252, alphas[1]]);
     image.data.set(data);
-    assert.deepEqual(decodePng(PNG.sync.write(image, { colorType })), {
-      width: 2,
-      height: 1,
-      data,
-    });
-  });
-}
+    assert.deepEqual(
+      decodePng(PNG.sync.write(image, { colorType })),
+      { width: 2, height: 1, data },
+      name,
+    );
+  }
+});
 
 test("non-SIMD lossless WebP preserves transparent RGB and pinned encoder bytes", async () => {
   const image = {

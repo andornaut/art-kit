@@ -54,24 +54,24 @@ test("indexed encoding accepts 256 distinct RGBA colours and declines 257", () =
   assert.equal(encodeIndexedPng(indexedOptions, pixels), undefined);
 });
 
-test("indexed PNG preserves transparent RGB, alpha and pinned encoded bytes", () => {
-  const bytes = encodeIndexedPng(indexedOptions, image);
-  assert.deepEqual(decodePng(bytes), image);
-  assert.deepEqual(encodeIndexedPng(indexedOptions, image), bytes);
-  assert.equal(
-    hash(bytes),
-    "0cdb21fb95284f8589a3c7d56ad1e2179ef75aa003db69db37ad1fffa675aaba",
-  );
-});
-
-test("RGBA PNG preserves transparent RGB, alpha and pinned explicit compression bytes", () => {
-  const bytes = encodeRgbaPng(rgbaOptions, image);
-  assert.deepEqual(decodePng(bytes), image);
-  assert.deepEqual(encodeRgbaPng(rgbaOptions, image), bytes);
-  assert.equal(
-    hash(bytes),
-    "7dea245da66c077a0d2cc763057b15c24af98c609bd06a680d57978f0a1a893b",
-  );
+test("indexed and RGBA PNG preserve transparent RGB, alpha and pinned explicit compression bytes", () => {
+  for (const [name, encode, sha256] of [
+    [
+      "indexed",
+      () => encodeIndexedPng(indexedOptions, image),
+      "0cdb21fb95284f8589a3c7d56ad1e2179ef75aa003db69db37ad1fffa675aaba",
+    ],
+    [
+      "RGBA",
+      () => encodeRgbaPng(rgbaOptions, image),
+      "7dea245da66c077a0d2cc763057b15c24af98c609bd06a680d57978f0a1a893b",
+    ],
+  ]) {
+    const bytes = encode();
+    assert.deepEqual(decodePng(bytes), image, `${name} decode`);
+    assert.deepEqual(encode(), bytes, `${name} deterministic`);
+    assert.equal(hash(bytes), sha256, `${name} pinned bytes`);
+  }
 });
 
 const opaque = {
@@ -89,28 +89,30 @@ test("RGB PNG writes colour type 2 and decodes to the opaque input", () => {
   assert.deepEqual(decodePng(bytes), opaque);
 });
 
-for (const alpha of [0, 128, 254]) {
-  test(`RGB PNG rejects alpha ${alpha}`, () => {
+test("RGB PNG rejects any alpha other than 255", () => {
+  for (const alpha of [0, 128, 254]) {
     const data = opaque.data.slice();
     data[4 * 4 + 3] = alpha;
-    assert.throws(() => encodeRgbPng(rgbaOptions, { ...opaque, data }), {
-      name: "RangeError",
-      message: `Pixel 4 has alpha ${alpha}, not 255`,
-    });
-  });
-}
+    assert.throws(
+      () => encodeRgbPng(rgbaOptions, { ...opaque, data }),
+      { name: "RangeError", message: `Pixel 4 has alpha ${alpha}, not 255` },
+      `alpha ${alpha}`,
+    );
+  }
+});
 
-for (const [width, height] of [
-  [0, 0],
-  [0, 2],
-  [2, 0],
-]) {
-  test(`RGB PNG encodes ${width}x${height} like RGBA PNG`, () => {
+test("RGB PNG encodes empty dimensions like RGBA PNG", () => {
+  for (const [width, height] of [
+    [0, 0],
+    [0, 2],
+    [2, 0],
+  ]) {
+    const name = `${width}x${height}`;
     const empty = { width, height, data: new Uint8Array(0) };
     const rgb = encodeRgbPng(rgbaOptions, empty);
     const rgba = encodeRgbaPng(rgbaOptions, empty);
-    assert.deepEqual(rgb.subarray(16, 24), rgba.subarray(16, 24));
-    assert.equal(rgb[COLOUR_TYPE_OFFSET], 2);
-    assert.equal(rgba[COLOUR_TYPE_OFFSET], 6);
-  });
-}
+    assert.deepEqual(rgb.subarray(16, 24), rgba.subarray(16, 24), `${name} IHDR dimensions`);
+    assert.equal(rgb[COLOUR_TYPE_OFFSET], 2, `${name} RGB colour type`);
+    assert.equal(rgba[COLOUR_TYPE_OFFSET], 6, `${name} RGBA colour type`);
+  }
+});

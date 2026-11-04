@@ -150,27 +150,27 @@ test("page build shares decoding, bypasses supplied images and preserves metadat
   );
 });
 
-for (const [name, sizes] of [
-  [
-    "wide strips",
+test("packs wide strips and tall and wide rectangles once into bounded nonoverlapping extruded cells", () => {
+  for (const [name, sizes] of [
     [
-      [672, 42],
-      [384, 80],
-      [300, 36],
-      [250, 26],
+      "wide strips",
+      [
+        [672, 42],
+        [384, 80],
+        [300, 36],
+        [250, 26],
+      ],
     ],
-  ],
-  [
-    "tall and wide rectangles",
     [
-      [48, 720],
-      [640, 96],
-      [336, 272],
-      [96, 204],
+      "tall and wide rectangles",
+      [
+        [48, 720],
+        [640, 96],
+        [336, 272],
+        [96, 204],
+      ],
     ],
-  ],
-]) {
-  test(`packs ${name} once into bounded nonoverlapping extruded cells`, () => {
+  ]) {
     const items = sizes.map((size, index) => item(index, size));
     const extrude = 1;
     const maxSize = 2048;
@@ -178,14 +178,14 @@ for (const [name, sizes] of [
       { ...policy, extrude, maxSize, widths: [maxSize] },
       items,
     );
-    assert.ok(result);
+    assert.ok(result, `${name} packs`);
     const placed = [];
     for (const page of result.pages) {
-      assert.ok(page.width <= maxSize && page.height <= maxSize);
+      assert.ok(page.width <= maxSize && page.height <= maxSize, `${name} page size`);
       const cells = [];
       for (const { at, item: entry } of page.placed) {
         placed.push(entry.value);
-        assert.equal(at.length, entry.rectangles.length);
+        assert.equal(at.length, entry.rectangles.length, `${name} placements`);
         for (const [index, rectangle] of entry.rectangles.entries()) {
           const left = at[index].x - extrude;
           const top = at[index].y - extrude;
@@ -196,6 +196,7 @@ for (const [name, sizes] of [
               top >= 0 &&
               right <= page.width &&
               bottom <= page.height,
+            `${name} cell within page`,
           );
           for (const other of cells) {
             assert.ok(
@@ -203,6 +204,7 @@ for (const [name, sizes] of [
                 other.right <= left ||
                 bottom <= other.top ||
                 other.bottom <= top,
+              `${name} cells do not overlap`,
             );
           }
           cells.push({ left, top, right, bottom });
@@ -212,9 +214,10 @@ for (const [name, sizes] of [
     assert.deepEqual(
       placed.sort((a, b) => a - b),
       items.map(({ value }) => value),
+      `${name} places every item once`,
     );
-  });
-}
+  }
+});
 
 test("page build propagates synchronous and asynchronous codec failures by identity", async () => {
   const failure = new Error("codec failure");

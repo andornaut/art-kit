@@ -66,18 +66,19 @@ test('export uses literal executable/paths, ordered commands and final-only colu
   });
 });
 
-test('failed source process stops sheet export and cleans temporary script', async () => {
-  await fixture(`${recorder}\nprocess.exit(7);`, async (scratch, executable, log) => {
-    await assert.rejects(exportSprite(executable, [], tags, join(scratch, 'a'), join(scratch, 'b'), join(scratch, 'c')), /failed \(7\)/);
-    const call = JSON.parse((await readFile(log, 'utf8')).trim());
-    await assert.rejects(stat(call.args[2]), { code: 'ENOENT' });
-  });
-});
-
-test('sheet process and missing executable failures propagate', async () => {
-  await fixture(`${recorder}\nif(process.argv[3] !== '--script') process.exit(9);`, async (scratch, executable) => {
-    const paths = ['a', 'b', 'c'].map(name => join(scratch, name));
-    await assert.rejects(exportSprite(executable, [], tags, ...paths), /failed \(9\)/);
-    await assert.rejects(exportSprite(join(scratch, 'missing'), [], tags, ...paths), { code: 'ENOENT' });
-  });
+test('source, sheet and missing executable failures propagate, and a failed source stops sheet export', async () => {
+  const cases = [
+    ['source process', 'process.exit(7);', (executable) => executable, /failed \(7\)/, 1],
+    ['sheet process', "if(process.argv[3] !== '--script') process.exit(9);", (executable) => executable, /failed \(9\)/, 2],
+    ['missing executable', '', (_, scratch) => join(scratch, 'missing'), { code: 'ENOENT' }, 0],
+  ];
+  for (const [name, exit, run, error, calls] of cases) {
+    await fixture(`${recorder}\n${exit}`, async (scratch, executable, log) => {
+      const paths = ['a', 'b', 'c'].map(path => join(scratch, path));
+      await assert.rejects(exportSprite(run(executable, scratch), [], tags, ...paths), error, name);
+      const logged = calls ? (await readFile(log, 'utf8')).trim().split('\n').map(JSON.parse) : [];
+      assert.equal(logged.length, calls, `${name} process count`);
+      if (calls) await assert.rejects(stat(logged[0].args[2]), { code: 'ENOENT' }, `${name} removes the temporary script`);
+    });
+  }
 });
