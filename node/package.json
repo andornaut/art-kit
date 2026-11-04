@@ -11,6 +11,7 @@
     "./png": { "types": "./dist/png.d.ts", "import": "./dist/png.js" },
     "./webp": { "types": "./dist/webp.d.ts", "import": "./dist/webp.js" },
     "./aseprite": { "types": "./dist/aseprite.d.ts", "import": "./dist/aseprite.js" },
+    "./draw": { "types": "./dist/draw.d.ts", "import": "./dist/draw.js" },
     "./colour": { "types": "./dist/colour.d.ts", "import": "./dist/colour.js" },
     "./fonts": { "types": "./dist/fonts.d.ts", "import": "./dist/fonts.js" },
     "./frames": { "types": "./dist/frames.d.ts", "import": "./dist/frames.js" },
