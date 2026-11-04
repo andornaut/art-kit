@@ -102,9 +102,13 @@ Python 3.12 or newer, Pillow 13.0.0 and optional Aseprite for exports. Ruff is p
 
 Node requires 24.21.0 or newer and exact peer dependencies `pngjs@7.0.0` and `@jsquash/webp@1.5.0`. WebP uses the non-SIMD WASM codecs supplied by that peer package.
 
-Run `scripts/check.sh` with explicit read-only Pillow, Ruff binary and build-dependency paths as documented by its usage. Checks run offline inside `python:3.12`, with four CPUs, a read-only source checkout and writable scratch only. The standard gate runs library tests and builds the wheel. Game projects assume library contracts are correct and test their own adapters and authored output. No game build or generation is part of the package gate.
+Every check, build and provisioning step runs in a container as the dedicated uid 19001 (`--user 19001:19001 -e HOME=/tmp`), which owns nothing on the host, with four CPUs, a read-only root, no capabilities and no network except while provisioning. Host paths are read-only bind mounts and must be readable by uid 19001 through their group or world bits; the container receives each mounted path's group. Writable state lives in a per-run named volume at `/tmp`, results are copied out with `docker cp` as the host user, and the container and volume are removed on exit. No host credential store or socket is mounted. Scripts start only below one-minute load 24 and discard results when Git status or listed file contents change during the run.
 
-`bash scripts/check-node.sh <readonly-node_modules>` compiles the current tree in scratch, packs and installs the compiled tarball into scratch `node_modules/@andornaut/art-kit`, then runs the Node tests against that installed package with `node:test`. Supply the pinned dependencies required by the script.
+`bash scripts/provision.sh <empty-directory>` downloads the pinned dependencies into `python/` (Pillow, Ruff, setuptools, wheel) and `node/node_modules`. CI runs the same scripts with those paths.
+
+Run `scripts/check.sh` with explicit Pillow, Ruff binary and build-dependency paths as documented by its usage. It runs offline inside `python:3.12` against the read-only checkout, runs library tests and builds the wheel. Game projects assume library contracts are correct and test their own adapters and authored output. No game build or generation is part of the package gate.
+
+`bash scripts/check-node.sh <node_modules>` copies the current tree into the container, compiles it, packs and installs the compiled tarball into `node_modules/@andornaut/art-kit`, then runs the Node tests against that installed package with `node:test`. Both checks copy their evidence to a new directory under `.claude/`.
 
 ## Version and licence
 
@@ -121,6 +125,6 @@ Released clients use `.venv-art/bin/python -I` and the wheel installed into that
 
 The Node release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`, using the same version from `pyproject.toml`. Consumers pin the published tarball and exact peers through their own dependency integration, without registry publication or a source fallback. The tarball contains compiled ESM and `.d.ts` files, not source TypeScript as runtime code.
 
-After building the wheel, run `bash scripts/pack-node.sh <readonly-node_modules> <output-directory>` with the same output directory. It archives exact `HEAD`, requires the existing `SOURCE_COMMIT` to match that commit, adds `art-kit-<version>.tgz` and recomputes the combined `SHA256SUMS`. Both artifacts share the same source identity.
+After building the wheel, run `bash scripts/pack-node.sh <node_modules> <output-directory>` with the same output directory. It archives exact `HEAD`, requires the existing `SOURCE_COMMIT` to match that commit, adds `art-kit-<version>.tgz` and recomputes the combined `SHA256SUMS`. Both artifacts share the same source identity.
 
 Before creating the immutable `v<version>` tag for the version declared in `pyproject.toml`, verify that every required CI workflow has completed successfully on the exact release commit on `main`. Publish that commit's checked wheel, Node tarball, `SHA256SUMS` and `SOURCE_COMMIT` as GitHub release assets; do not substitute an earlier artifact. Consumers adopt the published URL and checksum through their own integration process.

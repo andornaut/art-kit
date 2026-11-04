@@ -7,7 +7,10 @@ const [mode, revision] = process.argv.slice(2);
 if (!['check', 'pack'].includes(mode)) throw new Error('Expected check or pack mode');
 // Dependencies are mounted outside a conventional node_modules directory.
 process.env.NODE_PATH = '/deps';
-const root = '/work/source';
+// Inputs and outputs live in the container's writable /tmp volume; the caller copies /tmp/out out.
+const work = '/tmp/work';
+const out = '/tmp/out';
+const root = `${work}/source`;
 const descriptor = JSON.parse(readFileSync(`${root}/node/package.json`, 'utf8'));
 for (const [name, expected] of Object.entries({ ...descriptor.devDependencies, ...descriptor.peerDependencies })) {
   const actual = JSON.parse(readFileSync(`/deps/${name}/package.json`, 'utf8')).version;
@@ -16,25 +19,25 @@ for (const [name, expected] of Object.entries({ ...descriptor.devDependencies, .
 const version = readFileSync(`${root}/pyproject.toml`, 'utf8').match(/^version = "([^"]+)"$/m)?.[1];
 if (!version) throw new Error('Missing project version');
 if (mode === 'pack') {
-  const identity = '/out/SOURCE_COMMIT';
+  const identity = `${out}/SOURCE_COMMIT`;
   if (!existsSync(identity) || readFileSync(identity, 'utf8') !== `${revision}\n`) throw new Error('Existing SOURCE_COMMIT must match the release revision');
   const expectedWheel = `art_kit-${version}-py3-none-any.whl`;
-  const existing = readdirSync('/out');
+  const existing = readdirSync(out);
   if (!existing.includes(expectedWheel)) throw new Error(`Missing expected wheel: ${expectedWheel}`);
   if (existing.some(name => name.endsWith('.whl') && name !== expectedWheel) || existing.some(name => name.endsWith('.tgz'))) throw new Error('Unexpected or stale release artifact');
 }
 symlinkSync('/deps', `${root}/node/node_modules`);
 execFileSync('node', ['/deps/typescript/bin/tsc', '-p', `${root}/node/tsconfig.json`], { stdio: 'inherit' });
-const packageDir = '/work/package';
+const packageDir = `${work}/package`;
 mkdirSync(packageDir);
 cpSync(`${root}/node/dist`, `${packageDir}/dist`, { recursive: true });
 cpSync(`${root}/LICENSE`, `${packageDir}/LICENSE`);
 const { devDependencies, ...published } = descriptor;
 writeFileSync(`${packageDir}/package.json`, `${JSON.stringify({ ...published, version }, null, 2)}\n`);
 writeFileSync(`${packageDir}/SOURCE_COMMIT`, `${revision}\n`);
-execFileSync('npm', ['pack', '--ignore-scripts', '--offline', '--pack-destination', '/work', packageDir], { stdio: 'inherit' });
-const archive = `/work/andornaut-art-kit-${version}.tgz`;
-const install = '/work/installed';
+execFileSync('npm', ['pack', '--ignore-scripts', '--offline', '--pack-destination', work, packageDir], { stdio: 'inherit' });
+const archive = `${work}/andornaut-art-kit-${version}.tgz`;
+const install = `${work}/installed`;
 mkdirSync(`${install}/node_modules/@andornaut`, { recursive: true });
 execFileSync('tar', ['-xzf', archive, '-C', `${install}/node_modules/@andornaut`]);
 execFileSync('mv', [`${install}/node_modules/@andornaut/package`, `${install}/node_modules/@andornaut/art-kit`]);
@@ -75,15 +78,16 @@ if (mode === 'check') {
     return target;
   });
   execFileSync('node', ['--test', '--test-concurrency=4', ...targets], { cwd: install, stdio: 'inherit' });
+  cpSync(archive, `${out}/andornaut-art-kit-${version}.tgz`);
 } else {
-  const identity = '/out/SOURCE_COMMIT';
+  const identity = `${out}/SOURCE_COMMIT`;
   if (existsSync(identity) && readFileSync(identity, 'utf8') !== `${revision}\n`) throw new Error('Existing SOURCE_COMMIT differs');
-  const existing = readdirSync('/out');
+  const existing = readdirSync(out);
   if (existing.some(name => name.endsWith('.whl') && name !== `art_kit-${version}-py3-none-any.whl`) || existing.some(name => name.endsWith('.tgz'))) throw new Error('Unexpected or stale release artifact');
-  const target = `/out/art-kit-${version}.tgz`;
+  const target = `${out}/art-kit-${version}.tgz`;
   if (existsSync(target)) throw new Error('Node artifact already exists');
   cpSync(archive, target);
   writeFileSync(identity, `${revision}\n`);
-  const artifacts = readdirSync('/out').filter(name => name.endsWith('.whl') || name.endsWith('.tgz') || name === 'SOURCE_COMMIT').sort();
-  writeFileSync('/out/SHA256SUMS', artifacts.map(name => `${createHash('sha256').update(readFileSync(`/out/${name}`)).digest('hex')}  ${name}\n`).join(''));
+  const artifacts = readdirSync(out).filter(name => name.endsWith('.whl') || name.endsWith('.tgz') || name === 'SOURCE_COMMIT').sort();
+  writeFileSync(`${out}/SHA256SUMS`, artifacts.map(name => `${createHash('sha256').update(readFileSync(`${out}/${name}`)).digest('hex')}  ${name}\n`).join(''));
 }

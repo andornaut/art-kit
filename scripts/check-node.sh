@@ -3,29 +3,23 @@ set -euo pipefail
 [[ $# = 1 ]] || { echo 'Usage: check-node.sh <node_modules-directory>' >&2; exit 2; }
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 deps=$(realpath "$1")
-check_load=$(cut -d ' ' -f 1 /proc/loadavg)
-awk -v check_load="$check_load" 'BEGIN { exit !(check_load < 24) }' || { echo 'One-minute load must be below 24' >&2; exit 1; }
+# shellcheck source=scripts/container.sh
+source "$root/scripts/container.sh"
+require_idle
 mkdir -p "$root/.claude"
-scratch=$(mktemp -d "$root/.claude/node.XXXXXXXX")
-fingerprint() {
-  { git -C "$root" status --porcelain=v1 -z; git -C "$root" ls-files --cached --others --exclude-standard -z | sort -z | while IFS= read -r -d '' path; do sha256sum "$root/$path"; done; } | sha256sum
-}
-before=$(fingerprint)
-finish() {
-  result=$?
-  trap - EXIT
-  [[ "$before" = "$(fingerprint)" ]] || { echo 'Source changed; discard check result' >&2; exit 1; }
-  exit "$result"
-}
-trap finish EXIT
-mkdir -p "$scratch/source"
+evidence=$(mktemp -d "$root/.claude/node.XXXXXXXX")
+guard_source "$root"
 revision=$(git -C "$root" rev-parse HEAD)
-cp -R "$root/node" "$root/scripts" "$root/pyproject.toml" "$root/LICENSE" "$scratch/source/"
-docker run --rm --read-only --network none --cpus 4 -u "$(id -u):$(id -g)" \
-  --mount "type=bind,source=$scratch,target=/work" \
-  --mount "type=bind,source=$deps,target=/deps,readonly" \
-  --tmpfs "/tmp:exec,uid=$(id -u),gid=$(id -g)" \
-  -e HOME=/tmp -e npm_config_cache=/tmp/npm-cache \
-  -e ART_KIT_TEST_FONTS=/work/source/node/tests/fixtures \
-  -w /work node:24.21.0 node /work/source/scripts/node-package.mjs check "$revision"
-echo "Node evidence: $scratch"
+container_init art-kit-node none
+readonly_mount "$root" /app
+readonly_mount "$deps" /deps
+docker run "${container_args[@]}" -e "REVISION=$revision" -e npm_config_cache=/tmp/npm-cache \
+  -e ART_KIT_TEST_FONTS=/tmp/work/source/node/tests/fixtures -w /tmp node:24.21.0 bash -ec '
+  umask 022
+  mkdir -p /tmp/work/source /tmp/out
+  cp -R /app/node /app/scripts /app/pyproject.toml /app/LICENSE /tmp/work/source/
+  exec node /tmp/work/source/scripts/node-package.mjs check "$REVISION"
+'
+docker cp "$container:/tmp/out/." "$evidence"
+verify_source
+echo "Node evidence: $evidence"

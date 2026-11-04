@@ -16,52 +16,18 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-      - name: Prepare pinned tools in an isolated container
-        run: |
-          mkdir -p .claude/dependencies
-          docker run --rm --cpus 4 -u "$(id -u):$(id -g)" \
-            --mount "type=bind,source=$PWD/.claude/dependencies,target=/deps" \
-            --tmpfs "/tmp:uid=$(id -u),gid=$(id -g)" \
-            -e HOME=/tmp python:3.12 python -I -m pip install --no-cache-dir --target /deps \
-            Pillow==13.0.0 ruff==0.17.2 setuptools==84.2.1 wheel==0.48.0
-      - name: Prepare pinned Node tools in an isolated container
-        run: |
-          mkdir -p .claude/node-dependencies
-          docker run --rm --cpus 4 -u "$(id -u):$(id -g)" \
-            --mount "type=bind,source=$PWD/node/package.json,target=/descriptor.json,readonly" \
-            --mount "type=bind,source=$PWD/.claude/node-dependencies,target=/tools" \
-            --tmpfs "/tmp:uid=$(id -u),gid=$(id -g)" \
-            -e HOME=/tmp -w /tools node:24.21.0 bash -ec '
-              node --input-type=module -e '\''import {readFileSync,writeFileSync} from "node:fs"; const p=JSON.parse(readFileSync("/descriptor.json")); writeFileSync("package.json", JSON.stringify({private:true,dependencies:{...p.devDependencies,...p.peerDependencies}}))'\''
-              npm install --ignore-scripts --no-audit --no-fund --cache /tmp/npm-cache
-              (cd node_modules/skia-canvas && node lib/prebuild.mjs download)
-            '
+      - name: Provision pinned dependencies in isolated containers
+        run: bash scripts/provision.sh .claude/dependencies
       - name: Check Node package and required native font rendering offline
-        run: bash scripts/check-node.sh .claude/node-dependencies/node_modules
+        run: bash scripts/check-node.sh .claude/dependencies/node/node_modules
       - name: Check offline in an isolated container
-        run: bash scripts/check.sh .claude/dependencies .claude/dependencies/bin/ruff .claude/dependencies
+        run: bash scripts/check.sh .claude/dependencies/python .claude/dependencies/python/bin/ruff .claude/dependencies/python
       - name: Build committed release artifacts offline
-        run: bash scripts/pack.sh .claude/dependencies .claude/release-output
+        run: bash scripts/pack.sh .claude/dependencies/python .claude/release-output
       - name: Build committed Node release artifact offline
-        run: bash scripts/pack-node.sh .claude/node-dependencies/node_modules .claude/release-output
+        run: bash scripts/pack-node.sh .claude/dependencies/node/node_modules .claude/release-output
       - name: Verify installed wheel offline
-        run: |
-          docker run --rm --read-only --network none --cpus 4 -u "$(id -u):$(id -g)" \
-            --mount "type=bind,source=$PWD/pyproject.toml,target=/pyproject.toml,readonly" \
-            --mount "type=bind,source=$PWD/.claude/release-output,target=/release,readonly" \
-            --mount "type=bind,source=$PWD/.claude/dependencies,target=/deps,readonly" \
-            --tmpfs "/tmp:exec,uid=$(id -u),gid=$(id -g)" \
-            -e HOME=/tmp -e EXPECTED_COMMIT="$GITHUB_SHA" -w /tmp python:3.12 bash -ec '
-              EXPECTED_VERSION=$(python -I -c '\''import tomllib; print(tomllib.load(open("/pyproject.toml", "rb"))["project"]["version"])'\'')
-              export EXPECTED_VERSION
-              cd /release
-              sha256sum --check SHA256SUMS
-              test "$(cat SOURCE_COMMIT)" = "$EXPECTED_COMMIT"
-              python -I -m venv /tmp/venv
-              /tmp/venv/bin/python -I -m pip install --no-index --no-deps /release/art_kit-*.whl
-              printf "/deps\n" > /tmp/venv/lib/python3.12/site-packages/pillow.pth
-              /tmp/venv/bin/python -I -c "import importlib.metadata as m, os, pathlib, sys; import art_kit; from art_kit import aseprite, colour, fonts, frames, grid; import PIL; package = pathlib.Path(art_kit.__file__).resolve().parent; assert package.is_relative_to(pathlib.Path(sys.prefix)); assert (package / '\''SOURCE_COMMIT'\'').read_text().strip() == os.environ['\''EXPECTED_COMMIT'\'']; assert m.version('\''art-kit'\'') == os.environ['\''EXPECTED_VERSION'\'']; assert PIL.__version__ == '\''13.0.0'\''"
-            '
+        run: bash scripts/verify-wheel.sh .claude/dependencies/python .claude/release-output "$GITHUB_SHA"
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: art-kit-${{ github.sha }}
