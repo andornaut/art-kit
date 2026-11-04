@@ -359,6 +359,24 @@ async function drawFixtures(pillowPath: string): Promise<void> {
   });
 }
 
+// Python art_kit fonts.pack and bmfont_xml references for the packed glyph atlas layout. The v0.10.0 and v0.5.0
+// modules stream from git show into the container.
+async function bmfontFixtures(pillowPath: string): Promise<void> {
+  const pillow = realpathSync(pillowPath);
+  requireIdle();
+  const references = { 'fonts_v0100.py': 'v0.10.0', 'fonts_v050.py': 'v0.5.0' };
+  const spec: ContainerSpec = { network: 'none', env: { PYTHONDONTWRITEBYTECODE: '1' }, mounts: [[join(root, 'node/tests'), '/tests'], [pillow, '/deps']] };
+  await withContainer(spec, 'art-kit-bmfont-fixtures', PYTHON_IMAGE, async container => {
+    await createVenv(container, true);
+    await addPaths(container, 'bmfont-deps.pth', ['/deps']);
+    await exec({}, container, ['mkdir', '/tmp/out', '/tmp/references']);
+    for (const [name, tag] of Object.entries(references))
+      await writeFile(container, `/tmp/references/${name}`, git(['show', `${tag}:src/art_kit/fonts.py`]));
+    await exec({}, container, [VENV_PYTHON, '-I', '/tests/bmfont_fixtures.py', '/tmp/references', '/tests/fixtures', '/tmp/out/bmfont-packed.json']);
+    await copyOut(container, '/tmp/out/bmfont-packed.json', join(root, 'node/tests/fixtures/bmfont-packed.json'));
+  });
+}
+
 /** Adds group read, and group search where any execute bit is set, as chmod -R g+rX does. */
 function grantGroupRead(path: string): void {
   const stat = lstatSync(path);
@@ -487,12 +505,14 @@ const USAGE = {
   provision: 'provision <output-directory>',
   'verify-wheel': 'verify-wheel <Pillow dependency directory> <release directory> <expected commit>',
   'draw-fixtures': 'draw-fixtures <Pillow dependency directory>',
+  'bmfont-fixtures': 'bmfont-fixtures <Pillow dependency directory>',
   pillow: 'pillow <generate|crosscheck> <provision-directory>',
 } as const;
 
 const COMMANDS: Record<keyof typeof USAGE, (...args: string[]) => Promise<void>> = {
   check, 'check-node': checkNode, pack, 'pack-node': packNode, provision,
-  'verify-wheel': verifyWheel, 'draw-fixtures': drawFixtures, pillow: pillowReference,
+  'verify-wheel': verifyWheel, 'draw-fixtures': drawFixtures, 'bmfont-fixtures': bmfontFixtures,
+  pillow: pillowReference,
 };
 
 const [command, ...args] = process.argv.slice(2);
