@@ -1,33 +1,37 @@
 import { realpathSync } from "node:fs";
 import { Canvas, FontLibrary } from "skia-canvas";
 
-export interface BitmapFontOptions {
+import type { GlyphKerning, SuppliedBitmapGlyph } from "./glyphAtlas.js";
+
+export interface RasteriseOptions {
   path: string;
   size: number;
-  key: string;
   characters: Iterable<string>;
-  atlasWidth: number;
-  padding?: number;
-  lineHeight?: number;
-  face?: string;
-  base?: number;
-  kerning?: "none" | "all";
+  /** Defaults to true. */
   antialias?: boolean;
+  /** Defaults to true. */
   hinting?: boolean;
+  /** "all" measures every ordered pair of at most 256 unique characters; defaults to "none". */
+  kerning?: "none" | "all";
 }
 
-export interface BitmapGlyph {
-  id: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  xoffset: number;
-  yoffset: number;
-  xadvance: number;
+export interface RasterisedGlyphs {
+  /** Each unique character in order, trimmed to its ink, ready for glyphAtlas. */
+  glyphs: Map<string, SuppliedBitmapGlyph>;
+  /** The face's ascent and descent in pixels as Skia reports them, unrounded. */
+  ascent: number;
+  descent: number;
+  /** The ascent rounded up: the baseline's row from the line's top, which yoffset counts from. */
+  base: number;
+  /** The ascent plus the descent, rounded up. */
+  lineHeight: number;
+  /** Every nonzero rounded pair adjustment, in character order; empty unless kerning is "all". */
+  kernings: GlyphKerning[];
 }
 
 const families = new Map<string, string>();
+// Clear pixels drawn around each glyph's measured ink bounds, which can miss antialiased edges.
+const MARGIN = 8;
 
 function positive(value: number, label: string): number {
   if (!Number.isSafeInteger(value) || value <= 0 || value > 16384) {
@@ -46,37 +50,16 @@ function codePoint(char: string): number {
   return char.codePointAt(0)!;
 }
 
-function quote(value: string): string {
-  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(value)) {
-    throw new RangeError("Invalid XML attribute character");
-  }
-  return `"${value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\t", "&#9;")
-    .replaceAll("\n", "&#10;")
-    .replaceAll("\r", "&#13;")}"`;
-}
-
 /**
- * CPU Skia bitmap atlas. Metrics use outward-rounded ink bounds and nearest
- * integer advances/kerning; no shaping across glyph boundaries is represented.
- * Font files remain immutable after registration. Skia may use system fallback.
- * All-pair kerning is limited to 256 unique characters and retains nonzero amounts.
+ * CPU Skia glyph rasterization. Each glyph is drawn alone, white, and trimmed to the pixels with
+ * nonzero alpha: those are white with coverage in alpha and every other pixel is (0,0,0,0).
+ * Offsets are integers from the pen and the line's top (base rows above the baseline); advances
+ * and kerning round Skia's measurements to the nearest integer. Synthesis and cross-glyph
+ * ligature and contextual substitutions are disabled. Font files remain immutable after
+ * registration, and Skia may use a system fallback font for characters the file lacks.
  */
-export function buildBitmapFont(options: BitmapFontOptions) {
+export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
   const size = positive(options.size, "Font size");
-  const width = positive(options.atlasWidth, "Atlas width");
-  const maxHeight = 16384;
-  const padding = options.padding ?? 1;
-  if (!Number.isSafeInteger(padding) || padding < 1 || padding > 16384) {
-    throw new RangeError("Padding must be an integer in 1..16384");
-  }
-  const key = quote(options.key + ".png");
-  const face = options.face ?? options.key;
-  quote(face);
   const kerning = options.kerning ?? "none";
   if (kerning !== "none" && kerning !== "all")
     throw new RangeError("Kerning must be none or all");
@@ -84,141 +67,94 @@ export function buildBitmapFont(options: BitmapFontOptions) {
   characters.forEach(codePoint);
   if (kerning === "all" && characters.length > 256)
     throw new RangeError("All kerning supports at most 256 unique characters");
-  if (
-    options.base !== undefined &&
-    (!Number.isSafeInteger(options.base) || options.base < 0 || options.base > 16384)
-  )
-    throw new RangeError("Base must be an integer in 0..16384");
+  const antialias = options.antialias ?? true;
+  const hinting = options.hinting ?? true;
   const path = realpathSync(options.path);
-
   let family = families.get(path);
   if (!family) {
     family = `art-kit-bitmap-${families.size}`;
     FontLibrary.use(family, path);
     families.set(path, family);
   }
-  const image = new Canvas(width, 1);
-  image.gpu = false;
-  const context = image.getContext("2d");
-  const configure = () => {
-    context.font = `${size}px "${family}"`;
-    context.textBaseline = "alphabetic";
-    context.fontSynthesis = false;
-    context.fontKerning = "normal";
-    // Atlas entries are separate glyphs, so pair widths must not substitute ligatures.
-    context.fontFeatureSettings = { liga: false, clig: false, dlig: false, hlig: false, rlig: false, calt: false, rclt: false };
-    context.fontHinting = options.hinting ?? true;
-    context.fontSmoothing = options.antialias ?? true;
-    context.fillStyle = "white";
+  const context = (width: number, height: number) => {
+    const canvas = new Canvas(width, height);
+    canvas.gpu = false;
+    const ctx = canvas.getContext("2d");
+    ctx.font = `${size}px "${family}"`;
+    ctx.textBaseline = "alphabetic";
+    ctx.fontSynthesis = false;
+    ctx.fontKerning = "normal";
+    // Glyphs are separate, so pair widths must not substitute ligatures.
+    ctx.fontFeatureSettings = { liga: false, clig: false, dlig: false, hlig: false, rlig: false, calt: false, rclt: false };
+    ctx.fontHinting = hinting;
+    ctx.fontSmoothing = antialias;
+    ctx.fillStyle = "white";
+    return ctx;
   };
-  configure();
-  const metrics = context.measureText(" ");
-  const base = options.base ?? Math.ceil(metrics.fontBoundingBoxAscent);
-  const lineHeight = positive(
-    options.lineHeight ??
-      Math.ceil(metrics.fontBoundingBoxAscent + metrics.fontBoundingBoxDescent),
-    "Line height",
-  );
-  const glyphs = new Map<string, BitmapGlyph>();
+  const measure = context(1, 1);
+  const line = measure.measureText(" ");
+  const ascent = line.fontBoundingBoxAscent;
+  const descent = line.fontBoundingBoxDescent;
+  const base = Math.ceil(ascent);
+  const lineHeight = positive(Math.ceil(ascent + descent), "Line height");
+  const glyphs = new Map<string, SuppliedBitmapGlyph>();
   const advances = new Map<string, number>();
-  let x = padding,
-    y = padding,
-    rowHeight = 0;
   for (const char of characters) {
-    const id = codePoint(char);
-    const m = context.measureText(char);
+    const m = measure.measureText(char);
     advances.set(char, m.width);
+    const xadvance = Math.round(m.width);
     const left = Math.floor(-m.actualBoundingBoxLeft);
     const top = Math.floor(-m.actualBoundingBoxAscent);
     const w = Math.max(0, Math.ceil(m.actualBoundingBoxRight) - left);
     const h = Math.max(0, Math.ceil(m.actualBoundingBoxDescent) - top);
-    const hasInk = w > 0 && h > 0;
-    if (hasInk) {
-      if (w + padding * 2 > width)
-        throw new RangeError(`Glyph ${char} exceeds atlas width`);
-      if (x + w + padding > width) {
-        x = padding;
-        y += rowHeight + padding;
-        rowHeight = 0;
+    if (!w || !h) {
+      glyphs.set(char, { image: undefined, xadvance, xoffset: 0, yoffset: 0 });
+      continue;
+    }
+    const width = positive(w + 2 * MARGIN, "Glyph width");
+    const height = positive(h + 2 * MARGIN, "Glyph height");
+    const ctx = context(width, height);
+    ctx.fillText(char, MARGIN - left, MARGIN - top);
+    const { data } = ctx.getImageData(0, 0, width, height);
+    let [x0, y0, x1, y1] = [width, height, -1, -1];
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++)
+        if (data[(y * width + x) * 4 + 3]) {
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+          y0 = Math.min(y0, y);
+          y1 = Math.max(y1, y);
+        }
+    if (x1 < 0) {
+      glyphs.set(char, { image: undefined, xadvance, xoffset: 0, yoffset: 0 });
+      continue;
+    }
+    const iw = x1 - x0 + 1,
+      ih = y1 - y0 + 1;
+    const pixels = new Uint8Array(iw * ih * 4);
+    for (let y = 0; y < ih; y++)
+      for (let x = 0; x < iw; x++) {
+        const alpha = data[((y0 + y) * width + x0 + x) * 4 + 3];
+        if (alpha) pixels.set([255, 255, 255, alpha], (y * iw + x) * 4);
       }
-      if (y + h + padding > maxHeight)
-        throw new RangeError("Font exceeds maximum atlas height");
-    }
     glyphs.set(char, {
-      id,
-      x: hasInk ? x : 0,
-      y: hasInk ? y : 0,
-      width: hasInk ? w : 0,
-      height: hasInk ? h : 0,
-      xoffset: hasInk ? left : 0,
-      yoffset: hasInk ? base + top : 0,
-      xadvance: Math.round(m.width),
+      image: { data: pixels, height: ih, width: iw },
+      xadvance,
+      xoffset: left - MARGIN + x0,
+      yoffset: base + top - MARGIN + y0,
     });
-    if (hasInk) {
-      x += w + padding;
-      rowHeight = Math.max(rowHeight, h);
-    }
   }
-  const kernings = [] as { first: number; second: number; amount: number }[];
+  const kernings: GlyphKerning[] = [];
   if (kerning === "all")
     for (const first of characters)
       for (const second of characters) {
         const amount = Math.round(
-          context.measureText(first + second).width -
+          measure.measureText(first + second).width -
             advances.get(first)! -
             advances.get(second)!,
         );
         if (amount !== 0)
           kernings.push({ first: codePoint(first), second: codePoint(second), amount });
       }
-  image.height = Math.max(1, y + rowHeight + padding);
-  if (image.height > maxHeight)
-    throw new RangeError("Font exceeds maximum atlas height");
-  configure();
-  for (const [char, glyph] of glyphs) {
-    if (glyph.width && glyph.height)
-      context.fillText(
-        char,
-        glyph.x - glyph.xoffset,
-        glyph.y - glyph.yoffset + base,
-      );
-  }
-  const aa = Number(options.antialias ?? true);
-  const lines = [
-    '<?xml version="1.0"?>',
-    "<font>",
-    `  <info face=${quote(face)} size="${size}" bold="0" italic="0" unicode="1" smooth="${aa}" aa="${aa}"/>`,
-    `  <common lineHeight="${lineHeight}" base="${base}" scaleW="${width}" scaleH="${image.height}" pages="1" packed="0"/>`,
-    `  <pages><page id="0" file=${key}/></pages>`,
-    `  <chars count="${glyphs.size}">`,
-  ];
-  for (const glyph of glyphs.values()) {
-    lines.push(
-      `    <char ${Object.entries(glyph)
-        .map(([k, v]) => `${k}="${v}"`)
-        .join(" ")} page="0" chnl="15"/>`,
-    );
-  }
-  lines.push("  </chars>", `  <kernings count="${kernings.length}">`);
-  for (const k of kernings)
-    lines.push(
-      `    <kerning first="${k.first}" second="${k.second}" amount="${k.amount}"/>`,
-    );
-  lines.push("  </kernings>", "</font>", "");
-  return {
-    image,
-    xml: lines.join("\n"),
-    metadata: {
-      glyphs,
-      kernings,
-      size,
-      face,
-      kerning,
-      base,
-      lineHeight,
-      antialias: Boolean(aa),
-      hinting: options.hinting ?? true,
-      fallback: "system" as const,
-    },
-  };
+  return { ascent, base, descent, glyphs, kernings, lineHeight };
 }

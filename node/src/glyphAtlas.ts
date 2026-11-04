@@ -1,6 +1,16 @@
-import type { BitmapGlyph } from "./fonts.js";
 import { blankImage, blitExtruded, type RgbaImage } from "./rgbaImage.js";
 
+/** A packed glyph's code point, atlas rect and metrics, as the BMFont char element writes them. */
+export interface BitmapGlyph {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  xoffset: number;
+  yoffset: number;
+  xadvance: number;
+}
 export interface SuppliedBitmapGlyph {
   image: RgbaImage | undefined;
   xoffset: number;
