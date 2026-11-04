@@ -115,8 +115,8 @@ export function filledImage(rgba: Rgba, width: number, height: number): RgbaImag
   return { data, height, width };
 }
 
-/** The RGB of a frame colour name: the resolver's, or the palette entry's (else the name's) hex. */
-export function colourResolver(context: ColourContext): (colour: string) => Rgb {
+// The RGB of a frame colour name: the resolver's, or the palette entry's (else the name's) hex.
+function colourResolver(context: ColourContext): (colour: string) => Rgb {
   if (typeof context.resolveRgb === "function") return context.resolveRgb as (colour: string) => Rgb;
   const palette = context as Readonly<Record<string, string>>;
   return (name) => rgb(Object.hasOwn(palette, name) ? palette[name] : name);
@@ -140,6 +140,30 @@ export function frameToRgba(context: ColourContext, frame: Frame): RgbaImage {
     }),
   );
   return out;
+}
+
+export interface SheetOptions {
+  columns: number;
+  cellWidth: number;
+  cellHeight: number;
+}
+
+/**
+ * The images in row order, one per cell from the top-left, each copied exactly (RGBA, without
+ * blending or scaling) and clipped to its cell; unused cells are (0,0,0,0).
+ */
+export function composeSheet({ columns, cellWidth, cellHeight }: SheetOptions, images: readonly RgbaImage[]): RgbaImage {
+  positive(columns, "Columns");
+  positive(cellWidth, "Cell width");
+  positive(cellHeight, "Cell height");
+  if (!images.length) throw new RangeError("Sheet requires images");
+  images.forEach(image);
+  const sheet = filledImage([0, 0, 0, 0], columns * cellWidth, Math.ceil(images.length / columns) * cellHeight);
+  images.forEach((source, i) => {
+    const cell = { height: Math.min(cellHeight, source.height), width: Math.min(cellWidth, source.width), x: 0, y: 0 };
+    paste({ at: { x: (i % columns) * cellWidth, y: Math.floor(i / columns) * cellHeight } }, crop(cell, source), sheet);
+  });
+  return sheet;
 }
 
 export interface FillOptions {
@@ -464,7 +488,7 @@ export function mapChannels(
  * An opaque preview with one row per sprite and ground, tags flattened in order, built in memory
  * so that its size is not limited by a canvas. Cells are separated by gap and scaled by scale.
  * "largest-frame" sizes every cell from the largest frame (row height from the row's tallest) and
- * draws each frame over its ground, matching frames.renderContactSheet. "row-first-frame" sizes
+ * draws each frame over its ground. "row-first-frame" sizes
  * cell width from the widest first frame and row height from each row's first frame, paints every
  * frame cell (empty cells in the ground colour) and lets later frames overwrite earlier overflow.
  */

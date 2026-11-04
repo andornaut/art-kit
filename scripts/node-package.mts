@@ -12,7 +12,7 @@ interface Descriptor {
 }
 
 // Subpaths that import the optional Skia peer; every other export must import without the optional peers.
-const SKIA_SUBPATHS = ['fonts', 'frames', 'generate'];
+const SKIA_SUBPATHS = ['fonts'];
 
 const [mode, revision] = process.argv.slice(2);
 if (!['check', 'pack'].includes(mode)) throw new Error('Expected check or pack mode');

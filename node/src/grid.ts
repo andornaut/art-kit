@@ -75,6 +75,11 @@ export function opaqueCols(frames: readonly Frame[]): [number, number] | null {
   return max < 0 ? null : [min, max];
 }
 
+/** The frame mirrored left to right. */
+export function flipped(frame: Frame): Frame {
+  return frame.map((row) => [...row].reverse());
+}
+
 export class Grid {
   px: Frame;
   close = false;

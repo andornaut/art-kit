@@ -18,11 +18,9 @@
     "./draw": { "types": "./dist/draw.d.ts", "import": "./dist/draw.js" },
     "./colour": { "types": "./dist/colour.d.ts", "import": "./dist/colour.js" },
     "./fonts": { "types": "./dist/fonts.d.ts", "import": "./dist/fonts.js" },
-    "./frames": { "types": "./dist/frames.d.ts", "import": "./dist/frames.js" },
     "./grid": { "types": "./dist/grid.d.ts", "import": "./dist/grid.js" },
     "./raster": { "types": "./dist/raster.d.ts", "import": "./dist/raster.js" },
-    "./glyphAtlas": { "types": "./dist/glyphAtlas.d.ts", "import": "./dist/glyphAtlas.js" },
-    "./generate": { "types": "./dist/generate.d.ts", "import": "./dist/generate.js" }
+    "./glyphAtlas": { "types": "./dist/glyphAtlas.d.ts", "import": "./dist/glyphAtlas.js" }
   },
   "files": ["dist", "LICENSE", "SOURCE_COMMIT"],
   "peerDependencies": { "@jsquash/webp": "1.5.0", "pngjs": "7.0.0", "skia-canvas": "4.0.0" },

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
-import { renderContactSheet, renderFrame } from "@andornaut/art-kit/frames";
+import { createHash } from "node:crypto";
 import * as raster from "@andornaut/art-kit/raster";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
@@ -98,25 +98,28 @@ test("nearest resize matches Pillow 13.0.0 sample indices for non-integer ratios
   }
 });
 
-function pixels(canvas) {
-  return [...canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data];
-}
-
-test("frameToRgba resolves colours as renderFrame does", () => {
+test("frameToRgba resolves palette names, hex colours and callbacks", () => {
   const frame = [
     ["a", null, "102030"],
     [null, "toString", "a"],
   ];
   const palette = { a: "ff8000", toString: "0000ff" };
   const image = raster.frameToRgba(palette, frame);
-  assert.deepEqual([...image.data], pixels(renderFrame(palette, frame)));
+  assert.deepEqual([...image.data], [255, 128, 0, 255, 0, 0, 0, 0, 16, 32, 48, 255, 0, 0, 0, 0, 0, 0, 255, 255, 255, 128, 0, 255]);
   assert.deepEqual([...image.data.subarray(4, 8)], [0, 0, 0, 0]);
   const resolved = raster.frameToRgba({ resolveRgb: () => [1, 2, 3] }, frame);
   assert.deepEqual([...resolved.data.subarray(0, 4)], [1, 2, 3, 255]);
   assert.throws(() => raster.frameToRgba(palette, [["a"], []]), RangeError);
 });
 
-test("largest-frame contact sheets equal renderContactSheet pixels", () => {
+// sha256 of each sheet's RGBA from the Skia frames.renderContactSheet of v0.16.0; see fixtures/README.md.
+const SKIA_CONTACT_SHEETS = {
+  "1,0": "8x14 4e6f06fa21e31073c9a6fc5f290dd61a56c2124d51c48fe50940c539a6d8aadf",
+  "2,1": "20x36 cfcb7ee831814a39ccaf920750030ed1d6c156a66685e9a069eebc6a8c470393",
+  "3,4": "48x90 610d46d1fb6bbd2a07f98806219b40df7db9c5d046abb9a52a467e0898fb8fc0",
+};
+
+test("largest-frame contact sheets equal the frozen Skia contact sheets", () => {
   const palette = { r: [200, 30, 40], g: [20, 180, 60], b: [30, 40, 220], s: [90, 80, 70], t: [250, 240, 200] };
   const sprites = [
     ["mixed", [["idle", [[["r", null, "g"], [null, "b", null]], [["g", "g"], ["r", null], [null, "b"], ["b", "b"]]], 1]]],
@@ -125,10 +128,9 @@ test("largest-frame contact sheets equal renderContactSheet pixels", () => {
   const resolve = (name) => palette[name];
   for (const [scale, gap] of [[1, 0], [2, 1], [3, 4]]) {
     const options = { resolveRgb: resolve, background: [1, 2, 3], scale, gap };
-    const canvas = renderContactSheet(options, sprites, ["s", "t"]);
     const sheet = raster.composeContactSheet({ ...options, cellSize: "largest-frame" }, sprites, ["s", "t"]);
-    assert.deepEqual([sheet.width, sheet.height], [canvas.width, canvas.height]);
-    assert.deepEqual([...sheet.data], pixels(canvas));
+    const digest = createHash("sha256").update(sheet.data).digest("hex");
+    assert.equal(`${sheet.width}x${sheet.height} ${digest}`, SKIA_CONTACT_SHEETS[`${scale},${gap}`]);
   }
   assert.throws(() => raster.composeContactSheet({ resolveRgb: resolve, background: [0, 0, 0] }, sprites, ["s"]), RangeError);
 });
@@ -162,7 +164,7 @@ test("fill, paste and composite mutate in place; other operations return new ima
   raster.composite({ x: 0, y: 0 }, raster.filledImage([0, 0, 0, 0], 1, 1), target);
   assert.deepEqual([...target.data], [7, 8, 9, 200]);
   assert.deepEqual(Object.keys(raster).sort(), [
-    "channel", "composeContactSheet", "composite", "crop", "fill", "filledImage", "frameToRgba",
+    "channel", "composeContactSheet", "composeSheet", "composite", "crop", "fill", "filledImage", "frameToRgba",
     "grayscale", "mapChannels", "opaque", "paste", "resizeNearest", "rotateNearest",
   ]);
 });
