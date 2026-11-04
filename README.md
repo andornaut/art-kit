@@ -10,6 +10,7 @@ The compiled package includes TypeScript declarations and these public subpaths:
 | --- | --- | --- |
 | `atlasBuild` | Atlas drawing and encoded page assembly | Read/decode/encode functions, blits, extrusion and metadata |
 | `atlasLayout` | Shelf packing and candidate selection | Items, grouping, order comparator, candidate widths and size limits |
+| `build` | Sequential art build runs in dependency order, downstream selection, a byte-snapshot `--check` and a `[--check] [SET...]` command wrapper | Named build steps, their needs and the check paths |
 | `colour` | Six-digit hex RGB, WCAG contrast, sRGB to Oklab and OKLCH, and OKLCH to sRGB | Resolved hex colours, sRGB triples and OKLCH triples |
 | `draw` | Polygon, ellipse, line, arc, point, rectangle and rounded-rectangle drawing into RGBA buffers, pixel-exact with Pillow 13.0.0 | Colours, points, bounds, widths and the target image |
 | `fonts` | Skia glyph rasterization, line metrics and pair kerning | Font path, size, characters, antialiasing, hinting and kerning policy |
@@ -48,6 +49,29 @@ A client can subclass `Grid` to retain its existing constructor and outline sign
 `indexedPng.encodeIndexedPng({ level, memLevel }, image)` returns encoded bytes, or `undefined` when the image has more than 256 distinct RGBA colours. `png.encodeRgbaPng({ deflateLevel, deflateStrategy, filterType }, image)` returns RGBA PNG bytes. `png.encodeRgbPng` takes the same options and returns colour type 2 bytes that decode to the image, throwing `RangeError` when any alpha is not 255; bytes are not matched to Pillow. Both write the bytes pngjs 7.0.0 `PNG.sync.write` writes for the same options. They filter rows straight from `image.data` into a streamed deflate, so memory beyond the input is the compressed output plus a few rows; deflate level 0 and inputs pngjs treats specially go through pngjs. Compression context precedes the image; callers choose indexed-first fallback, PNG versus WebP and output metadata.
 
 `colour.rgb(hex)` returns the bytes of exactly six hexadecimal digits without `#` and throws `RangeError` for any other string. `colour.srgbToOklab(rgb)` and `srgbToOklch(rgb)` return Oklab and OKLCH triples. `oklchToSrgb(lch)` clamps lightness to 0..1, limits chroma to the search bound, wraps hue in degrees and reduces out-of-gamut chroma at fixed lightness and hue, then clamps linear channels and quantizes to bytes. Neutral hue is zero. Palette targets and perceptual contrast policy remain caller-owned.
+
+## Builds
+
+`build` runs a game's art build sets one at a time. `BuildSets` maps each set name to `{ build, needs? }`, where `build` returns nothing or a promise and `needs` names the sets whose outputs it reads. `buildOrder(sets, selected?)` returns the run order: each set after every set it needs, with ties broken by declaration (insertion) order, so the earliest-declared ready set runs next; a table declared in a valid order runs in exactly that order. Selected names run with every set downstream of them, directly or transitively, in the same order; the sets they need are not rebuilt. An unknown need or a cycle throws `RangeError` naming them (`a needs unknown set b`, `build sets form a cycle: a -> c -> b -> a`), and unknown selected names throw `UsageError`.
+
+`runBuilds({ sets, check?, log? }, selected?)` logs `build <set>` before each set and resolves to `{ order, changes? }`. A build that throws or rejects stops the run with `BuildError`, whose `set` names it and whose `cause` is the original error. With `check: { paths }`, the files under each path (a file or a directory, recursively; a missing path holds none) are snapshotted by SHA-256 before the first build and after the last, symbolic links by target, and any added, removed or changed path throws `CheckError` with `changes: { added, removed, changed }`, each sorted. Paths are reported joined to the check path as given, and relative paths resolve against the process working directory.
+
+The check compares the tree before and after the rebuild, without Git, so it works in a copy with no `.git`. Unlike a check against the Git index, it does not flag a difference or untracked file that existed before the run and that the rebuild leaves unchanged, and it does include ignored files under the check paths. Run it on a clean checkout to compare the rebuild with the committed outputs.
+
+`buildCommand({ sets, check?, usage?, log?, error? }, argv)` handles `[--check] [SET...]` and resolves to an exit status: 0 on success; 1 for a failing build (the cause's stack, then `<set> build failed: <message>`), check differences (`A`, `D` or `M`, a tab and the path, sorted by path, then a summary) or invalid sets; and 2 for a usage error (an unknown option or set, or `--check` without check paths), followed by `usage`. `log` and `error` default to `console.log` and `console.error`. The module uses only Node built-ins and spawns nothing; a step that runs another program spawns it itself.
+
+```ts
+import { buildCommand } from '@andornaut/art-kit/build';
+
+process.exitCode = await buildCommand({
+  sets: {
+    sprites: { build: sprites.build },
+    silhouettes: { build: silhouettes.build, needs: ['sprites'] },
+  },
+  check: { paths: ['public/art'] },
+  usage: 'Usage: node art/tools/build.ts [--check] [SET...]',
+}, process.argv.slice(2));
+```
 
 ## Fonts
 
