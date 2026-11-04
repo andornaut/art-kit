@@ -1,4 +1,4 @@
-/** Hexadecimal RGB and WCAG contrast, retaining the Python transfer threshold. */
+/** Hexadecimal RGB and WCAG 2.0 contrast with its 0.03928 transfer threshold. */
 export function rgb(colour: string): [
     number,
     number,

@@ -21,22 +21,15 @@ jobs:
           node-version: 24.21.0
       - name: Provision pinned dependencies in isolated containers
         run: bash scripts/provision.sh .claude/dependencies
-      - name: Check Node package and required native font rendering offline
-        run: bash scripts/check-node.sh .claude/dependencies/node/node_modules
-      - name: Check offline in an isolated container
-        run: bash scripts/check.sh .claude/dependencies/python .claude/dependencies/python/bin/ruff .claude/dependencies/python
+      - name: Check the package and required native font rendering offline
+        run: bash scripts/check.sh .claude/dependencies/node/node_modules
       - name: Build committed release artifacts offline
-        run: bash scripts/pack.sh .claude/dependencies/python .claude/release-output
-      - name: Build committed Node release artifact offline
-        run: bash scripts/pack-node.sh .claude/dependencies/node/node_modules .claude/release-output
-      - name: Verify installed wheel offline
-        run: bash scripts/verify-wheel.sh .claude/dependencies/python .claude/release-output "$GITHUB_SHA"
+        run: bash scripts/pack.sh .claude/dependencies/node/node_modules .claude/release-output
       - uses: actions/upload-artifact@v7.0.2
         with:
           name: art-kit-${{ github.sha }}
           path: |
             .claude/release-output/art-kit-*.tgz
-            .claude/release-output/art_kit-*.whl
             .claude/release-output/SHA256SUMS
             .claude/release-output/SOURCE_COMMIT
           if-no-files-found: error

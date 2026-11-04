@@ -1,4 +1,4 @@
-// Container orchestration for the check, packaging, provisioning and fixture commands.
+// Container orchestration for the check, packaging and provisioning commands.
 // Usage: node scripts/container.mts <command> <arguments...>; the scripts/*.sh wrappers document each command.
 // Host Node only assembles arguments, streams inputs and copies results; every test, build and download runs in a
 // container as uid 19001, which owns nothing on the host. Host paths are read-only bind mounts readable through
@@ -6,13 +6,12 @@
 // 1777 /tmp), results leave through docker cp as the host user, and the container and volume are removed on exit.
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import { createHash, randomInt } from 'node:crypto';
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { loadavg } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = realpathSync(fileURLToPath(new URL('..', import.meta.url)));
-const PYTHON_IMAGE = 'python:3.12';
 const NODE_IMAGE = 'node:24.21.0';
 
 class Failure extends Error {
@@ -123,12 +122,6 @@ function revision(): string {
   return git(['rev-parse', 'HEAD']).trim();
 }
 
-function projectVersion(pyproject: string): string {
-  const version = pyproject.match(/^version = "([^"]+)"$/m)?.[1];
-  if (!version) throw new Failure('Missing project version');
-  return version;
-}
-
 // Containers
 
 const containers = new Set<string>();
@@ -214,262 +207,49 @@ for (const [signal, number] of [['SIGHUP', 1], ['SIGINT', 2], ['SIGTERM', 15]] a
   });
 }
 
-// Python commands, removed with the Python package.
-
-const VENV_PYTHON = '/tmp/venv/bin/python';
-const SITE_PACKAGES = '/tmp/venv/lib/python3.12/site-packages';
-
-function createVenv(container: Container, systemSitePackages: boolean): Promise<string> {
-  return exec({}, container, ['python', '-I', '-m', 'venv', ...(systemSitePackages ? ['--system-site-packages', '--without-pip'] : []), '/tmp/venv']);
-}
-
-// Isolated Python ignores PYTHONPATH, so a venv .pth file adds read-only dependency and source paths.
-function addPaths(container: Container, pth: string, paths: readonly string[]): Promise<void> {
-  return writeFile(container, `${SITE_PACKAGES}/${pth}`, paths.map(path => `${path}\n`).join(''));
-}
-
-const BUILD_PINS = `import importlib.metadata as metadata
-import re
-import tomllib
-from pathlib import Path
-
-normalise = lambda name: re.sub(r"[-_.]+", "-", name).lower()
-installed = {normalise(dist.metadata["Name"]): dist.version for dist in metadata.distributions(path=["/build-deps"])}
-requirements = tomllib.loads(Path("pyproject.toml").read_text())["build-system"]["requires"]
-for requirement in requirements:
-    pin = re.fullmatch(r"([A-Za-z0-9_.-]+)==([^*<>=!~;\\s]+)", requirement)
-    if pin is None:
-        raise SystemExit(f"Build dependency must use an exact version pin: {requirement}")
-    name, expected = pin.groups()
-    actual = installed.get(normalise(name), "missing")
-    if actual != expected:
-        raise SystemExit(f"Build dependency {name}: expected {expected}, actual {actual} in /build-deps")
-`;
-
-const WHEEL_IDENTITY = `import glob, tomllib, zipfile
-from email.parser import BytesParser
-from pathlib import Path
-version = tomllib.loads(Path("/tmp/package/pyproject.toml").read_text())["project"]["version"]
-wheels = glob.glob("art_kit-*.whl")
-assert wheels == [f"art_kit-{version}-py3-none-any.whl"], wheels
-with zipfile.ZipFile(wheels[0]) as wheel:
-    assert wheel.read("art_kit/SOURCE_COMMIT") == Path("SOURCE_COMMIT").read_bytes()
-    metadata = BytesParser().parsebytes(wheel.read(f"art_kit-{version}.dist-info/METADATA"))
-    assert metadata["Name"] == "art-kit" and metadata["Version"] == version
-`;
-
-const INSTALLED_WHEEL = `import importlib.metadata as m, os, pathlib, sys
-import art_kit
-from art_kit import aseprite, colour, fonts, frames, grid
-import PIL
-package = pathlib.Path(art_kit.__file__).resolve().parent
-assert package.is_relative_to(pathlib.Path(sys.prefix))
-assert (package / "SOURCE_COMMIT").read_text().strip() == os.environ["EXPECTED_COMMIT"]
-assert m.version("art-kit") == os.environ["EXPECTED_VERSION"]
-assert PIL.__version__ == "13.0.0"
-`;
-
-async function check(pillowPath: string, ruffPath: string, buildPath: string): Promise<void> {
-  const [pillow, ruff, build] = [pillowPath, ruffPath, buildPath].map(path => realpathSync(path));
-  requireIdle();
-  const evidence = evidenceDirectory('check');
-  guardSource();
-  const spec: ContainerSpec = {
-    network: 'none', workdir: '/app', env: { PYTHONDONTWRITEBYTECODE: '1' },
-    mounts: [[root, '/app'], [pillow, '/deps'], [ruff, '/ruff'], [build, '/build-deps']],
-  };
-  await withContainer(spec, 'art-kit-check', PYTHON_IMAGE, async container => {
-    await createVenv(container, true);
-    await addPaths(container, 'art-kit.pth', ['/deps', '/build-deps', '/app/src']);
-    const ruffVersion = (await exec({ capture: true }, container, ['/ruff', '--version'])).trim();
-    if (ruffVersion !== 'ruff 0.17.2') throw new Failure(`Expected ruff 0.17.2, actual ${ruffVersion}`);
-    console.log(ruffVersion);
-    await exec({}, container, [VENV_PYTHON, '-I', '-c', "import PIL; assert PIL.__version__ == '13.0.0'"]);
-    await exec({}, container, ['/ruff', 'check', '--no-cache', '.']);
-    await exec({}, container, ['/ruff', 'format', '--check', '--no-cache', '.']);
-    await exec({}, container, [VENV_PYTHON, '-I', '-m', 'unittest', 'discover', '-s', 'tests', '-v']);
-    await exec({}, container, ['mkdir', '-p', '/tmp/package', '/tmp/out/wheels']);
-    await exec({}, container, ['cp', '/app/pyproject.toml', '/app/README.md', '/app/LICENSE', '/tmp/package/']);
-    await exec({}, container, ['cp', '-R', '/app/src', '/tmp/package/']);
-    await exec({}, container, [VENV_PYTHON, '-I', '-m', 'pip', 'wheel', '--no-build-isolation', '--no-deps', '--no-index', '/tmp/package', '--wheel-dir', '/tmp/out/wheels']);
-    await exec({}, container, [VENV_PYTHON, '-I', '-c', "import importlib.metadata as m; print({p:m.version(p) for p in ['Pillow','setuptools','wheel']})"]);
-    await copyOut(container, '/tmp/out/.', evidence);
-  });
-  verifySource();
-  console.log(`Check evidence: ${evidence}`);
-}
-
-async function pack(buildPath: string, outputPath: string): Promise<void> {
-  const build = realpathSync(buildPath);
-  requireIdle();
-  const output = emptyOutput(outputPath);
-  guardSource();
-  const commit = revision();
-  const epoch = git(['show', '-s', '--format=%ct', commit]).trim();
-  const wheel = `art_kit-${projectVersion(git(['show', `${commit}:pyproject.toml`]))}-py3-none-any.whl`;
-  const spec: ContainerSpec = { network: 'none', env: { SOURCE_DATE_EPOCH: epoch }, mounts: [[build, '/build-deps']] };
-  await withContainer(spec, 'art-kit-pack', PYTHON_IMAGE, async container => {
-    await exec({}, container, ['mkdir', '-p', '/tmp/package', '/tmp/out']);
-    await extractArchive(container, commit, ['src', 'pyproject.toml', 'README.md', 'LICENSE'], '/tmp/package');
-    await writeFile(container, '/tmp/package/src/art_kit/SOURCE_COMMIT', `${commit}\n`);
-    await createVenv(container, true);
-    await addPaths(container, 'art-build.pth', ['/build-deps']);
-    await exec({ workdir: '/tmp/package' }, container, [VENV_PYTHON, '-I', '-c', BUILD_PINS]);
-    await exec({ workdir: '/tmp/package' }, container, [VENV_PYTHON, '-I', '-m', 'pip', 'wheel', '--no-build-isolation', '--no-deps', '--no-index', '/tmp/package', '--wheel-dir', '/tmp/out']);
-    await exec({}, container, ['cp', '/tmp/package/src/art_kit/SOURCE_COMMIT', '/tmp/out/SOURCE_COMMIT']);
-    await exec({ workdir: '/tmp/out' }, container, [VENV_PYTHON, '-I', '-c', WHEEL_IDENTITY]);
-    const sums = await exec({ workdir: '/tmp/out', capture: true }, container, ['sha256sum', wheel, 'SOURCE_COMMIT']);
-    await writeFile(container, '/tmp/out/SHA256SUMS', sums);
-    await copyOut(container, '/tmp/out/.', output);
-  });
-  verifySource();
-  console.log(`Release artifacts: ${output}`);
-}
-
-async function verifyWheel(pillowPath: string, releasePath: string, expectedCommit: string): Promise<void> {
-  const [pillow, release] = [pillowPath, releasePath].map(path => realpathSync(path));
-  requireIdle();
-  guardSource();
-  const expectedVersion = projectVersion(readFileSync(join(root, 'pyproject.toml'), 'utf8'));
-  if (readFileSync(join(release, 'SOURCE_COMMIT'), 'utf8').replace(/\n+$/, '') !== expectedCommit) throw new Failure('SOURCE_COMMIT differs from the expected commit');
-  const wheels = readdirSync(release).filter(name => /^art_kit-.*\.whl$/.test(name)).sort();
-  if (!wheels.length) throw new Failure('Missing wheel');
-  const spec: ContainerSpec = { network: 'none', mounts: [[release, '/release'], [pillow, '/deps']] };
-  await withContainer(spec, 'art-kit-verify-wheel', PYTHON_IMAGE, async container => {
-    await exec({ workdir: '/release' }, container, ['sha256sum', '--check', 'SHA256SUMS']);
-    await createVenv(container, false);
-    await exec({}, container, [VENV_PYTHON, '-I', '-m', 'pip', 'install', '--no-index', '--no-deps', ...wheels.map(name => `/release/${name}`)]);
-    await addPaths(container, 'pillow.pth', ['/deps']);
-    await exec({ env: { EXPECTED_COMMIT: expectedCommit, EXPECTED_VERSION: expectedVersion } }, container, [VENV_PYTHON, '-I', '-c', INSTALLED_WHEEL]);
-  });
-  verifySource();
-  console.log(`Verified wheel: ${release}`);
-}
-
-async function drawFixtures(pillowPath: string): Promise<void> {
-  const pillow = realpathSync(pillowPath);
-  requireIdle();
-  const spec: ContainerSpec = { network: 'none', env: { PYTHONDONTWRITEBYTECODE: '1' }, mounts: [[join(root, 'node/tests'), '/tests'], [pillow, '/deps']] };
-  await withContainer(spec, 'art-kit-draw-fixtures', PYTHON_IMAGE, async container => {
-    await createVenv(container, true);
-    await addPaths(container, 'draw-deps.pth', ['/deps']);
-    await exec({}, container, ['mkdir', '/tmp/out']);
-    await exec({}, container, [VENV_PYTHON, '-I', '/tests/draw_fixtures.py', '/tmp/out/draw.json']);
-    await copyOut(container, '/tmp/out/draw.json', join(root, 'node/tests/fixtures/draw.json'));
-  });
-}
-
-// Python art_kit fonts.pack and bmfont_xml references for the packed glyph atlas layout. The v0.10.0 and v0.5.0
-// modules stream from git show into the container.
-async function bmfontFixtures(pillowPath: string): Promise<void> {
-  const pillow = realpathSync(pillowPath);
-  requireIdle();
-  const references = { 'fonts_v0100.py': 'v0.10.0', 'fonts_v050.py': 'v0.5.0' };
-  const spec: ContainerSpec = { network: 'none', env: { PYTHONDONTWRITEBYTECODE: '1' }, mounts: [[join(root, 'node/tests'), '/tests'], [pillow, '/deps']] };
-  await withContainer(spec, 'art-kit-bmfont-fixtures', PYTHON_IMAGE, async container => {
-    await createVenv(container, true);
-    await addPaths(container, 'bmfont-deps.pth', ['/deps']);
-    await exec({}, container, ['mkdir', '/tmp/out', '/tmp/references']);
-    for (const [name, tag] of Object.entries(references))
-      await writeFile(container, `/tmp/references/${name}`, git(['show', `${tag}:src/art_kit/fonts.py`]));
-    await exec({}, container, [VENV_PYTHON, '-I', '/tests/bmfont_fixtures.py', '/tmp/references', '/tests/fixtures', '/tmp/out/bmfont-packed.json']);
-    await copyOut(container, '/tmp/out/bmfont-packed.json', join(root, 'node/tests/fixtures/bmfont-packed.json'));
-  });
-}
-
-/** Adds group read, and group search where any execute bit is set, as chmod -R g+rX does. */
-function grantGroupRead(path: string): void {
-  const stat = lstatSync(path);
-  if (stat.isSymbolicLink()) return;
-  chmodSync(path, stat.mode | 0o040 | (stat.isDirectory() || stat.mode & 0o111 ? 0o010 : 0));
-  if (stat.isDirectory()) for (const name of readdirSync(path)) grantGroupRead(join(path, name));
-}
-
-// Pillow 13.0.0 references for the GIF and ICO encoders. generate rewrites pillow.json from Pillow's decodes of
-// its own saves; crosscheck encodes the fixture inputs with the current Node source and compares Pillow's decodes.
-async function pillowReference(mode: string, provisionPath: string): Promise<void> {
-  if (mode !== 'generate' && mode !== 'crosscheck') throw new Failure(`Usage: container.mts ${USAGE.pillow}`, 2);
-  const provision = realpathSync(provisionPath);
-  const fixture = '/app/node/tests/fixtures/gif-ico';
-  const reference = '/app/tests/gif_ico_reference.py';
-  requireIdle();
-  const python = (mounts: ReadonlyArray<readonly [string, string]>): ContainerSpec => ({
-    network: 'none', env: { PYTHONPATH: '/deps', PYTHONDONTWRITEBYTECODE: '1' },
-    mounts: [[root, '/app'], [join(provision, 'python'), '/deps'], ...mounts],
-  });
-  if (mode === 'generate') {
-    const target = join(root, 'node/tests/fixtures/gif-ico/pillow.json');
-    await withContainer(python([]), 'art-kit-pillow-generate', PYTHON_IMAGE, async container => {
-      await exec({}, container, ['python', reference, 'generate', '/tmp/pillow.json']);
-      await copyOut(container, '/tmp/pillow.json', target);
-    });
-    console.log(`Generated: ${target}`);
-    return;
-  }
-  guardSource();
-  const encoded = evidenceDirectory('pillow');
-  const node: ContainerSpec = { network: 'none', mounts: [[root, '/app'], [join(provision, 'node/node_modules'), '/deps']] };
-  await withContainer(node, 'art-kit-pillow-encode', NODE_IMAGE, async container => {
-    await exec({}, container, ['mkdir', '/tmp/src']);
-    await exec({}, container, ['cp', '-R', '/app/node/src', '/app/node/tsconfig.json', '/app/node/package.json', '/tmp/src/']);
-    await exec({}, container, ['ln', '-s', '/deps', '/tmp/src/node_modules']);
-    await exec({}, container, ['node', '/deps/typescript/bin/tsc', '-p', '/tmp/src/tsconfig.json']);
-    await exec({}, container, ['node', `${fixture}/encode.mjs`, '/tmp/src/dist', `${fixture}/pillow.json`, '/tmp/out']);
-    await copyOut(container, '/tmp/out/.', encoded);
-  });
-  grantGroupRead(encoded);
-  await withContainer(python([[encoded, '/encoded']]), 'art-kit-pillow-crosscheck', PYTHON_IMAGE, async container => {
-    await exec({}, container, ['python', reference, 'crosscheck', `${fixture}/pillow.json`, '/encoded']);
-  });
-  verifySource();
-  console.log(`Encoded: ${encoded}`);
-}
-
-// Node commands
+// Commands
 
 interface Descriptor {
   devDependencies: Record<string, string>;
   peerDependencies: Record<string, string>;
 }
 
-async function checkNode(dependencyPath: string): Promise<void> {
+async function check(dependencyPath: string): Promise<void> {
   const dependencies = realpathSync(dependencyPath);
   requireIdle();
-  const evidence = evidenceDirectory('node');
+  const evidence = evidenceDirectory('check');
   guardSource();
   const commit = revision();
   const spec: ContainerSpec = {
     network: 'none', mounts: [[root, '/app'], [dependencies, '/deps']],
     env: { npm_config_cache: '/tmp/npm-cache', ART_KIT_TEST_FONTS: '/tmp/work/source/node/tests/fixtures' },
   };
-  await withContainer(spec, 'art-kit-node', NODE_IMAGE, async container => {
+  await withContainer(spec, 'art-kit-check', NODE_IMAGE, async container => {
     await exec({}, container, ['mkdir', '-p', '/tmp/work/source', '/tmp/out']);
-    await exec({}, container, ['cp', '-R', '/app/node', '/app/pyproject.toml', '/app/LICENSE', '/tmp/work/source/']);
+    await exec({}, container, ['cp', '-R', '/app/node', '/app/LICENSE', '/tmp/work/source/']);
     await exec({}, container, ['node', '/app/scripts/node-package.mts', 'check', commit]);
     await copyOut(container, '/tmp/out/.', evidence);
   });
   verifySource();
-  console.log(`Node evidence: ${evidence}`);
+  console.log(`Check evidence: ${evidence}`);
 }
 
-async function packNode(dependencyPath: string, outputPath: string): Promise<void> {
-  const [dependencies, output] = [dependencyPath, outputPath].map(path => realpathSync(path));
+async function pack(dependencyPath: string, outputPath: string): Promise<void> {
+  const dependencies = realpathSync(dependencyPath);
   requireIdle();
+  const output = emptyOutput(outputPath);
   guardSource();
   const commit = revision();
-  const tarball = `art-kit-${projectVersion(git(['show', `${commit}:pyproject.toml`]))}.tgz`;
   // The packaging program comes from this checkout; the packaged tree is the committed revision.
   const spec: ContainerSpec = {
     network: 'none', env: { npm_config_cache: '/tmp/npm-cache' },
-    mounts: [[dependencies, '/deps'], [output, '/release'], [join(root, 'scripts/node-package.mts'), '/tools/node-package.mts']],
+    mounts: [[dependencies, '/deps'], [join(root, 'scripts/node-package.mts'), '/tools/node-package.mts']],
   };
-  await withContainer(spec, 'art-kit-pack-node', NODE_IMAGE, async container => {
+  await withContainer(spec, 'art-kit-pack', NODE_IMAGE, async container => {
     await exec({}, container, ['mkdir', '-p', '/tmp/work/source', '/tmp/out']);
-    await extractArchive(container, commit, ['node', 'pyproject.toml', 'LICENSE'], '/tmp/work/source');
-    await exec({}, container, ['cp', '-R', '/release/.', '/tmp/out/']);
+    await extractArchive(container, commit, ['node', 'LICENSE'], '/tmp/work/source');
     await exec({}, container, ['node', '/tools/node-package.mts', 'pack', commit]);
-    await copyOut(container, `/tmp/out/${tarball}`, join(output, tarball));
-    await copyOut(container, '/tmp/out/SHA256SUMS', join(output, 'SHA256SUMS'));
+    await copyOut(container, '/tmp/out/.', output);
   });
   verifySource();
   console.log(`Release artifacts: ${output}`);
@@ -478,13 +258,9 @@ async function packNode(dependencyPath: string, outputPath: string): Promise<voi
 async function provision(outputPath: string): Promise<void> {
   requireIdle();
   const output = emptyOutput(outputPath);
-  await withContainer({ network: 'bridge' }, 'art-kit-provision-python', PYTHON_IMAGE, async container => {
-    await exec({}, container, ['python', '-I', '-m', 'pip', 'install', '--no-cache-dir', '--target', '/tmp/python', 'Pillow==13.0.0', 'ruff==0.17.2', 'setuptools==84.2.1', 'wheel==0.48.0']);
-    await copyOut(container, '/tmp/python', join(output, 'python'));
-  });
   const descriptor: Descriptor = JSON.parse(readFileSync(join(root, 'node/package.json'), 'utf8'));
   const manifest = JSON.stringify({ private: true, dependencies: { ...descriptor.devDependencies, ...descriptor.peerDependencies } });
-  await withContainer({ network: 'bridge' }, 'art-kit-provision-node', NODE_IMAGE, async container => {
+  await withContainer({ network: 'bridge' }, 'art-kit-provision', NODE_IMAGE, async container => {
     await exec({}, container, ['mkdir', '/tmp/tools']);
     await writeFile(container, '/tmp/tools/package.json', manifest);
     await exec({ workdir: '/tmp/tools' }, container, ['npm', 'install', '--ignore-scripts', '--no-audit', '--no-fund', '--cache', '/tmp/npm-cache']);
@@ -492,28 +268,18 @@ async function provision(outputPath: string): Promise<void> {
     mkdirSync(join(output, 'node'));
     await copyOut(container, '/tmp/tools/node_modules', join(output, 'node/node_modules'));
   });
-  console.log(`Dependencies: ${output}/python and ${output}/node/node_modules`);
+  console.log(`Dependencies: ${output}/node/node_modules`);
 }
 
 // Entry point
 
 const USAGE = {
-  check: 'check <Pillow dependency directory> <Ruff binary> <build dependency directory>',
-  'check-node': 'check-node <node_modules-directory>',
-  pack: 'pack <build-dependency-directory> <output-directory>',
-  'pack-node': 'pack-node <node_modules-directory> <output-directory>',
+  check: 'check <node_modules-directory>',
+  pack: 'pack <node_modules-directory> <output-directory>',
   provision: 'provision <output-directory>',
-  'verify-wheel': 'verify-wheel <Pillow dependency directory> <release directory> <expected commit>',
-  'draw-fixtures': 'draw-fixtures <Pillow dependency directory>',
-  'bmfont-fixtures': 'bmfont-fixtures <Pillow dependency directory>',
-  pillow: 'pillow <generate|crosscheck> <provision-directory>',
 } as const;
 
-const COMMANDS: Record<keyof typeof USAGE, (...args: string[]) => Promise<void>> = {
-  check, 'check-node': checkNode, pack, 'pack-node': packNode, provision,
-  'verify-wheel': verifyWheel, 'draw-fixtures': drawFixtures, 'bmfont-fixtures': bmfontFixtures,
-  pillow: pillowReference,
-};
+const COMMANDS: Record<keyof typeof USAGE, (...args: string[]) => Promise<void>> = { check, pack, provision };
 
 const [command, ...args] = process.argv.slice(2);
 try {
