@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 
 import { buildAtlasPages, drawAtlasPage } from "@andornaut/art-kit/atlasBuild";
 import { packAtlas } from "@andornaut/art-kit/atlasLayout";
+import { decodePng, encodeRgbaPng } from "@andornaut/art-kit/png";
 import { blankImage, blitExtruded } from "@andornaut/art-kit/rgbaImage";
 
 const item = (value, ...sizes) => ({
@@ -226,5 +230,45 @@ test("page build propagates synchronous and asynchronous codec failures by ident
       ),
       (error) => error === failure,
     );
+  }
+});
+
+// The check container runs with an open-file limit of 256, so reading every source at once fails.
+test("page build reads 2000 distinct files within a low open-file limit, in order", async () => {
+  const count = 2000;
+  const directory = await mkdtemp(join(tmpdir(), "atlas-sources-"));
+  try {
+    const options = { deflateLevel: 9, deflateStrategy: 3, filterType: -1 };
+    const paths = [];
+    for (let i = 0; i < count; i++) {
+      const pixel = blankImage(1, 1);
+      pixel.data.set([i & 0xff, i >> 8, 7, 255]);
+      paths.push(join(directory, `${i}.png`));
+      // eslint-disable-next-line no-await-in-loop
+      await writeFile(paths[i], encodeRgbaPng(options, pixel));
+    }
+    const page = {
+      blits: paths.map((source, x) => ({
+        at: { x, y: 0 },
+        from: { height: 1, width: 1, x: 0, y: 0 },
+        source,
+      })),
+      height: 1,
+      metadata: "page",
+      width: count,
+    };
+    const [result] = await buildAtlasPages(
+      { decode: decodePng, encode: (image) => image.data, extrude: 0, read: readFile },
+      [page],
+    );
+    assert.equal(result.metadata, "page");
+    for (let i = 0; i < count; i++) {
+      assert.deepEqual(
+        [...result.image.data.subarray(i * 4, i * 4 + 4)],
+        [i & 0xff, i >> 8, 7, 255],
+      );
+    }
+  } finally {
+    await rm(directory, { force: true, recursive: true });
   }
 });

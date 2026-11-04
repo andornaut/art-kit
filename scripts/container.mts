@@ -178,6 +178,8 @@ interface ContainerSpec {
   mounts?: ReadonlyArray<readonly [string, string]>;
   env?: Readonly<Record<string, string>>;
   workdir?: string;
+  /** Open-file limit, soft and hard; the image default when omitted. */
+  nofile?: number;
 }
 
 function policyArguments(spec: ContainerSpec, name: string): string[] {
@@ -202,6 +204,9 @@ function policyArguments(spec: ContainerSpec, name: string): string[] {
     "-w",
     spec.workdir ?? "/tmp",
   ];
+  if (spec.nofile !== undefined) {
+    args.push("--ulimit", `nofile=${spec.nofile}:${spec.nofile}`);
+  }
   for (const [source, target] of spec.mounts ?? []) {
     args.push(
       "--mount",
@@ -344,6 +349,8 @@ async function check(dependencyPath: string): Promise<void> {
       npm_config_cache: "/tmp/npm-cache",
       ART_KIT_TEST_FIXTURES: "/tmp/work/source/node/tests/fixtures",
     },
+    // A low open-file limit, so the tests catch code that opens every input at once.
+    nofile: 256,
   };
   await withContainer(spec, "art-kit-check", NODE_IMAGE, async (container) => {
     await exec({}, container, ["mkdir", "-p", "/tmp/work/source", "/tmp/out"]);
