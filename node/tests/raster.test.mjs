@@ -37,8 +37,6 @@ function apply(c, all) {
       return target;
     case "crop":
       return raster.crop(rect(c.rect), all[c.source]);
-    case "flipX":
-      return raster.flipX(all[c.source]);
     case "resizeNearest":
       return raster.resizeNearest(c.size[0], c.size[1], all[c.source]);
     case "rotateNearest":
@@ -49,8 +47,6 @@ function apply(c, all) {
       return raster.grayscale(all[c.source]);
     case "channel":
       return raster.channel(c.index, all[c.source]);
-    case "withChannel":
-      return raster.withChannel(c.index, typeof c.value === "number" ? c.value : all[c.value], all[c.source]);
     case "mapChannels":
       return raster.mapChannels(c.luts, all[c.source]);
     case "copy":
@@ -69,7 +65,7 @@ function apply(c, all) {
 test("raster output is byte-equal to Pillow 13.0.0 references, including partial alpha", () => {
   assert.equal(reference.pillow, "13.0.0");
   const ops = new Set(reference.cases.map(({ op }) => op));
-  for (const op of ["fill", "paste", "composite", "composeContactSheet", "rotateNearest", "withChannel", "mapChannels"])
+  for (const op of ["fill", "paste", "composite", "composeContactSheet", "rotateNearest", "mapChannels"])
     assert.ok(ops.has(op), op);
   reference.cases.forEach((c, i) => {
     const all = inputs();
@@ -166,8 +162,8 @@ test("fill, paste and composite mutate in place; other operations return new ima
   raster.composite({ x: 0, y: 0 }, raster.filledImage([0, 0, 0, 0], 1, 1), target);
   assert.deepEqual([...target.data], [7, 8, 9, 200]);
   assert.deepEqual(Object.keys(raster).sort(), [
-    "channel", "composeContactSheet", "composite", "crop", "fill", "filledImage", "flipX", "frameToRgba",
-    "grayscale", "mapChannels", "opaque", "paste", "resizeNearest", "rotateNearest", "withChannel",
+    "channel", "composeContactSheet", "composite", "crop", "fill", "filledImage", "frameToRgba",
+    "grayscale", "mapChannels", "opaque", "paste", "resizeNearest", "rotateNearest",
   ]);
 });
 
@@ -186,8 +182,6 @@ test("invalid geometry and plane sizes throw RangeError", () => {
     () => raster.crop({ x: 0, y: 0, width: -1, height: 1 }, image),
     () => raster.resizeNearest(2.5, 1, image),
     () => raster.channel(4, image),
-    () => raster.withChannel(3, { width: 1, height: 1, data: new Uint8Array(1) }, image),
-    () => raster.withChannel(0, 256, image),
     () => raster.mapChannels([[], [], [], []], image),
   ])
     assert.throws(call, RangeError);

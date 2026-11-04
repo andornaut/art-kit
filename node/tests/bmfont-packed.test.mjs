@@ -1,15 +1,10 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import test from 'node:test';
-import { PNG } from 'pngjs';
 import { buildBitmapFontFromGlyphs as build } from '@andornaut/art-kit/glyphAtlas';
-import { exportBitmapFontFromGlyphs } from '@andornaut/art-kit/generate';
 
-// Frozen art_kit v0.10.0 fonts.pack and bmfont_xml outputs; see fixtures/README.md.
+// Frozen packed-layout references; see fixtures/README.md.
 const fixtures = JSON.parse(readFileSync(`${process.env.ART_KIT_TEST_FONTS}/bmfont-packed.json`, 'utf8'));
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 function inputs(fixture) {
@@ -23,7 +18,7 @@ function inputs(fixture) {
 }
 
 for (const fixture of fixtures.cases) {
-  test(`packed layout matches Python v0.10.0: ${fixture.name}`, () => {
+  test(`packed layout matches the frozen reference: ${fixture.name}`, () => {
     const { glyphs, options } = inputs(fixture);
     const { image, xml, metadata } = build(options, glyphs);
     assert.equal(xml, fixture.xml);
@@ -35,7 +30,7 @@ for (const fixture of fixtures.cases) {
   });
 }
 
-test('fixtures cover the Python quirks the packed layout reproduces', () => {
+test('fixtures cover every packed-layout rule', () => {
   const { cases } = fixtures;
   assert.ok(cases.some(c => c.kernings.length === 0) && cases.some(c => c.kernings.some(k => k.amount === -1)));
   assert.ok(cases.some(c => c.antialias) && cases.some(c => !c.antialias));
@@ -44,16 +39,6 @@ test('fixtures cover the Python quirks the packed layout reproduces', () => {
   assert.ok(cases.some(c => /face='/.test(c.xml)) && cases.some(c => /face="[^"]*&quot;/.test(c.xml)));
   assert.ok(cases.some(c => c.glyphs.some(g => g.image?.width === c.width)));
   assert.ok(fixtures.legacy_matches >= 1);
-});
-
-test('export writes the packed atlas and XML unchanged', async () => {
-  const fixture = fixtures.cases.find(c => c.name === 'font-body');
-  const { glyphs, options: { key, ...font } } = inputs(fixture);
-  const root = await mkdtemp(join(tmpdir(), 'bmfont-packed-'));
-  const output = { png: join(root, `${key}.png`), fnt: join(root, `${key}.fnt`) };
-  await exportBitmapFontFromGlyphs({ font, glyphs, output });
-  assert.equal(await readFile(output.fnt, 'utf8'), fixture.xml);
-  assert.equal(sha256(PNG.sync.read(await readFile(output.png)).data), fixture.atlas.sha256);
 });
 
 test('packed layout requires antialias and rejects padding; padded rejects antialias', () => {

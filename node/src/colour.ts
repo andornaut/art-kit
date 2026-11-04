@@ -76,12 +76,6 @@ export function srgbToOklab(colour: Triple): [
     const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
     return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
 }
-/** Convert Oklab to sRGB bytes with explicit linear channel clamping. */
-export function oklabToSrgb(colour: Triple): [
-    number,
-    number,
-    number
-] { return bytes(linearLab(triple(colour))); }
 /** Convert bytes to (L, C, hue degrees); neutral hue is zero. */
 export function srgbToOklch(colour: Triple): [
     number,

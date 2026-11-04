@@ -271,18 +271,6 @@ export function crop(r: Rect, source: RgbaImage): RgbaImage {
   return out;
 }
 
-/** image mirrored left to right. */
-export function flipX(source: RgbaImage): RgbaImage {
-  image(source);
-  const out = clone(source);
-  for (let y = 0; y < source.height; y++)
-    for (let x = 0; x < source.width; x++) {
-      const read = (y * source.width + x) * 4;
-      out.data.set(source.data.subarray(read, read + 4), (y * source.width + source.width - 1 - x) * 4);
-    }
-  return out;
-}
-
 // Geometry.c ImagingScaleAffine with fill: source x starts at x offset + 0.5 * x scale and
 // accumulates the scale in double precision, truncated toward zero (negative is outside). Columns
 // between the first and last valid ones keep source column 0 when invalid, as Pillow's table does.
@@ -329,7 +317,7 @@ export function resizeNearest(width: number, height: number, source: RgbaImage):
   return scaleAffine([source.width / width, 0, source.height / height, 0], width, height, source);
 }
 
-// Python round(value, 15): the nearest 15-decimal value, ties to even. toFixed rounds an exact
+// The nearest 15-decimal value, ties to even. toFixed rounds an exact
 // tie up, so a tie (the exact expansion ends in 5 at the 16th decimal) is resolved separately.
 function round15(value: number): number {
   const exact = Math.abs(value).toFixed(100);
@@ -373,7 +361,7 @@ function rotateSquare(clockwise: boolean, source: RgbaImage): RgbaImage {
 export function rotateNearest(angle: number, source: RgbaImage): RgbaImage {
   if (!Number.isFinite(angle)) throw new RangeError("Angle must be finite");
   image(source);
-  // Python float modulo: the result takes the divisor's sign.
+  // Floored modulo into 0..360.
   let degrees = angle % 360;
   if (degrees !== 0) {
     if (degrees < 0) degrees += 360;
@@ -454,21 +442,6 @@ export function channel(index: ChannelIndex, source: RgbaImage): Plane {
   const data = new Uint8Array(source.width * source.height);
   for (let i = 0; i < data.length; i++) data[i] = source.data[i * 4 + index];
   return { data, height: source.height, width: source.width };
-}
-
-/** A new image with one channel replaced by a plane of the image's size or a constant byte. */
-export function withChannel(index: ChannelIndex, value: Plane | number, source: RgbaImage): RgbaImage {
-  channelIndex(index);
-  const out = clone(source);
-  if (typeof value === "number") byte(value, "Channel value");
-  else {
-    plane(value);
-    if (value.width !== source.width || value.height !== source.height)
-      throw new RangeError("Channel plane must match the image size");
-  }
-  for (let i = 0; i < source.width * source.height; i++)
-    out.data[i * 4 + index] = typeof value === "number" ? value : value.data[i];
-  return out;
 }
 
 /** A new image with red, green, blue and alpha each mapped through its own 256-byte table. */

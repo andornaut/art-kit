@@ -7,7 +7,7 @@ export interface OutlineOptions {
   close?: boolean;
 }
 
-export function outline(
+function outline(
   edge: Edge | null,
   frame: readonly (readonly Colour[])[],
   { enabled = true, close = false }: OutlineOptions = {},

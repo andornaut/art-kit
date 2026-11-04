@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import {
-  COLOUR_TYPE_INDEXED,
-  MAX_PALETTE,
-  encodeIndexedPng,
-} from "@andornaut/art-kit/indexedPng";
+import { encodeIndexedPng } from "@andornaut/art-kit/indexedPng";
 import { decodePng, encodeRgbPng, encodeRgbaPng } from "@andornaut/art-kit/png";
 import { blankImage, opaqueRect } from "@andornaut/art-kit/rgbaImage";
 
@@ -19,6 +15,9 @@ const image = {
     128, 1, 2, 3, 0,
   ]),
 };
+// An 8-bit indexed PNG holds at most 256 palette entries; IHDR byte 25 is its colour type.
+const MAX_PALETTE = 256;
+const COLOUR_TYPE_INDEXED = 3;
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 test("opaque bounds respect the window and include partial alpha", () => {

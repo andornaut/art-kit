@@ -4,10 +4,10 @@ import type { RgbaImage } from "./rgbaImage.js";
 
 // An 8-bit indexed PNG holds at most this many colours, each an RGBA value: PLTE holds the RGB
 // and tRNS the alpha.
-export const MAX_PALETTE = 256;
+const MAX_PALETTE = 256;
 
 const SIGNATURE = Uint8Array.of(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
-export const COLOUR_TYPE_INDEXED = 3;
+const COLOUR_TYPE_INDEXED = 3;
 const FILTER_NONE = 0;
 
 // Each pixel's palette index and the palette as RGBA values (R in the high byte), or undefined

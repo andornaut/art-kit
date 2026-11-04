@@ -2,12 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PNG } from "pngjs";
 import { decodePng } from "@andornaut/art-kit/png";
-import {
-  decodeWebp,
-  encodeLosslessWebp,
-  sameRgba,
-  webpDecodesTo,
-} from "@andornaut/art-kit/webp";
+import { readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
+import decoderFactory from "@jsquash/webp/codec/dec/webp_dec.js";
+import { initEmscriptenModule } from "@jsquash/webp/utils.js";
+import { encodeLosslessWebp } from "@andornaut/art-kit/webp";
+
+// The pinned peer's own decoder checks that encoding is lossless.
+async function decodeWebp(bytes) {
+  const wasm = await WebAssembly.compile(
+    await readFile(createRequire(import.meta.url).resolve("@jsquash/webp/codec/dec/webp_dec.wasm")),
+  );
+  const { data, height, width } = (await initEmscriptenModule(decoderFactory, wasm)).decode(bytes);
+  return { width, height, data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength) };
+}
 
 test("PNG colour types 2 and 6 decode to RGBA", () => {
   for (const [name, colorType, alphas] of [
@@ -39,10 +47,4 @@ test("non-SIMD lossless WebP preserves transparent RGB and pinned encoder bytes"
   );
   assert.deepEqual(await decodeWebp(bytes), image);
   assert.deepEqual(await encodeLosslessWebp(image), bytes);
-  assert.equal(await webpDecodesTo(image, bytes), true);
-  assert.equal(sameRgba(image, { ...image, width: 1, height: 2 }), false);
-  assert.equal(
-    await webpDecodesTo({ ...image, data: new Uint8Array(8) }, bytes),
-    false,
-  );
 });

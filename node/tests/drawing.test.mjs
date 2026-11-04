@@ -1,7 +1,7 @@
 import { Canvas } from "skia-canvas";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Grid, outline } from "@andornaut/art-kit/grid";
+import { Grid } from "@andornaut/art-kit/grid";
 import { rgb, contrast } from "@andornaut/art-kit/colour";
 import {
   flipped,
@@ -31,11 +31,14 @@ test("outline uses original neighbours in top bottom left right priority and clo
     ["b", null, "c"],
     [null, "d", null],
   ];
-  const out = outline((c) => c.toUpperCase(), f, { close: true });
+  const g = new Grid({}, 3, 3);
+  g.px = f;
+  const out = g.outlined({ edge: (c) => c.toUpperCase(), close: true });
   assert.equal(out[1][1], "A");
   assert.equal(out[2][1], "D");
   assert.equal(f[1][1], null);
-  assert.deepEqual(outline(null, f, { enabled: false }), f);
+  assert.deepEqual(g.outlined({ enabled: false }), f);
+  assert.throws(() => g.outlined(), /outline colour rule/);
 });
 test("pixel-centred shapes and triangle boundaries remain explicit", () => {
   for (const method of ["ell", "blob", "cel"]) {
