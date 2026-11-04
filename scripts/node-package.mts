@@ -3,6 +3,12 @@ import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+interface Descriptor {
+  exports: Record<string, unknown>;
+  devDependencies: Record<string, string>;
+  peerDependencies: Record<string, string>;
+}
+
 const [mode, revision] = process.argv.slice(2);
 if (!['check', 'pack'].includes(mode)) throw new Error('Expected check or pack mode');
 // Dependencies are mounted outside a conventional node_modules directory.
@@ -11,8 +17,8 @@ process.env.NODE_PATH = '/deps';
 const work = '/tmp/work';
 const out = '/tmp/out';
 const root = `${work}/source`;
-const descriptor = JSON.parse(readFileSync(`${root}/node/package.json`, 'utf8'));
-for (const [name, expected] of Object.entries({ ...descriptor.devDependencies, ...descriptor.peerDependencies })) {
+const descriptor: Descriptor = JSON.parse(readFileSync(`${root}/node/package.json`, 'utf8'));
+for (const [name, expected] of Object.entries<string>({ ...descriptor.devDependencies, ...descriptor.peerDependencies })) {
   const actual = JSON.parse(readFileSync(`/deps/${name}/package.json`, 'utf8')).version;
   if (actual !== expected) throw new Error(`${name}: expected ${expected}, actual ${actual}`);
 }
@@ -45,9 +51,9 @@ for (const name of Object.keys(descriptor.peerDependencies)) {
   if (name.startsWith('@')) mkdirSync(`${install}/node_modules/${name.split('/')[0]}`, { recursive: true });
   symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);
 }
-const installedManifest = JSON.parse(readFileSync(`${install}/node_modules/@andornaut/art-kit/package.json`));
+const installedManifest = JSON.parse(readFileSync(`${install}/node_modules/@andornaut/art-kit/package.json`, 'utf8'));
 if (readFileSync(`${install}/node_modules/@andornaut/art-kit/SOURCE_COMMIT`, 'utf8') !== `${revision}\n`) throw new Error('Installed source identity differs');
-if (readdirSync(`${install}/node_modules/@andornaut/art-kit`, { recursive: true }).some(path => /(?:^|\/)fixtures(?:\/|$)|\.(?:ttf|otf|woff2?)$/i.test(path))) throw new Error('Font fixtures must not be published');
+if (readdirSync(`${install}/node_modules/@andornaut/art-kit`, { encoding: 'utf8', recursive: true }).some(path => /(?:^|\/)fixtures(?:\/|$)|\.(?:ttf|otf|woff2?)$/i.test(path))) throw new Error('Font fixtures must not be published');
 if (installedManifest.version !== version || existsSync(`${install}/node_modules/@andornaut/art-kit/src`)) throw new Error('Invalid compiled package');
 // Existing image-codec consumers do not need optional rendering or font parsing.
 for (const name of ['skia-canvas', 'fontkit']) unlinkSync(`${install}/node_modules/${name}`);
@@ -62,8 +68,8 @@ const contractFile = `${install}/contracts.mts`;
 writeFileSync(contractFile, Object.keys(descriptor.exports).map(path => `import * as ${path.slice(2)} from '@andornaut/art-kit/${path.slice(2)}';`).join('\n'));
 execFileSync('node', ['/deps/typescript/bin/tsc', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2023', '--strict', '--skipLibCheck', '--noEmit', '--types', 'node', '--typeRoots', '/deps/@types', contractFile], { cwd: install, stdio: 'inherit' });
 if (mode === 'check') {
-  const tests = [];
-  function collect(dir) {
+  const tests: string[] = [];
+  function collect(dir: string): void {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
       const path = join(dir, entry.name);
       if (entry.isDirectory()) collect(path);
