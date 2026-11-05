@@ -6,25 +6,25 @@ Shared TypeScript mechanisms for scripted pixel art and atlas builds. Source liv
 
 The package ships TypeScript declarations and these subpaths. Import each explicitly, for example `@andornaut/art-kit/raster`.
 
-| Subpath       | Owns                                                                                     | Client supplies                                                  |
-| ------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `atlasBuild`  | Atlas page drawing and encoded page assembly                                             | Read, decode and encode functions, blits, extrusion and metadata |
-| `atlasLayout` | Shelf packing and candidate selection                                                    | Items, order comparator, candidate widths and size limits        |
-| `build`       | Sequential art builds in dependency order, a byte-snapshot check and its command wrapper | Named build steps, their needs and the check paths               |
-| `colour`      | Six-digit hex RGB, WCAG contrast, sRGB to Oklab and OKLCH, and OKLCH to sRGB             | Resolved hex colours and colour triples                          |
-| `draw`        | Pillow 13.0.0-exact shape drawing into RGBA buffers                                      | Colours, points, bounds, widths and the target image             |
-| `fonts`       | Skia glyph rasterization, font coverage, line metrics and pair kerning                   | Font path, size, characters, antialiasing, hinting and kerning   |
-| `gif`         | Animated GIF encoding with exact palettes and binary alpha                               | Frames, durations, loop and disposal                             |
-| `glyphAtlas`  | BMFont atlas packing and XML for supplied RGBA glyphs                                    | Glyph images, offsets, advances and font metrics                 |
-| `grid`        | Pixel-frame drawing, outlines, opaque extents and mirroring                              | Palette, colour names and edge colour rule                       |
-| `ico`         | ICO encoding with PNG entries                                                            | One pre-sized RGBA image per entry                               |
-| `indexedPng`  | Indexed PNG encoding                                                                     | RGBA image and compression options                               |
-| `png`         | PNG decoding to RGBA, and RGBA and opaque RGB PNG encoding                               | Encoded bytes, or an RGBA image and compression options          |
-| `quantise`    | Deterministic median-cut reduction to one shared palette                                 | Frames and the colour limit                                      |
-| `raster`      | Pillow 13.0.0-exact RGBA operations, frame rendering, sheets and contact sheets          | Images, planes, colours, frames, colour resolver and geometry    |
-| `rgbaImage`   | RGBA allocation, alpha bounds and extruded blitting                                      | Image dimensions, pixels, rectangles and bounds                  |
-| `spriteSheet` | Sprite sheet PNG and json-hash data byte-identical to Aseprite 1.2.30, without Aseprite  | Key, image name, tags, optional columns and slice margins, paths |
-| `webp`        | Lossless WebP encoding                                                                   | RGBA images                                                      |
+| Subpath       | Owns                                                                                                                                      | Client supplies                                                          |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `atlasBuild`  | Atlas page drawing and encoded page assembly                                                                                              | Read, decode and encode functions, blits, extrusion and metadata         |
+| `atlasLayout` | Shelf packing and candidate selection                                                                                                     | Items, order comparator, candidate widths and size limits                |
+| `build`       | Sequential art builds in dependency order, set table self-checks, snapshot and Git index checks, node process steps and a command wrapper | Named build steps, their needs, the module directory and the check paths |
+| `colour`      | Six-digit hex RGB, WCAG contrast, sRGB to Oklab and OKLCH, and OKLCH to sRGB                                                              | Resolved hex colours and colour triples                                  |
+| `draw`        | Pillow 13.0.0-exact shape drawing into RGBA buffers                                                                                       | Colours, points, bounds, widths and the target image                     |
+| `fonts`       | Skia glyph rasterization, font coverage, line metrics and pair kerning                                                                    | Font path, size, characters, antialiasing, hinting and kerning           |
+| `gif`         | Animated GIF encoding with exact palettes and binary alpha                                                                                | Frames, durations, loop and disposal                                     |
+| `glyphAtlas`  | BMFont atlas packing and XML for supplied RGBA glyphs                                                                                     | Glyph images, offsets, advances and font metrics                         |
+| `grid`        | Pixel-frame drawing, outlines, opaque extents and mirroring                                                                               | Palette, colour names and edge colour rule                               |
+| `ico`         | ICO encoding with PNG entries                                                                                                             | One pre-sized RGBA image per entry                                       |
+| `indexedPng`  | Indexed PNG encoding                                                                                                                      | RGBA image and compression options                                       |
+| `png`         | PNG decoding to RGBA, and RGBA and opaque RGB PNG encoding                                                                                | Encoded bytes, or an RGBA image and compression options                  |
+| `quantise`    | Deterministic median-cut reduction to one shared palette                                                                                  | Frames and the colour limit                                              |
+| `raster`      | Pillow 13.0.0-exact RGBA operations, frame rendering, sheets and contact sheets                                                           | Images, planes, colours, frames, colour resolver and geometry            |
+| `rgbaImage`   | RGBA allocation, alpha bounds and extruded blitting                                                                                       | Image dimensions, pixels, rectangles and bounds                          |
+| `spriteSheet` | Sprite sheet PNG and json-hash data byte-identical to Aseprite 1.2.30, without Aseprite                                                   | Key, image name, tags, optional columns and slice margins, paths         |
+| `webp`        | Lossless WebP encoding                                                                                                                    | RGBA images                                                              |
 
 Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject; invalid geometry, colours and sizes throw `RangeError`. Only `fonts` needs Skia; every other subpath is canvas-free with exact integer arithmetic.
 
@@ -83,28 +83,45 @@ Callers choose indexed-first fallback, PNG versus WebP and output metadata. The 
 
 ## Builds
 
-`build` runs a game's art build sets one at a time. The module uses only Node built-ins and spawns nothing.
+`build` runs a game's art build sets one at a time. The module uses only Node built-ins; it spawns a process only for a `nodeBuild` step and runs `git` only for a check with `index: true`.
 
-| Export                                                       | Contract                                                                                                                                                                                                   |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BuildSets`                                                  | Set name to `{ build, needs? }`; `needs` names the sets whose outputs it reads                                                                                                                             |
-| `buildOrder(sets, selected?)`                                | Each set after its needs, ties in declaration order. Selected sets run with everything downstream, not their needs. Unknown needs and cycles throw `RangeError`; unknown selected names throw `UsageError` |
-| `runBuilds({ sets, check?, log? }, selected?)`               | Logs `build <set>` before each and resolves to `{ changes?, order }`. A failing build throws `BuildError` with `set` and `cause`                                                                           |
-| `check: { paths }`                                           | SHA-256 snapshot of every file under each path before and after (symbolic links by target); any difference throws `CheckError` with sorted `{ added, changed, removed }`                                   |
-| `buildCommand({ sets, check?, usage?, log?, error? }, argv)` | `[--check] [SET...]`; resolves to 0, 1 for a failing build, check differences or invalid sets, or 2 for a usage error followed by `usage`                                                                  |
+| Export                                                                               | Contract                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BuildSets`                                                                          | Set name to `{ build, needs? }`; `needs` names the sets whose outputs it reads                                                                                                                             |
+| `buildOrder(sets, selected?)`                                                        | Each set after its needs, ties in declaration order. Selected sets run with everything downstream, not their needs. Unknown needs and cycles throw `RangeError`; unknown selected names throw `UsageError` |
+| `checkSets({ strictOrder?, modules? }, sets)`                                        | Startup self-checks, all off by default; every problem found is listed in one `RangeError`                                                                                                                 |
+| `runBuilds({ sets, check?, strictOrder?, modules?, log? }, selected?)`               | Runs `checkSets`, then logs `build <set>` before each and resolves to `{ changes?, order }`. A failing build throws `BuildError` with `set` and `cause`                                                    |
+| `check: { paths, index? }`                                                           | SHA-256 snapshot of every file under each path before and after (symbolic links by target); any difference throws `CheckError` with sorted `{ added, changed, removed }` (and `dirty`, `untracked`)        |
+| `nodeBuild({ directory, extension?, args? }, set)`                                   | A build step running `node <directory>/<set><extension> ...args` (defaults `.ts` and `["build"]`) with `process.execPath` and inherited stdio; throws `exit <status>` or `signal <name>`                   |
+| `buildCommand({ sets, check?, strictOrder?, modules?, usage?, log?, error? }, argv)` | `[--check] [SET...]`; resolves to 0, 1 for a failed self-check, a failing build, check differences or invalid sets, or 2 for a usage error followed by `usage`                                             |
 
-The check compares the tree before and after the rebuild without Git, so it works in a copy with no `.git`. It ignores differences that existed before the run and includes ignored files under the check paths: run it on a clean checkout to compare the rebuild with the committed outputs. Relative paths resolve against the working directory.
+### Self-checks
+
+`strictOrder: true` requires the declared order to meet every need and throws `<set> is declared before <need>, which it needs` instead of reordering; a table that passes runs in declaration order. `modules: { directory, nonSets, extension? }` reconciles a directory of one module per set (`.ts` by default) with the table: it lists each module that is neither a set nor in `nonSets`, each set or non-set without a module, and each name listed as both. Both are off by default so tables built in process, without modules or with a dependent declared first, keep working. `buildCommand` runs them after `--help` and before parsing the sets, so a failed self-check exits 1 even when the arguments also hold an unknown set.
+
+### Command line
+
+A sole `--help` or `-h` prints `usage` (or `Usage: [--check] [SET...]` when none is given) through `log`, which defaults to stdout, and returns 0 without running the self-checks. With other arguments either is an unknown option, exit 2.
+
+### Check modes
+
+The default check compares the tree before and after the rebuild without Git, so it works in a copy with no `.git`. It ignores differences that existed before the run and includes ignored files under the check paths: run it on a clean checkout to compare the rebuild with the committed outputs. Relative paths resolve against the working directory.
+
+`index: true` adds the Git index state from before the run: tracked files under the check paths whose working tree content differs from the index (`dirty`, printed as `~\tpath`) and untracked files that `.gitignore` does not exclude (`untracked`, printed as `?\tpath`), keyed like the snapshot. Staged changes count as clean and ignored files are skipped. A pass then means the tree under the check paths matched the index before the run and the rebuild changed nothing, so it also works on a dirty checkout. It runs `git` in the working directory without taking the index lock; Git must be on `PATH` and must trust the repository (`safe.directory` when the checkout belongs to another user), and a Git failure propagates as an `Error`.
 
 ```ts
-import { buildCommand } from "@andornaut/art-kit/build";
+import { buildCommand, nodeBuild } from "@andornaut/art-kit/build";
 
+const tools = { directory: "art/tools" };
 process.exitCode = await buildCommand(
   {
     check: { paths: ["public/art"] },
+    modules: { ...tools, nonSets: ["build", "pixel"] },
     sets: {
-      silhouettes: { build: silhouettes.build, needs: ["sprites"] },
-      sprites: { build: sprites.build },
+      sprites: { build: nodeBuild(tools, "sprites") },
+      silhouettes: { build: nodeBuild(tools, "silhouettes"), needs: ["sprites"] },
     },
+    strictOrder: true,
     usage: "Usage: node art/tools/build.ts [--check] [SET...]",
   },
   process.argv.slice(2),
