@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 
 import { Canvas, FontLibrary } from "skia-canvas";
 
+import { readCoverage } from "./cmap.js";
 import type { GlyphKerning, SuppliedBitmapGlyph } from "./glyphAtlas.js";
 
 export interface RasteriseOptions {
@@ -30,7 +31,7 @@ export interface RasterisedGlyphs {
   kernings: GlyphKerning[];
 }
 
-const families = new Map<string, string>();
+const families = new Map<string, { coverage: ReadonlySet<number>; family: string }>();
 // Clear pixels drawn around each glyph's measured ink bounds, which can miss antialiased edges.
 const MARGIN = 8;
 
@@ -50,12 +51,22 @@ function codePoint(char: string): number {
 }
 
 /**
+ * The Unicode code points the TrueType or OpenType font file at path maps to a glyph other than
+ * .notdef, read from its format 12 Unicode cmap subtable, else its format 4 one. Throws RangeError
+ * for font collections, WOFF, other formats and malformed tables.
+ */
+export function fontCoverage(path: string): ReadonlySet<number> {
+  return readCoverage(path);
+}
+
+/**
  * CPU Skia glyph rasterization. Each glyph is drawn alone, white, and trimmed to the pixels with
  * nonzero alpha: those are white with coverage in alpha and every other pixel is (0,0,0,0).
  * Offsets are integers from the pen and the line's top (base rows above the baseline); advances
  * and kerning round Skia's measurements to the nearest integer. Synthesis and cross-glyph
  * ligature and contextual substitutions are disabled. Font files remain immutable after
- * registration, and Skia may use a system fallback font for characters the file lacks.
+ * registration. Every character must be in the file's fontCoverage, so Skia never substitutes a
+ * system font: otherwise this throws RangeError listing each missing character.
  */
 export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
   const size = positive(options.size, "Font size");
@@ -71,11 +82,21 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
   const antialias = options.antialias ?? true;
   const hinting = options.hinting ?? true;
   const path = realpathSync(options.path);
-  let family = families.get(path);
-  if (!family) {
-    family = `art-kit-bitmap-${families.size}`;
-    FontLibrary.use(family, path);
-    families.set(path, family);
+  let face = families.get(path);
+  if (!face) {
+    const coverage = readCoverage(path);
+    face = { coverage, family: `art-kit-bitmap-${families.size}` };
+    FontLibrary.use(face.family, path);
+    families.set(path, face);
+  }
+  const { coverage, family } = face;
+  const missing = characters.filter((char) => !coverage.has(codePoint(char)));
+  if (missing.length) {
+    const list = missing.map((char) => {
+      const hex = codePoint(char).toString(16).toUpperCase().padStart(4, "0");
+      return `U+${hex} ${JSON.stringify(char)}`;
+    });
+    throw new RangeError(`${options.path} has no glyph for ${list.join(", ")}`);
   }
   const context = (width: number, height: number) => {
     const canvas = new Canvas(width, height);
