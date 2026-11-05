@@ -177,7 +177,6 @@ interface ContainerSpec {
   /** [host source, container target] pairs, each bound read-only with its group added. */
   mounts?: ReadonlyArray<readonly [string, string]>;
   env?: Readonly<Record<string, string>>;
-  workdir?: string;
   /** Open-file limit, soft and hard; the image default when omitted. */
   nofile?: number;
 }
@@ -202,7 +201,7 @@ function policyArguments(spec: ContainerSpec, name: string): string[] {
     "--mount",
     `type=volume,source=${name},target=/tmp`,
     "-w",
-    spec.workdir ?? "/tmp",
+    "/tmp",
   ];
   if (spec.nofile !== undefined) {
     args.push("--ulimit", `nofile=${spec.nofile}:${spec.nofile}`);
@@ -253,7 +252,6 @@ async function withContainer<T>(
 
 interface ExecOptions extends RunOptions {
   workdir?: string;
-  env?: Readonly<Record<string, string>>;
 }
 
 function exec(
@@ -267,9 +265,6 @@ function exec(
   }
   if (options.workdir) {
     args.push("-w", options.workdir);
-  }
-  for (const [key, value] of Object.entries(options.env ?? {})) {
-    args.push("-e", `${key}=${value}`);
   }
   return run(options, "docker", [...args, container.name, ...command]);
 }

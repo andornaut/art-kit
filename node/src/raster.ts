@@ -582,12 +582,12 @@ export function mapChannels(
 }
 
 /**
- * An opaque preview with one row per sprite and ground, tags flattened in order, built in memory
- * so that its size is not limited by a canvas. Cells are separated by gap and scaled by scale.
- * "largest-frame" sizes every cell from the largest frame (row height from the row's tallest) and
- * draws each frame over its ground. "row-first-frame" sizes
- * cell width from the widest first frame and row height from each row's first frame, paints every
- * frame cell (empty cells in the ground colour) and lets later frames overwrite earlier overflow.
+ * An opaque preview with one row per sprite and ground, tags flattened in order. Cells are
+ * separated by gap and scaled by scale. "largest-frame" sizes every cell from the largest frame
+ * (row height from the row's tallest) and draws each frame over its ground. "row-first-frame"
+ * sizes cell width from the widest first frame and row height from each row's first frame, paints
+ * every frame cell (empty cells in the ground colour) and lets later frames overwrite earlier
+ * overflow.
  */
 export function composeContactSheet(
   { background, cellSize, gap = 4, resolveRgb, scale = 3 }: ContactSheetOptions,

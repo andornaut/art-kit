@@ -11,7 +11,6 @@ import { pngFile } from "./pngChunks.js";
 import type { Tag } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
-export type { Tag } from "./raster.js";
 // Nine-slice margins in pixels from each frame edge.
 export type Margins = readonly [left: number, top: number, right: number, bottom: number];
 
