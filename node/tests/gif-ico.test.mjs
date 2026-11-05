@@ -130,9 +130,9 @@ function merged(durations, frames) {
 
 for (const [name, { frames, options, pillow }] of Object.entries(reference.gif)) {
   test(`GIF ${name} holds every distinct frame whole with Pillow's timing and loop`, () => {
-    const { disposal = 0, duration, loop } = options;
+    const { duration, loop } = options;
     const inputs = frames.map(image);
-    const gif = parseGif(encodeGif({ durations: duration, loop, disposal }, inputs));
+    const gif = parseGif(encodeGif({ durations: duration, loop }, inputs));
     assert.equal(gif.trailing, 0);
     assert.deepEqual([gif.width, gif.height], pillow.size);
     assert.equal(gif.loop ?? null, pillow.loop);
@@ -142,7 +142,7 @@ for (const [name, { frames, options, pillow }] of Object.entries(reference.gif))
     gif.frames.forEach((frame, i) => {
       assert.deepEqual(frame.image, kept[i].image);
       assert.equal(frame.control?.duration ?? null, pillow.frames[i].duration);
-      assert.equal(frame.control?.disposal ?? 0, disposal);
+      assert.equal(frame.control?.disposal ?? 0, 0);
     });
   });
 }
@@ -166,12 +166,6 @@ test("GIF rejects input it cannot encode exactly", () => {
     [{ durations: 10 }, [two([0, 0, 0, 0], [1, 1, 1, 0])], /more than one fully transparent/],
     [{ durations: 10 }, [image(reference.gif.noise.frames[0]), pixel(1, 1, 1, 255)], /is 1x1/],
     [{ durations: [10] }, [pixel(1, 1, 1, 255), pixel(2, 2, 2, 255)], /Expected 2 durations/],
-    [{ durations: 10, disposal: 3 }, [pixel(1, 1, 1, 255)], /disposal/],
-    [
-      { durations: 10, disposal: 2 },
-      [pixel(1, 1, 1, 255), pixel(0, 0, 0, 0)],
-      /transparent after an opaque frame/,
-    ],
     [{ durations: 10 }, [], /at least one frame/],
   ];
   for (const [options, frames, message] of cases) {

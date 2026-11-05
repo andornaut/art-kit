@@ -86,12 +86,12 @@ export interface BuildResult {
 }
 
 /** An unknown set name in a selection or a command line argument. */
-export class UsageError extends Error {
+class UsageError extends Error {
   override name = "UsageError";
 }
 
 /** A set's build threw or rejected; `cause` is the original error. */
-export class BuildError extends Error {
+class BuildError extends Error {
   override name = "BuildError";
   constructor(
     readonly set: string,
@@ -106,7 +106,7 @@ export class BuildError extends Error {
 const pathCount = (count: number): string => `${count} path${count === 1 ? "" : "s"}`;
 
 /** The rebuild changed files under the check paths, or, with `index: true`, they were not clean. */
-export class CheckError extends Error {
+class CheckError extends Error {
   override name = "CheckError";
   constructor(readonly changes: Changes) {
     const changed = changes.added.length + changes.removed.length + changes.changed.length;
@@ -316,7 +316,7 @@ async function snapshotInto(path: string, into: Snapshot): Promise<void> {
  * A SHA-256 digest of every file under each path, keyed by its path joined to the given one. A
  * missing path contributes nothing; symbolic links are recorded by target, not followed.
  */
-export async function snapshot(paths: readonly string[]): Promise<ReadonlyMap<string, string>> {
+async function snapshot(paths: readonly string[]): Promise<ReadonlyMap<string, string>> {
   const into: Snapshot = new Map();
   for (const path of paths) {
     // eslint-disable-next-line no-await-in-loop
@@ -326,7 +326,7 @@ export async function snapshot(paths: readonly string[]): Promise<ReadonlyMap<st
 }
 
 /** The paths added, removed and changed from `before` to `after`, each sorted. */
-export function compareSnapshots(
+function compareSnapshots(
   before: ReadonlyMap<string, string>,
   after: ReadonlyMap<string, string>,
 ): Changes {
@@ -398,7 +398,7 @@ function indexState(paths: readonly string[]): Pick<Changes, "dirty" | "untracke
  * `~\tpath` for a file that differed from the Git index and `?\tpath` for an untracked file before
  * the run, sorted by path.
  */
-export function formatChanges(changes: Changes): string[] {
+function formatChanges(changes: Changes): string[] {
   const lines = [
     ...changes.added.map((path) => [path, "A"] as const),
     ...changes.removed.map((path) => [path, "D"] as const),

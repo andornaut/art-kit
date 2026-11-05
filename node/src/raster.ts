@@ -243,10 +243,10 @@ export interface PasteOptions {
   /** Where the source's top-left lands; the source is clipped to the image on every side. */
   at: Point;
   /**
-   * Omitted: source pixels replace target pixels. A plane sized to source, or "alpha" for the
-   * source's own alpha: each channel blends from target to source by the mask value.
+   * Omitted: source pixels replace target pixels. "alpha": each channel blends from target to
+   * source by the source's own alpha.
    */
-  mask?: Plane | "alpha";
+  mask?: "alpha";
   /** Write only RGB and keep the target's alpha, for opaque (RGB) targets. Defaults to false. */
   keepAlpha?: boolean;
 }
@@ -264,15 +264,17 @@ export function paste(
   point(at);
   image(source);
   image(target);
+  if (mask !== undefined && mask !== "alpha") {
+    throw new RangeError('Mask must be "alpha"');
+  }
   const data = source === target ? source.data.slice() : source.data;
-  const weight = mask === undefined ? undefined : maskPlane(mask, { ...source, data });
   const c = clip(at, source.width, source.height, target);
   if (!c) {
     return;
   }
   const channels = keepAlpha ? 3 : 4;
   for (let y = 0; y < c.h; y++) {
-    if (!weight && !keepAlpha) {
+    if (!mask && !keepAlpha) {
       const read = ((c.sy + y) * source.width + c.sx) * 4;
       target.data.set(data.subarray(read, read + c.w * 4), ((c.dy + y) * target.width + c.dx) * 4);
       continue;
@@ -280,23 +282,12 @@ export function paste(
     for (let x = 0; x < c.w; x++) {
       const s = (c.sy + y) * source.width + c.sx + x,
         t = ((c.dy + y) * target.width + c.dx + x) * 4;
-      const m = weight ? weight(s) : 255;
+      const m = mask ? data[s * 4 + 3] : 255;
       for (let i = 0; i < channels; i++) {
         target.data[t + i] = blend(m, target.data[t + i], data[s * 4 + i]);
       }
     }
   }
-}
-
-function maskPlane(mask: Plane | "alpha", source: RgbaImage): (i: number) => number {
-  if (mask === "alpha") {
-    return (i) => source.data[i * 4 + 3];
-  }
-  plane(mask);
-  if (mask.width !== source.width || mask.height !== source.height) {
-    throw new RangeError("Mask must match the source size");
-  }
-  return (i) => mask.data[i];
 }
 
 /**
@@ -556,29 +547,6 @@ export function channel(index: ChannelIndex, source: RgbaImage): Plane {
     data[i] = source.data[i * 4 + index];
   }
   return { data, height: source.height, width: source.width };
-}
-
-/** A new image with red, green, blue and alpha each mapped through its own 256-byte table. */
-export function mapChannels(
-  luts: readonly [ArrayLike<number>, ArrayLike<number>, ArrayLike<number>, ArrayLike<number>],
-  source: RgbaImage,
-): RgbaImage {
-  if (luts.length !== 4) {
-    throw new RangeError("Four channel tables are required");
-  }
-  for (const lut of luts) {
-    if (lut.length !== 256) {
-      throw new RangeError("Channel tables must have 256 entries");
-    }
-    for (let i = 0; i < 256; i++) {
-      byte(lut[i], "Channel table entry");
-    }
-  }
-  const out = clone(source);
-  for (let i = 0; i < out.data.length; i++) {
-    out.data[i] = luts[i & 3][out.data[i]];
-  }
-  return out;
 }
 
 /**

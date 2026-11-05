@@ -20,7 +20,6 @@ const inputs = () =>
   );
 const point = ([x, y]) => ({ x, y });
 const rect = ([x, y, width, height]) => ({ height, width, x, y });
-const mask = (all, name) => (name === "alpha" ? "alpha" : all[name]);
 const resolveRgb = (name) => reference.palette[name];
 
 function apply(c, all) {
@@ -33,7 +32,7 @@ function apply(c, all) {
       raster.paste(
         {
           at: point(c.at),
-          ...(c.mask && { mask: mask(all, c.mask) }),
+          ...(c.mask && { mask: c.mask }),
           ...(c.keepAlpha && { keepAlpha: true }),
         },
         all[c.source],
@@ -55,8 +54,6 @@ function apply(c, all) {
       return raster.grayscale(all[c.source]);
     case "channel":
       return raster.channel(c.index, all[c.source]);
-    case "mapChannels":
-      return raster.mapChannels(c.luts, all[c.source]);
     case "copy":
       return { ...all[c.source], data: all[c.source].data.slice() };
     case "composeContactSheet":
@@ -73,14 +70,7 @@ function apply(c, all) {
 test("raster output is byte-equal to Pillow 13.0.0 references, including partial alpha", () => {
   assert.equal(reference.pillow, "13.0.0");
   const ops = new Set(reference.cases.map(({ op }) => op));
-  for (const op of [
-    "fill",
-    "paste",
-    "composite",
-    "composeContactSheet",
-    "rotateNearest",
-    "mapChannels",
-  ]) {
+  for (const op of ["fill", "paste", "composite", "composeContactSheet", "rotateNearest"]) {
     assert.ok(ops.has(op), op);
   }
   reference.cases.forEach((c, i) => {
@@ -280,7 +270,6 @@ test("fill, paste and composite mutate in place; other operations return new ima
     "filledImage",
     "frameToRgba",
     "grayscale",
-    "mapChannels",
     "opaque",
     "paste",
     "resizeNearest",
@@ -300,12 +289,7 @@ test("invalid geometry and plane sizes throw RangeError", () => {
       raster.fill({ rect: { x: 0, y: 0, width: 1, height: 2 }, mask: plane }, [0, 0, 0, 0], image),
     () =>
       raster.paste({ at: { x: 0, y: 0 } }, { width: 2, height: 2, data: new Uint8Array(3) }, image),
-    () =>
-      raster.paste(
-        { at: { x: 0, y: 0 }, mask: { width: 1, height: 2, data: new Uint8Array(2) } },
-        image,
-        image,
-      ),
+    () => raster.paste({ at: { x: 0, y: 0 }, mask: plane }, image, image),
     () =>
       raster.fill(
         {
@@ -318,9 +302,8 @@ test("invalid geometry and plane sizes throw RangeError", () => {
     () => raster.crop({ x: 0, y: 0, width: -1, height: 1 }, image),
     () => raster.resizeNearest(2.5, 1, image),
     () => raster.channel(4, image),
-    () => raster.mapChannels([[], [], [], []], image),
   ]) {
     assert.throws(call, RangeError);
   }
-  raster.paste({ at: { x: 0, y: 0 }, mask: plane }, image, image);
+  raster.fill({ rect: { x: 0, y: 0, width: 2, height: 2 }, mask: plane }, [0, 0, 0, 0], image);
 });

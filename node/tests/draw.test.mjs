@@ -4,15 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-  arc,
-  ellipse,
-  line,
-  point,
-  polygon,
-  rectangle,
-  roundedRectangle,
-} from "@andornaut/art-kit/draw";
+import { arc, ellipse, line, point, polygon, rectangle } from "@andornaut/art-kit/draw";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
@@ -36,10 +28,13 @@ function background(width, height) {
   return { data, height, width };
 }
 
-// Fixtures record Pillow's argument shapes: [x, y] points and [x0, y0, x1, y1] boxes.
+// Fixtures record Pillow's argument shapes: [x, y] points, [x0, y0, x1, y1] boxes and line's
+// joint argument, always null here.
 function draw({ args, op }, image) {
-  const { end, joint, start, ...rest } = args;
+  const { end, start, ...rest } = args;
+  assert.equal(rest.joint ?? null, null);
   delete rest.box;
+  delete rest.joint;
   delete rest.points;
   const points = args.points?.map(([x, y]) => ({ x, y }));
   const box = args.box && { x0: args.box[0], y0: args.box[1], x1: args.box[2], y1: args.box[3] };
@@ -49,9 +44,6 @@ function draw({ args, op }, image) {
       key === "fill" || key === "outline" ? fixture.colours[value] : value,
     ]),
   );
-  if (joint) {
-    style.joint = joint;
-  }
   switch (op) {
     case "point":
       return point(style.fill, points, image);
@@ -65,8 +57,6 @@ function draw({ args, op }, image) {
       return rectangle(style, box, image);
     case "arc":
       return arc(style, box, start, end, image);
-    case "roundedRectangle":
-      return roundedRectangle(style, box, image);
     default:
       throw new Error(`Unknown op ${op}`);
   }
@@ -75,15 +65,7 @@ function draw({ args, op }, image) {
 test("draw fixtures come from Pillow 13.0.0 and cover every operation", () => {
   assert.equal(fixture.pillow, "13.0.0");
   const ops = new Set(fixture.cases.map((c) => c.op));
-  assert.deepEqual([...ops].sort(), [
-    "arc",
-    "ellipse",
-    "line",
-    "point",
-    "polygon",
-    "rectangle",
-    "roundedRectangle",
-  ]);
+  assert.deepEqual([...ops].sort(), ["arc", "ellipse", "line", "point", "polygon", "rectangle"]);
   assert.ok(fixture.cases.some((c) => c.error));
   assert.ok(fixture.cases.some((c) => c.rgba));
 });
@@ -136,4 +118,16 @@ test("colours must be four bytes", () => {
   const image = { data: new Uint8Array(4), height: 1, width: 1 };
   assert.throws(() => point([255, 255, 255], [{ x: 0, y: 0 }], image), RangeError);
   assert.throws(() => point([256, 0, 0, 255], [{ x: 0, y: 0 }], image), RangeError);
+});
+
+test("draw exports one function per operation", async () => {
+  const draw = await import("@andornaut/art-kit/draw");
+  assert.deepEqual(Object.keys(draw).sort(), [
+    "arc",
+    "ellipse",
+    "line",
+    "point",
+    "polygon",
+    "rectangle",
+  ]);
 });

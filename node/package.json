@@ -1,6 +1,6 @@
 {
   "name": "@andornaut/art-kit",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -38,10 +38,6 @@
     "./ico": {
       "types": "./dist/ico.d.ts",
       "import": "./dist/ico.js"
-    },
-    "./quantise": {
-      "types": "./dist/quantise.d.ts",
-      "import": "./dist/quantise.js"
     },
     "./spriteSheet": {
       "types": "./dist/spriteSheet.d.ts",

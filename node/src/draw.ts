@@ -3,9 +3,8 @@ import type { Rgba } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
 // Pillow 13.0.0 ImageDraw.Draw(image) on an RGBA image: every operation writes its ink bytes
-// directly, without blending. Coordinates are truncated toward zero; rounded rectangles round
-// their box half to even first. Float arithmetic that Pillow performs in single precision is
-// reproduced with Math.fround.
+// directly, without blending. Coordinates are truncated toward zero. Float arithmetic that Pillow
+// performs in single precision is reproduced with Math.fround.
 
 // The ports keep Pillow's C shape, which advances and clamps its coordinate parameters in place.
 /* eslint-disable no-param-reassign */
@@ -39,19 +38,11 @@ export interface ShapeStyle {
 export interface LineStyle {
   fill: Rgba;
   width?: number;
-  // "curve" rounds joints between segments wider than 4 pixels.
-  joint?: "curve";
 }
 
 export interface ArcStyle {
   fill: Rgba;
   width?: number;
-}
-
-export interface RoundedRectangleStyle extends ShapeStyle {
-  radius: number;
-  // Top-left, top-right, bottom-right, bottom-left. Defaults to all rounded.
-  corners?: readonly [boolean, boolean, boolean, boolean];
 }
 
 // Pillow's default ink when neither fill nor outline is given.
@@ -61,8 +52,6 @@ const MAX_ELLIPSE_SPAN = 8192;
 
 const f32 = Math.fround;
 // Degree and radian conversion multiply by these constants rather than dividing.
-const RAD_TO_DEG = 180 / Math.PI;
-const DEG_TO_RAD = Math.PI / 180;
 
 function checkColour(colour: Rgba): Rgba {
   if (colour.length !== 4 || colour.some((v) => !Number.isInteger(v) || v < 0 || v > 255)) {
@@ -115,32 +104,6 @@ function roundDownD(v: number): number {
 // roundf and lround: half away from zero.
 function roundAway(v: number): number {
   return v < 0 ? -Math.round(-v) : Math.round(v);
-}
-
-// Floored modulo: the result takes the divisor's sign.
-function floorMod(a: number, b: number): number {
-  let mod = a % b;
-  if (mod) {
-    if (b < 0 !== mod < 0) {
-      mod += b;
-    }
-  } else {
-    mod = b < 0 ? -0 : 0;
-  }
-  return mod;
-}
-
-// Round half to even.
-function roundHalfEven(v: number): number {
-  const floor = Math.floor(v);
-  const diff = v - floor;
-  if (diff > 0.5) {
-    return floor + 1;
-  }
-  if (diff < 0.5) {
-    return floor;
-  }
-  return floor % 2 === 0 ? floor : floor + 1;
 }
 
 /* Pixel primitives */
@@ -588,7 +551,7 @@ class EllipseSpans {
   }
 }
 
-/* Half-plane clipping tree for arcs and pie slices */
+/* Half-plane clipping tree for arcs */
 
 type ClipNode =
   | { type: "clip"; a: number; b: number; c: number }
@@ -743,25 +706,6 @@ function arcInit(a: number, b: number, w: number, al: number, ar: number): Clipp
   };
 }
 
-function pieInit(a: number, b: number, w: number, al: number, ar: number): ClippedEllipse {
-  const spans = new EllipseSpans(a, b, w);
-  const xl = a * Math.cos((al * Math.PI) / 180);
-  const xr = a * Math.cos((ar * Math.PI) / 180);
-  const yl = b * Math.sin((al * Math.PI) / 180);
-  const yr = b * Math.sin((ar * Math.PI) / 180);
-  const span = f32(ar - al);
-  let root: ClipNode = {
-    l: clipNode(-yl, xl, 0),
-    r: clipNode(yr, -xr, 0),
-    type: span < 180 ? "and" : "or",
-  };
-  // One more half-plane avoids spikes.
-  if (span < 90) {
-    root = { l: root, r: clipNode((xl + xr) / 2, (yl + yr) / 2, 0), type: "and" };
-  }
-  return { root, spans };
-}
-
 function drawClipped(
   image: RgbaImage,
   x0: number,
@@ -854,34 +798,6 @@ function arcPrimitive(
   drawClipped(image, x0, y0, a, b, arcInit(a, b, width, start, end), ink);
 }
 
-// Filled pie slice only.
-function pieslicePrimitive(
-  image: RgbaImage,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  start: number,
-  end: number,
-  ink: Rgba,
-): void {
-  [start, end] = normalizeAngles(start, end);
-  if (f32(start + 360) === end) {
-    ellipsePrimitive(image, x0, y0, x1, y1, ink, true, 0);
-    return;
-  }
-  if (start === end) {
-    return;
-  }
-  const a = x1 - x0;
-  const b = y1 - y0;
-  if (a < 0 || b < 0) {
-    return;
-  }
-  checkSpan(a, b);
-  drawClipped(image, x0, y0, a, b, pieInit(a, b, x1 + y1 - x0 - y0, start, end), ink);
-}
-
 /* Pillow's C bindings: truncate coordinates and check box order */
 
 function boxInts(box: readonly number[]): [number, number, number, number] {
@@ -921,17 +837,6 @@ function drawArc(
 ): void {
   const [x0, y0, x1, y1] = boxInts(box);
   arcPrimitive(image, x0, y0, x1, y1, f32(start), f32(end), ink, width);
-}
-
-function drawPieslice(
-  image: RgbaImage,
-  box: readonly number[],
-  start: number,
-  end: number,
-  ink: Rgba,
-): void {
-  const [x0, y0, x1, y1] = boxInts(box);
-  pieslicePrimitive(image, x0, y0, x1, y1, f32(start), f32(end), ink);
 }
 
 function drawPolygon(
@@ -983,65 +888,13 @@ export function point(fill: Rgba, points: readonly Point[], image: RgbaImage): v
 
 // Pillow ImageDraw.line: a polyline; width 1 includes the final point.
 export function line(style: LineStyle, points: readonly Point[], image: RgbaImage): void {
-  lineXY(style, xy(points), image);
-}
-
-function lineXY(style: LineStyle, points: readonly XY[], image: RgbaImage): void {
   const fill = checkColour(style.fill);
   const width = style.width ?? 1;
   if (width === 0) {
     return;
   }
-  drawLines(image, points, fill, width);
-  if (style.joint !== "curve" || width <= 4) {
-    return;
-  }
-  for (let i = 1; i < points.length - 1; i++) {
-    const p = points[i]!;
-    const angles = [
-      [points[i - 1]!, p],
-      [p, points[i + 1]!],
-    ].map(([s, e]) => floorMod(RAD_TO_DEG * Math.atan2(e![0] - s![0], s![1] - e![1]), 360)) as [
-      number,
-      number,
-    ];
-    if (angles[0] === angles[1]) {
-      continue;
-    }
-    const coordAtAngle = ([x, y]: XY, angle: number): XY => {
-      angle -= 90;
-      const distance = width / 2 - 1;
-      const offset = (d: number) => (d > 0 ? Math.floor(d) : Math.ceil(d));
-      return [
-        x + offset(distance * Math.cos(DEG_TO_RAD * angle)),
-        y + offset(distance * Math.sin(DEG_TO_RAD * angle)),
-      ];
-    };
-    const flipped =
-      (angles[1] > angles[0] && angles[1] - 180 > angles[0]) ||
-      (angles[1] < angles[0] && angles[1] + 180 > angles[0]);
-    const box = [
-      p[0] - width / 2 + 1,
-      p[1] - width / 2 + 1,
-      p[0] + width / 2 - 1,
-      p[1] + width / 2 - 1,
-    ];
-    const [start, end] = flipped
-      ? [angles[1] + 90, angles[0] + 90]
-      : [angles[0] - 90, angles[1] - 90];
-    drawPieslice(image, box, start - 90, end - 90, fill);
-    if (width > 8) {
-      // Cover potential gaps between the line and the joint.
-      const turn = flipped ? 90 : -90;
-      lineXY(
-        { fill, width: 3 },
-        [coordAtAngle(p, angles[0] + turn), p, coordAtAngle(p, angles[1] + turn)],
-        image,
-      );
-    }
-  }
+  drawLines(image, xy(points), fill, width);
 }
-
 // Pillow ImageDraw.polygon. A wider outline stays inside the filled area.
 export function polygon(style: ShapeStyle, vertices: readonly Point[], image: RgbaImage): void {
   const points = xy(vertices);
@@ -1109,141 +962,5 @@ export function rectangle(style: ShapeStyle, bounds: Bounds, image: RgbaImage): 
   }
   if (ink !== undefined && !sameInk(ink, fillInk) && width !== 0) {
     drawRectangle(image, box, ink, false, width);
-  }
-}
-
-// Pillow ImageDraw.rounded_rectangle, composed of pie slices, arcs and rectangles.
-export function roundedRectangle(
-  style: RoundedRectangleStyle,
-  bounds: Bounds,
-  image: RgbaImage,
-): void {
-  let [x0, y0, x1, y1] = boxOf(bounds);
-  if (x1 < x0) {
-    throw new RangeError("x1 must be greater than or equal to x0");
-  }
-  if (y1 < y0) {
-    throw new RangeError("y1 must be greater than or equal to y0");
-  }
-  const rounded = style.corners ?? [true, true, true, true];
-  const width = style.width ?? 1;
-  let d = Math.min(x1 - x0, y1 - y0, style.radius * 2);
-  [x0, y0, x1, y1] = [roundHalfEven(x0), roundHalfEven(y0), roundHalfEven(x1), roundHalfEven(y1)];
-  let fullX = false;
-  let fullY = false;
-  if (rounded.every(Boolean)) {
-    fullX = d >= x1 - x0 - 1;
-    if (fullX) {
-      d = x1 - x0;
-    }
-    fullY = d >= y1 - y0 - 1;
-    if (fullY) {
-      d = y1 - y0;
-    }
-    if (fullX && fullY) {
-      ellipse(style, bounds, image);
-      return;
-    }
-  }
-  if (d === 0 || !rounded.some(Boolean)) {
-    rectangle(style, bounds, image);
-    return;
-  }
-  const r = Math.trunc(Math.floor(d / 2));
-  const [ink, fillInk] = inks(style);
-  const drawCorners = (pieslice: boolean, colour: Rgba) => {
-    let parts: [number[], number, number][];
-    if (fullX) {
-      parts = [
-        [[x0, y0, x0 + d, y0 + d], 180, 360],
-        [[x0, y1 - d, x0 + d, y1], 0, 180],
-      ];
-    } else if (fullY) {
-      parts = [
-        [[x0, y0, x0 + d, y0 + d], 90, 270],
-        [[x1 - d, y0, x1, y0 + d], 270, 90],
-      ];
-    } else {
-      const all: [number[], number, number][] = [
-        [[x0, y0, x0 + d, y0 + d], 180, 270],
-        [[x1 - d, y0, x1, y0 + d], 270, 360],
-        [[x1 - d, y1 - d, x1, y1], 0, 90],
-        [[x0, y1 - d, x0 + d, y1], 90, 180],
-      ];
-      parts = all.filter((_, i) => rounded[i]);
-    }
-    for (const [part, start, end] of parts) {
-      if (pieslice) {
-        drawPieslice(image, part, start, end, colour);
-      } else {
-        drawArc(image, part, start, end, colour, width);
-      }
-    }
-  };
-  if (fillInk !== undefined) {
-    drawCorners(true, fillInk);
-    if (fullX) {
-      drawRectangle(image, [x0, y0 + r + 1, x1, y1 - r - 1], fillInk, true);
-    } else if (x1 - r - 1 >= x0 + r + 1) {
-      drawRectangle(image, [x0 + r + 1, y0, x1 - r - 1, y1], fillInk, true);
-    }
-    if (!fullX && !fullY) {
-      const left = [x0, y0, x0 + r, y1];
-      if (rounded[0]) {
-        left[1] += r + 1;
-      }
-      if (rounded[3]) {
-        left[3] -= r + 1;
-      }
-      drawRectangle(image, left, fillInk, true);
-      const right = [x1 - r, y0, x1, y1];
-      if (rounded[1]) {
-        right[1] += r + 1;
-      }
-      if (rounded[2]) {
-        right[3] -= r + 1;
-      }
-      drawRectangle(image, right, fillInk, true);
-    }
-  }
-  if (ink === undefined || sameInk(ink, fillInk) || width === 0) {
-    return;
-  }
-  drawCorners(false, ink);
-  if (!fullX) {
-    const top = [x0, y0, x1, y0 + width - 1];
-    if (rounded[0]) {
-      top[0] += r + 1;
-    }
-    if (rounded[1]) {
-      top[2] -= r + 1;
-    }
-    drawRectangle(image, top, ink, true);
-    const bottom = [x0, y1 - width + 1, x1, y1];
-    if (rounded[3]) {
-      bottom[0] += r + 1;
-    }
-    if (rounded[2]) {
-      bottom[2] -= r + 1;
-    }
-    drawRectangle(image, bottom, ink, true);
-  }
-  if (!fullY) {
-    const left = [x0, y0, x0 + width - 1, y1];
-    if (rounded[0]) {
-      left[1] += r + 1;
-    }
-    if (rounded[3]) {
-      left[3] -= r + 1;
-    }
-    drawRectangle(image, left, ink, true);
-    const right = [x1 - width + 1, y0, x1, y1];
-    if (rounded[1]) {
-      right[1] += r + 1;
-    }
-    if (rounded[2]) {
-      right[3] -= r + 1;
-    }
-    drawRectangle(image, right, ink, true);
   }
 }

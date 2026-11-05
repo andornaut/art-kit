@@ -1,15 +1,11 @@
 // Animated GIF encoding with exact palettes and binary alpha.
 import type { RgbaImage } from "./rgbaImage.js";
 
-// 0 leaves disposal unspecified, 1 keeps the frame and 2 restores the background.
-export type GifDisposal = 0 | 1 | 2;
-
 export interface GifOptions {
   // Milliseconds, one for every frame or one per frame; stored in hundredths, truncated.
   durations: number | readonly number[];
   // Repetitions after the first play, 0 for forever; omitted writes no loop extension.
   loop?: number;
-  disposal?: GifDisposal;
 }
 
 const MAX_COLOURS = 256;
@@ -148,23 +144,20 @@ function tableBits(count: number): number {
 
 // Encodes every frame whole. Consecutive identical frames merge into one, adding durations, as
 // Pillow 13.0.0 merges them. Pillow decodes the result to the input frames with the frame count,
-// size, durations, loop and disposal it decodes from its own save of the same frames, and to the
+// size, durations and loop it decodes from its own save of the same frames, and to the
 // same pixels whenever its quantizer keeps every colour: always for RGB input of at most 256
 // colours, but not for many-colour RGBA input, where this encoder stays exact and Pillow does not.
 // Fully transparent pixels use a transparency index; partial alpha, more than one fully
 // transparent RGBA value or more than 256 colours in a frame throw RangeError. Frames share a
 // global palette when they hold at most 256 colours together, otherwise each has its own.
 export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Uint8Array {
-  const { disposal = 0, loop } = options;
+  const { loop } = options;
   if (frames.length === 0) {
     throw new RangeError("A GIF needs at least one frame");
   }
   const { height, width } = frames[0];
   if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= 0xffff)) {
     throw new RangeError(`Invalid GIF size ${width}x${height}`);
-  }
-  if (![0, 1, 2].includes(disposal)) {
-    throw new RangeError(`Unsupported GIF disposal: ${disposal}`);
   }
   if (loop !== undefined && !(Number.isInteger(loop) && loop >= 0 && loop <= 0xffff)) {
     throw new RangeError(`Invalid GIF loop: ${loop}`);
@@ -182,16 +175,6 @@ export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Ui
     if (last && samePixels(last.pixels, frame.pixels)) {
       last.duration += frame.duration;
       return;
-    }
-    // Pillow restores an opaque frame's area to its background colour, an index into a palette
-    // order this encoder does not reproduce, so a later transparent pixel would differ.
-    if (
-      last &&
-      disposal === 2 &&
-      last.transparent === undefined &&
-      frame.transparent !== undefined
-    ) {
-      throw new RangeError(`Frame ${index} is transparent after an opaque frame with disposal 2`);
     }
     kept.push(frame);
   });
@@ -223,8 +206,9 @@ export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Ui
     // Pillow gives a later frame a spare transparency index whenever its palette has room, so
     // its control block, and a decoded duration of 0, appears even without other content.
     const spare = position > 0 && frame.colours.length < MAX_COLOURS;
-    if (transparency !== undefined || hundredths !== 0 || disposal !== 0 || spare) {
-      out.u8(0x21, 0xf9, 4, (disposal << 2) | Number(transparency !== undefined));
+    // Disposal stays 0 (unspecified).
+    if (transparency !== undefined || hundredths !== 0 || spare) {
+      out.u8(0x21, 0xf9, 4, Number(transparency !== undefined));
       out.u16(hundredths);
       out.u8(transparency ?? 0, 0);
     }

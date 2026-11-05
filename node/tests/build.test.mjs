@@ -7,15 +7,14 @@ import test from "node:test";
 
 import {
   buildCommand,
-  BuildError,
   buildOrder,
-  CheckError,
   checkSets,
-  formatChanges,
   nodeBuild,
   runBuilds,
-  UsageError,
 } from "@andornaut/art-kit/build";
+
+// The error classes are internal; callers identify them by name.
+const named = (caught, name) => caught instanceof Error && caught.name === name;
 
 // A set table from [name, needs] pairs in declaration order; each build appends its name to ran.
 function table(entries, ran = [], failing) {
@@ -100,31 +99,31 @@ const invalid = [
   {
     name: "cycle",
     entries: [["a", ["c"]], ["b", ["a"]], ["c", ["b"]], ["d"]],
-    error: RangeError,
+    error: "RangeError",
     message: /cycle: a -> c -> b -> a$/,
   },
-  { name: "self need", entries: [["a", ["a"]]], error: RangeError, message: /cycle: a -> a$/ },
+  { name: "self need", entries: [["a", ["a"]]], error: "RangeError", message: /cycle: a -> a$/ },
   {
     name: "unknown need",
     entries: [
       ["a", ["ghost"]],
       ["b", ["phantom"]],
     ],
-    error: RangeError,
+    error: "RangeError",
     message: /^a needs unknown set ghost; b needs unknown set phantom$/,
   },
   {
     name: "unknown selection",
     entries: [["a"]],
     selected: ["b", "a", "c", "b"],
-    error: UsageError,
+    error: "UsageError",
     message: /^unknown set b, c$/,
   },
   {
     name: "inherited name is unknown",
     entries: [["a"]],
     selected: ["toString"],
-    error: UsageError,
+    error: "UsageError",
     message: /^unknown set toString$/,
   },
 ];
@@ -133,7 +132,7 @@ for (const { entries, error, message, name, selected } of invalid) {
   test(`buildOrder rejects ${name}`, () => {
     assert.throws(
       () => buildOrder(table(entries), selected),
-      (caught) => caught instanceof error && message.test(caught.message),
+      (caught) => named(caught, error) && message.test(caught.message),
     );
   });
 }
@@ -169,7 +168,7 @@ test("runBuilds names the failing set and stops", async () => {
   const ran = [];
   const sets = table([["a"], ["b", ["a"]], ["c", ["b"]]], ran, "b");
   await assert.rejects(runBuilds({ sets, log: () => {} }), (caught) => {
-    assert.ok(caught instanceof BuildError);
+    assert.ok(named(caught, "BuildError"));
     assert.equal(caught.set, "b");
     assert.equal(caught.message, "b build failed: b broke");
     assert.equal(caught.cause.message, "b broke");
@@ -240,7 +239,7 @@ for (const { changes, edit, name } of checks) {
       return;
     }
     await assert.rejects(run, (caught) => {
-      assert.ok(caught instanceof CheckError);
+      assert.ok(named(caught, "CheckError"));
       assert.deepEqual(caught.changes, changes(dir));
       return true;
     });
@@ -583,12 +582,12 @@ for (const { args, error, name, options, set } of spawns) {
   });
 }
 
-test("nodeBuild failures become BuildError naming the set", async (t) => {
+test("nodeBuild failures become a BuildError naming the set", async (t) => {
   const dir = await moduleDir(t, []);
   await writeFile(join(dir, "broken.ts"), "process.exitCode = 1;\n");
   const sets = { broken: { build: nodeBuild({ directory: dir }, "broken") } };
   await assert.rejects(runBuilds({ log: () => {}, sets }), (caught) => {
-    assert.ok(caught instanceof BuildError);
+    assert.ok(named(caught, "BuildError"));
     assert.equal(caught.message, "broken build failed: exit 1");
     return true;
   });
@@ -698,6 +697,28 @@ const indexChecks = [
 ];
 
 for (const { before, changes, edit, lines: expected, message, name } of indexChecks) {
+  test(`buildCommand --check with index prints: ${name}`, async (t) => {
+    const dir = await repository(t);
+    const previous = process.cwd();
+    process.chdir(dir);
+    t.after(() => process.chdir(previous));
+    await before(dir);
+    const lines = [];
+    const errors = [];
+    const options = {
+      check: { index: true, paths: ["out", "single.txt", "missing.txt"] },
+      error: (line) => errors.push(line),
+      log: (line) => lines.push(line),
+      sets: { only: { build: () => edit(dir) } },
+    };
+    assert.equal(await buildCommand(options, ["--check"]), changes ? 1 : 0);
+    assert.deepEqual(
+      lines.filter((line) => line.includes("\t")),
+      expected ?? [],
+    );
+    assert.deepEqual(errors, changes ? [message] : []);
+  });
+
   test(`runBuilds index check: ${name}`, async (t) => {
     const dir = await repository(t);
     const previous = process.cwd();
@@ -718,9 +739,8 @@ for (const { before, changes, edit, lines: expected, message, name } of indexChe
       return;
     }
     await assert.rejects(run, (caught) => {
-      assert.ok(caught instanceof CheckError);
+      assert.ok(named(caught, "CheckError"));
       assert.deepEqual(caught.changes, changes);
-      assert.deepEqual(formatChanges(caught.changes), expected);
       assert.equal(caught.message, message);
       return true;
     });
@@ -758,7 +778,7 @@ test("runBuilds index check reports changes keyed like the snapshot", async (t) 
   const check = { index: true, paths: [join(dir, "out"), "../single.txt"] };
   await writeFile(join(dir, "single.txt"), "two");
   await assert.rejects(runBuilds({ check, log: () => {}, sets: {} }), (caught) => {
-    assert.ok(caught instanceof CheckError);
+    assert.ok(named(caught, "CheckError"));
     assert.deepEqual(caught.changes, {
       added: [],
       removed: [],
@@ -788,4 +808,15 @@ test("only the index check runs git", async (t) => {
     runBuilds({ check: { ...check, index: true }, log: () => {}, sets }),
     /^Error: git rev-parse failed: .*ENOENT/,
   );
+});
+
+test("build exports only its public API", async () => {
+  const build = await import("@andornaut/art-kit/build");
+  assert.deepEqual(Object.keys(build).sort(), [
+    "buildCommand",
+    "buildOrder",
+    "checkSets",
+    "nodeBuild",
+    "runBuilds",
+  ]);
 });
