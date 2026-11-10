@@ -38,19 +38,6 @@ if (mode === "exec") {
   mkdirSync("/tmp/out", { recursive: true });
   cpSync("/work", source, { recursive: true, verbatimSymlinks: true });
   process.env.ART_KIT_TEST_FIXTURES = join(source, "node/tests/fixtures");
-  if (mode === "lint") {
-    run("shellcheck", [
-      "-x",
-      "-P",
-      "SCRIPTDIR",
-      "tests/container/run",
-      "tests/container/check",
-      "scripts/check.sh",
-      "scripts/pack.sh",
-      "scripts/provision.sh",
-    ]);
-    run("markdownlint-cli2", []);
-  }
   run(process.execPath, [join(source, "scripts/node-package.mts"), mode, revision, ...args]);
   if (mode === "build" && process.env.CHECK_EXPORT === "1") {
     const output = "/work/dist";

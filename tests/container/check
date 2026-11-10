@@ -1,2 +1,13 @@
 #!/bin/sh
+set -eu
+
+case "${1:-}" in
+    lint)
+        shellcheck -x -P SCRIPTDIR \
+            tests/container/run tests/container/check \
+            scripts/check.sh scripts/pack.sh scripts/provision.sh
+        markdownlint-cli2
+        ;;
+esac
+
 exec node /work/tests/container/check.mts "$@"
