@@ -1,64 +1,21 @@
-import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { lstatSync, mkdirSync, realpathSync, symlinkSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
-const [mode, ...args] = process.argv.slice(2);
-
-function run(command: string, parameters: readonly string[]): void {
-  const result = spawnSync(command, parameters, { cwd: "/work", stdio: "inherit" });
-  if (result.error) {
-    throw result.error;
-  }
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
-}
-
-if (mode === "exec") {
-  if (args.length) {
-    run(args[0], args.slice(1));
-  } else if (process.env.COMMAND) {
-    run("sh", ["-ec", process.env.COMMAND]);
-  } else {
-    throw new Error("exec requires arguments or COMMAND");
-  }
-} else {
-  if (!["lint", "test", "build"].includes(mode)) {
-    throw new Error("Expected lint, test, build or exec");
-  }
-  if (args.length && mode !== "test") {
-    throw new Error("Only test accepts extra arguments");
-  }
-  const revision = process.env.CHECK_REVISION;
-  if (!revision) {
-    throw new Error("CHECK_REVISION is required");
-  }
-  const source = "/tmp/work/source";
-  mkdirSync(source, { recursive: true });
-  mkdirSync("/tmp/out", { recursive: true });
-  cpSync("/work", source, { recursive: true, verbatimSymlinks: true });
-  process.env.ART_KIT_TEST_FIXTURES = join(source, "node/tests/fixtures");
-  run(process.execPath, [join(source, "scripts/node-package.mts"), mode, revision, ...args]);
-  if (mode === "build" && process.env.CHECK_EXPORT === "1") {
-    const output = "/work/dist";
-    mkdirSync(output, { recursive: true });
-    cpSync(join(source, "node/dist"), output, { recursive: true });
-    for (const file of readdirSync("/tmp/out")) {
-      cpSync(join("/tmp/out", file), join(output, file));
+for (const [relative, dependencies] of [
+  ["node/node_modules", "/opt/tools/node_modules"],
+  ["tests/container/node_modules", "/opt/lint/node_modules"],
+]) {
+  const target = resolve("/work", relative);
+  mkdirSync(dirname(target), { recursive: true });
+  try {
+    const existing = lstatSync(target);
+    if (!existing.isSymbolicLink() || realpathSync(target) !== dependencies) {
+      throw new Error(`Refusing to replace existing dependency path: ${relative}`);
     }
-    writeFileSync(
-      join(output, "CHECK_SNAPSHOT.json"),
-      `${JSON.stringify(
-        {
-          version: 1,
-          revision,
-          sourceSha256: process.env.CHECK_SOURCE_SHA256,
-          dirty: process.env.CHECK_SOURCE_DIRTY === "true",
-          snapshot: true,
-        },
-        null,
-        2,
-      )}\n`,
-    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+    symlinkSync(dependencies, target, "dir");
   }
 }

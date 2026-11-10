@@ -1,13 +1,28 @@
 #!/bin/sh
 set -eu
 
-case "${1:-}" in
-    lint)
-        shellcheck -x -P SCRIPTDIR \
-            tests/container/run tests/container/check \
-            scripts/check.sh scripts/pack.sh scripts/provision.sh
-        markdownlint-cli2
+case "${1:-check}" in
+    check)
+        if [ "$#" -gt 0 ]; then shift; fi
+        if [ "$#" -ne 0 ]; then exit 2; fi
+        set -- npm --prefix node run check
+        ;;
+    lint|test|build)
+        category=$1
+        shift
+        set -- npm --prefix node run "$category" -- "$@"
+        ;;
+    exec)
+        shift
+        if [ "$#" -eq 0 ]; then
+            set -- /bin/sh -ec "${COMMAND:?COMMAND is required}"
+        fi
+        ;;
+    *)
+        printf 'Unknown check action: %s\n' "$1" >&2
+        exit 2
         ;;
 esac
 
-exec node /work/tests/container/check.mts "$@"
+node /work/tests/container/check.mts
+exec "$@"
