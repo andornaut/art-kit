@@ -49,7 +49,7 @@ export default defineConfig(
   },
   // Tests and tooling: they verify or produce what ships rather than being it.
   {
-    files: [...TEST_FILES, "*.mjs", "scripts/**/*.mts"],
+    files: [...TEST_FILES, "*.mjs", "scripts/**/*.mts", "tests/container/**/*.mts"],
     plugins,
     rules: toolingRules,
   },

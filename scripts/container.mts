@@ -7,7 +7,6 @@
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createHash, randomInt } from "node:crypto";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { loadavg } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -100,12 +99,6 @@ function git(args: readonly string[]): string {
 }
 
 // Host guards
-
-function requireIdle(): void {
-  if (!(loadavg()[0] < 24)) {
-    throw new Failure("One-minute load must be below 24");
-  }
-}
 
 function fingerprint(): string {
   const hash = createHash("sha256").update(git(["status", "--porcelain=v1", "-z"]));
@@ -319,9 +312,8 @@ interface Descriptor {
   peerDependencies: Record<string, string>;
 }
 
-async function check(dependencyPath: string): Promise<void> {
+async function checkTask(mode: string, dependencyPath: string): Promise<void> {
   const dependencies = realpathSync(dependencyPath);
-  requireIdle();
   const evidence = evidenceDirectory("check");
   guardSource();
   const commit = revision();
@@ -347,7 +339,7 @@ async function check(dependencyPath: string): Promise<void> {
     // A low open-file limit, so the tests catch code that opens every input at once.
     nofile: 256,
   };
-  await withContainer(spec, "art-kit-check", NODE_IMAGE, async (container) => {
+  await withContainer(spec, `art-kit-${mode}`, NODE_IMAGE, async (container) => {
     await exec({}, container, ["mkdir", "-p", "/tmp/work/source", "/tmp/out"]);
     await exec({}, container, [
       "cp",
@@ -355,16 +347,31 @@ async function check(dependencyPath: string): Promise<void> {
       ...entries.map((entry) => `/app/${entry}`),
       "/tmp/work/source/",
     ]);
-    await exec({}, container, ["node", "/app/scripts/node-package.mts", "check", commit]);
+    await exec({}, container, ["node", "/app/scripts/node-package.mts", mode, commit]);
     await copyOut(container, "/tmp/out/.", evidence);
   });
   verifySource();
   console.log(`Check evidence: ${evidence}`);
 }
 
+async function check(dependencyPath: string): Promise<void> {
+  await checkTask("check", dependencyPath);
+}
+
+async function lint(dependencyPath: string): Promise<void> {
+  await checkTask("lint", dependencyPath);
+}
+
+async function test(dependencyPath: string): Promise<void> {
+  await checkTask("test", dependencyPath);
+}
+
+async function build(dependencyPath: string): Promise<void> {
+  await checkTask("build", dependencyPath);
+}
+
 async function pack(dependencyPath: string, outputPath: string): Promise<void> {
   const dependencies = realpathSync(dependencyPath);
-  requireIdle();
   const output = emptyOutput(outputPath);
   guardSource();
   const commit = revision();
@@ -388,7 +395,6 @@ async function pack(dependencyPath: string, outputPath: string): Promise<void> {
 }
 
 async function provision(outputPath: string): Promise<void> {
-  requireIdle();
   const output = emptyOutput(outputPath);
   const descriptor: Descriptor = JSON.parse(readFileSync(join(root, "node/package.json"), "utf8"));
   const manifest = JSON.stringify({
@@ -422,12 +428,18 @@ async function provision(outputPath: string): Promise<void> {
 
 const USAGE = {
   check: "check <node_modules-directory>",
+  lint: "lint <node_modules-directory>",
+  test: "test <node_modules-directory>",
+  build: "build <node_modules-directory>",
   pack: "pack <node_modules-directory> <output-directory>",
   provision: "provision <output-directory>",
 } as const;
 
 const COMMANDS: Record<keyof typeof USAGE, (...args: string[]) => Promise<void>> = {
   check,
+  lint,
+  test,
+  build,
   pack,
   provision,
 };

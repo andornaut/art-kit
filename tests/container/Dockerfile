@@ -1,6 +1,10 @@
+# syntax=docker/dockerfile:1.25
+FROM koalaman/shellcheck:v0.11.0 AS shellcheck
+
 FROM node:24.21.0
 
-RUN mkdir -p /opt/tools /opt/check && chown 19001:19001 /opt/tools
+RUN mkdir -p /opt/tools /opt/lint /opt/check && chown 19001:19001 /opt/tools /opt/lint
+COPY --from=shellcheck /bin/shellcheck /usr/local/bin/shellcheck
 COPY --chmod=0444 node/package.json /opt/package.json
 COPY --chmod=0555 tests/container/check /opt/check/run
 RUN ln -s /opt/tools/node_modules /deps
@@ -11,5 +15,7 @@ RUN node --input-type=module -e 'import { readFileSync, writeFileSync } from "no
     && npm install --ignore-scripts --no-audit --no-fund \
     && cd node_modules/skia-canvas \
     && node lib/prebuild.mjs download
+RUN npm install --prefix /opt/lint --ignore-scripts --no-audit --no-fund markdownlint-cli2@0.24.0
+ENV PATH=/opt/lint/node_modules/.bin:${PATH}
 WORKDIR /work
 ENTRYPOINT ["/opt/check/run"]

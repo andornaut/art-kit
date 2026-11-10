@@ -215,7 +215,7 @@ if (mode === "test" || mode === "check") {
     cpSync(path, target);
     return target;
   });
-  execFileSync("node", ["--test", "--test-concurrency=4", ...testArgs, ...targets], {
+  execFileSync("node", ["--test", ...testArgs, "--test-concurrency=4", ...targets], {
     cwd: install,
     stdio: "inherit",
   });

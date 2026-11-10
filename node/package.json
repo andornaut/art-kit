@@ -99,5 +99,12 @@
     "prettier": "3.9.10",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1"
+  },
+  "scripts": {
+    "check": "make --no-print-directory -C .. check",
+    "test": "make --no-print-directory -C .. test",
+    "lint": "make --no-print-directory -C .. lint",
+    "build": "make --no-print-directory -C .. build",
+    "check-info": "make --no-print-directory -C .. check-info"
   }
 }

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, readdirSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const [mode, ...args] = process.argv.slice(2);
@@ -38,6 +38,19 @@ if (mode === "exec") {
   mkdirSync("/tmp/out", { recursive: true });
   cpSync("/work", source, { recursive: true, verbatimSymlinks: true });
   process.env.ART_KIT_TEST_FIXTURES = join(source, "node/tests/fixtures");
+  if (mode === "lint") {
+    run("shellcheck", [
+      "-x",
+      "-P",
+      "SCRIPTDIR",
+      "tests/container/run",
+      "tests/container/check",
+      "scripts/check.sh",
+      "scripts/pack.sh",
+      "scripts/provision.sh",
+    ]);
+    run("markdownlint-cli2", []);
+  }
   run(process.execPath, [join(source, "scripts/node-package.mts"), mode, revision, ...args]);
   if (mode === "build" && process.env.CHECK_EXPORT === "1") {
     const output = "/work/dist";
@@ -46,5 +59,19 @@ if (mode === "exec") {
     for (const file of readdirSync("/tmp/out")) {
       cpSync(join("/tmp/out", file), join(output, file));
     }
+    writeFileSync(
+      join(output, "CHECK_SNAPSHOT.json"),
+      `${JSON.stringify(
+        {
+          version: 1,
+          revision,
+          sourceSha256: process.env.CHECK_SOURCE_SHA256,
+          dirty: process.env.CHECK_SOURCE_DIRTY === "true",
+          snapshot: true,
+        },
+        null,
+        2,
+      )}\n`,
+    );
   }
 }
