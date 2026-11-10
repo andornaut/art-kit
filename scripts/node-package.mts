@@ -24,8 +24,8 @@ interface Descriptor {
 const SKIA_SUBPATHS = ["fonts"];
 
 const [mode, revision] = process.argv.slice(2);
-if (!["check", "pack"].includes(mode)) {
-  throw new Error("Expected check or pack mode");
+if (!["lint", "test", "build", "check", "pack"].includes(mode)) {
+  throw new Error("Expected lint, test, build, check or pack mode");
 }
 // Dependencies are mounted outside a conventional node_modules directory.
 process.env.NODE_PATH = "/deps";
@@ -47,7 +47,7 @@ const { version } = descriptor;
 if (!/^\d+\.\d+\.\d+$/.test(version ?? "")) {
   throw new Error("Missing or invalid package version");
 }
-if (mode === "check") {
+if (mode === "lint" || mode === "check") {
   // The linters resolve their configs' imports through node_modules beside them; preserving the symlinked
   // path lets each package find its siblings in /deps.
   symlinkSync("/deps", `${root}/node_modules`);
@@ -60,6 +60,9 @@ if (mode === "check") {
   };
   tool("prettier/bin/prettier.cjs", ["--check", "."]);
   tool("eslint/bin/eslint.js", ["--max-warnings", "0", "."]);
+}
+if (mode === "lint") {
+  process.exit(0);
 }
 symlinkSync("/deps", `${root}/node/node_modules`);
 execFileSync("node", ["/deps/typescript/bin/tsc", "-p", `${root}/node/tsconfig.json`], {
@@ -181,7 +184,7 @@ execFileSync(
   ],
   { cwd: install, stdio: "inherit" },
 );
-if (mode === "check") {
+if (mode === "test" || mode === "check") {
   const tests: string[] = [];
   function collect(dir: string): void {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -206,8 +209,8 @@ if (mode === "check") {
     cwd: install,
     stdio: "inherit",
   });
-  cpSync(archive, `${out}/andornaut-art-kit-${version}.tgz`);
-} else {
+}
+if (mode === "pack") {
   const tarball = `art-kit-${version}.tgz`;
   cpSync(archive, `${out}/${tarball}`);
   writeFileSync(`${out}/SOURCE_COMMIT`, `${revision}\n`);
@@ -222,4 +225,6 @@ if (mode === "check") {
       )
       .join(""),
   );
+} else {
+  cpSync(archive, `${out}/andornaut-art-kit-${version}.tgz`);
 }
