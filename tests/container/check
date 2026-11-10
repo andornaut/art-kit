@@ -1,0 +1,2 @@
+#!/bin/sh
+exec node /work/tests/container/check.mts "$@"
