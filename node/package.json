@@ -101,10 +101,9 @@
     "typescript-eslint": "8.72.1"
   },
   "scripts": {
-    "check": "make --no-print-directory -C .. check",
-    "test": "make --no-print-directory -C .. test",
-    "lint": "make --no-print-directory -C .. lint",
-    "build": "make --no-print-directory -C .. build",
-    "check-info": "make --no-print-directory -C .. check-info"
+    "check": "npm run lint && npm test && npm run build",
+    "test": "node ../scripts/native-check.mts test",
+    "lint": "node ../scripts/native-check.mts lint",
+    "build": "node ../scripts/native-check.mts build"
   }
 }

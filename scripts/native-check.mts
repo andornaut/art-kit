@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   cpSync,
@@ -56,9 +56,11 @@ function allowed(path: string): boolean {
   return !path.split(/[\\/]/).some(
     (part) =>
       // eslint-disable-next-line max-len
-      /^(?:\.git|\.claude|\.codex|\.worktrees|\.private|\.ssh|\.gnupg|node_modules|dist|\.npmrc|\.netrc|\.pypirc|\.git-credentials|AGENTS\.md|CLAUDE(?:\.local)?\.md|GEMINI\.md|\.env(?:\..*)?)$/i.test(
+      /^(?:\.git|\.agents|\.claude|\.codex|\.worktrees|\.private|\.ssh|\.aws|\.gnupg|node_modules|dist|\.npmrc|\.netrc|\.pypirc|\.git-credentials|credentials(?:\..*)?|AGENTS\.md|CLAUDE(?:\.local)?\.md|GEMINI\.md|\.dev\.vars(?:\..*)?|\.env(?:\..*)?)$/i.test(
         part,
-      ) || /\.(?:pem|key|p12|pfx|kdbx|age)$/i.test(part),
+      ) ||
+      /\.(?:env|pem|key|crt|cer|p12|pfx|kdbx|age|gpg)$/i.test(part) ||
+      /\.sops\./i.test(part),
   );
 }
 
@@ -159,29 +161,51 @@ try {
   if (fingerprint() !== before) {
     throw new Error("Source changed during snapshot; discard this run");
   }
+  const options = {
+    cwd: source,
+    stdio: "inherit" as const,
+    env: {
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
+      ),
+      HOME: scratch,
+      TMPDIR: scratch,
+      GIT_CONFIG_GLOBAL: "/dev/null",
+      GIT_CONFIG_NOSYSTEM: "1",
+      ART_KIT_PACKAGE_WORK: scratch,
+      ART_KIT_PACKAGE_OUT: output,
+      ART_KIT_PACKAGE_ROOT: source,
+      ART_KIT_PACKAGE_NODE_MODULES: dependencies,
+      ART_KIT_TEST_FIXTURES: join(source, "node/tests/fixtures"),
+      npm_config_cache: join(scratch, "npm-cache"),
+      UV_THREADPOOL_SIZE: "4",
+    },
+  };
+  if (mode === "lint" || mode === "check") {
+    execFileSync(
+      "shellcheck",
+      [
+        "-x",
+        "-P",
+        "SCRIPTDIR",
+        "tests/container/run",
+        "tests/container/check",
+        "scripts/check.sh",
+        "scripts/pack.sh",
+        "scripts/provision.sh",
+      ],
+      options,
+    );
+    execFileSync(
+      process.execPath,
+      [realpathSync(join(root, "tests/container/node_modules/.bin/markdownlint-cli2"))],
+      options,
+    );
+  }
   const result = spawnSync(
     process.execPath,
     [join(source, "scripts/node-package.mts"), mode, revision, ...args],
-    {
-      cwd: source,
-      stdio: "inherit",
-      env: {
-        ...Object.fromEntries(
-          Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")),
-        ),
-        HOME: scratch,
-        TMPDIR: scratch,
-        GIT_CONFIG_GLOBAL: "/dev/null",
-        GIT_CONFIG_NOSYSTEM: "1",
-        ART_KIT_PACKAGE_WORK: scratch,
-        ART_KIT_PACKAGE_OUT: output,
-        ART_KIT_PACKAGE_ROOT: source,
-        ART_KIT_PACKAGE_NODE_MODULES: dependencies,
-        ART_KIT_TEST_FIXTURES: join(source, "node/tests/fixtures"),
-        npm_config_cache: join(scratch, "npm-cache"),
-        UV_THREADPOOL_SIZE: "4",
-      },
-    },
+    options,
   );
   if (result.error) {
     throw result.error;
