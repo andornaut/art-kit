@@ -186,7 +186,7 @@ The existing `scripts/*.sh` wrappers retain explicit dependency paths for provis
 | `bash scripts/check.sh <node_modules>`                  | Copies the working tree, runs `prettier --check` and `eslint --max-warnings 0`, compiles, packs and installs the tarball, imports every subpath (all but `fonts` without Skia), checks the declarations and runs the Node tests |
 | `bash scripts/pack.sh <node_modules> <empty-directory>` | Builds `art-kit-<version>.tgz`, `SOURCE_COMMIT` and `SHA256SUMS` from the committed `HEAD`                                                                                                                                      |
 
-Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. CI runs `make check`, retains committed packaging and uploads its output. The Markdown, ShellCheck and attribution workflows remain additional source gates. Game projects test their own adapters and authored output; no game build is part of the package gate.
+Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. CI runs `make check`, retains committed packaging and uploads its output. Markdown runs through the pinned container lint command; CI also retains ShellCheck and attribution scanning. Game projects test their own adapters and authored output; no game build is part of the package gate.
 
 ## Version and licence
 
