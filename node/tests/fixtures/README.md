@@ -21,7 +21,7 @@ These fixtures are frozen reference outputs. Their generators are not in this tr
 
 ## Fonts
 
-Unmodified Liberation Sans Regular and Bold from Debian fonts-liberation 1:2.1.5-3 (upstream 2.1.5). Source: https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.5
+Unmodified Liberation Sans Regular and Bold from Debian fonts-liberation 1:2.1.5-3 (upstream 2.1.5). Source: [Liberation Fonts 2.1.5](https://github.com/liberationfonts/liberation-fonts/releases/tag/2.1.5).
 
 These test-only fonts retain the SIL Open Font License 1.1 in LICENSE.txt. They are not helper-code MIT assets. Release payloads include compiled Node dist only, excluding this directory.
 
