@@ -15,7 +15,9 @@ RUN node --input-type=module -e 'import { readFileSync, writeFileSync } from "no
     && npm install --ignore-scripts --no-audit --no-fund \
     && cd node_modules/skia-canvas \
     && node lib/prebuild.mjs download
-RUN npm install --prefix /opt/lint --ignore-scripts --no-audit --no-fund markdownlint-cli2@0.24.0
+WORKDIR /opt/lint
+COPY --chmod=0444 tests/container/package.json tests/container/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
 ENV PATH=/opt/lint/node_modules/.bin:${PATH}
 WORKDIR /work
 ENTRYPOINT ["/opt/check/run"]
