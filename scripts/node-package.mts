@@ -6,6 +6,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  renameSync,
   symlinkSync,
   unlinkSync,
   writeFileSync,
@@ -31,17 +32,18 @@ if (mode !== "test" && testArgs.length) {
   throw new Error(`Extra arguments are only supported in test mode, not ${mode}`);
 }
 // Dependencies are mounted outside a conventional node_modules directory.
-process.env.NODE_PATH = "/deps";
+const dependencies = process.env.ART_KIT_PACKAGE_NODE_MODULES ?? "/deps";
+process.env.NODE_PATH = dependencies;
 // Inputs and outputs live in the container's writable /tmp volume; the caller copies /tmp/out out.
-const work = "/tmp/work";
-const out = "/tmp/out";
-const root = `${work}/source`;
+const work = process.env.ART_KIT_PACKAGE_WORK ?? "/tmp/work";
+const out = process.env.ART_KIT_PACKAGE_OUT ?? "/tmp/out";
+const root = process.env.ART_KIT_PACKAGE_ROOT ?? `${work}/source`;
 const descriptor: Descriptor = JSON.parse(readFileSync(`${root}/node/package.json`, "utf8"));
 for (const [name, expected] of Object.entries<string>({
   ...descriptor.devDependencies,
   ...descriptor.peerDependencies,
 })) {
-  const actual = JSON.parse(readFileSync(`/deps/${name}/package.json`, "utf8")).version;
+  const actual = JSON.parse(readFileSync(`${dependencies}/${name}/package.json`, "utf8")).version;
   if (actual !== expected) {
     throw new Error(`${name}: expected ${expected}, actual ${actual}`);
   }
@@ -50,14 +52,14 @@ const { version } = descriptor;
 if (!/^\d+\.\d+\.\d+$/.test(version ?? "")) {
   throw new Error("Missing or invalid package version");
 }
-symlinkSync("/deps", `${root}/node/node_modules`);
+symlinkSync(dependencies, `${root}/node/node_modules`);
 if (mode === "lint" || mode === "check") {
   // The linters resolve their configs' imports through node_modules beside them; preserving the symlinked
   // path lets each package find its siblings in /deps.
-  symlinkSync("/deps", `${root}/node_modules`);
+  symlinkSync(dependencies, `${root}/node_modules`);
   const tool = (path: string, args: readonly string[]): void => {
     execFileSync(
-      "node",
+      process.execPath,
       ["--preserve-symlinks", "--preserve-symlinks-main", `${root}/node_modules/${path}`, ...args],
       { cwd: root, stdio: "inherit" },
     );
@@ -66,8 +68,8 @@ if (mode === "lint" || mode === "check") {
   tool("eslint/bin/eslint.js", ["--max-warnings", "0", "."]);
   if (mode === "lint") {
     execFileSync(
-      "node",
-      ["/deps/typescript/bin/tsc", "--noEmit", "-p", `${root}/node/tsconfig.json`],
+      process.execPath,
+      [`${dependencies}/typescript/bin/tsc`, "--noEmit", "-p", `${root}/node/tsconfig.json`],
       { stdio: "inherit" },
     );
   }
@@ -75,9 +77,13 @@ if (mode === "lint" || mode === "check") {
 if (mode === "lint") {
   process.exit(0);
 }
-execFileSync("node", ["/deps/typescript/bin/tsc", "-p", `${root}/node/tsconfig.json`], {
-  stdio: "inherit",
-});
+execFileSync(
+  process.execPath,
+  [`${dependencies}/typescript/bin/tsc`, "-p", `${root}/node/tsconfig.json`],
+  {
+    stdio: "inherit",
+  },
+);
 const packageDir = `${work}/package`;
 mkdirSync(packageDir);
 cpSync(`${root}/node/dist`, `${packageDir}/dist`, { recursive: true });
@@ -96,15 +102,15 @@ const archive = `${work}/andornaut-art-kit-${version}.tgz`;
 const install = `${work}/installed`;
 mkdirSync(`${install}/node_modules/@andornaut`, { recursive: true });
 execFileSync("tar", ["-xzf", archive, "-C", `${install}/node_modules/@andornaut`]);
-execFileSync("mv", [
+renameSync(
   `${install}/node_modules/@andornaut/package`,
   `${install}/node_modules/@andornaut/art-kit`,
-]);
+);
 for (const name of Object.keys(descriptor.peerDependencies)) {
   if (name.startsWith("@")) {
     mkdirSync(`${install}/node_modules/${name.split("/")[0]}`, { recursive: true });
   }
-  symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);
+  symlinkSync(`${dependencies}/${name}`, `${install}/node_modules/${name}`);
 }
 const installedManifest = JSON.parse(
   readFileSync(`${install}/node_modules/@andornaut/art-kit/package.json`, "utf8"),
@@ -143,7 +149,7 @@ for (const name of optionalPeers) {
 }
 for (const subpath of subpaths.filter((subpath) => !SKIA_SUBPATHS.includes(subpath))) {
   execFileSync(
-    "node",
+    process.execPath,
     [
       "--input-type=module",
       "-e",
@@ -153,11 +159,11 @@ for (const subpath of subpaths.filter((subpath) => !SKIA_SUBPATHS.includes(subpa
   );
 }
 for (const name of optionalPeers) {
-  symlinkSync(`/deps/${name}`, `${install}/node_modules/${name}`);
+  symlinkSync(`${dependencies}/${name}`, `${install}/node_modules/${name}`);
 }
 for (const subpath of subpaths) {
   execFileSync(
-    "node",
+    process.execPath,
     [
       "--input-type=module",
       "-e",
@@ -174,9 +180,9 @@ writeFileSync(
     .join("\n"),
 );
 execFileSync(
-  "node",
+  process.execPath,
   [
-    "/deps/typescript/bin/tsc",
+    `${dependencies}/typescript/bin/tsc`,
     "--module",
     "NodeNext",
     "--moduleResolution",
@@ -189,7 +195,7 @@ execFileSync(
     "--types",
     "node",
     "--typeRoots",
-    "/deps/@types",
+    `${dependencies}/@types`,
     contractFile,
   ],
   { cwd: install, stdio: "inherit" },
@@ -215,7 +221,7 @@ if (mode === "test" || mode === "check") {
     cpSync(path, target);
     return target;
   });
-  execFileSync("node", ["--test", ...testArgs, "--test-concurrency=4", ...targets], {
+  execFileSync(process.execPath, ["--test", ...testArgs, "--test-concurrency=4", ...targets], {
     cwd: install,
     stdio: "inherit",
   });
