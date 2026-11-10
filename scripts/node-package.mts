@@ -23,9 +23,12 @@ interface Descriptor {
 // Subpaths that import the optional Skia peer; every other export must import without the optional peers.
 const SKIA_SUBPATHS = ["fonts"];
 
-const [mode, revision] = process.argv.slice(2);
+const [mode, revision, ...testArgs] = process.argv.slice(2);
 if (!["lint", "test", "build", "check", "pack"].includes(mode)) {
   throw new Error("Expected lint, test, build, check or pack mode");
+}
+if (mode !== "test" && testArgs.length) {
+  throw new Error(`Extra arguments are only supported in test mode, not ${mode}`);
 }
 // Dependencies are mounted outside a conventional node_modules directory.
 process.env.NODE_PATH = "/deps";
@@ -47,6 +50,7 @@ const { version } = descriptor;
 if (!/^\d+\.\d+\.\d+$/.test(version ?? "")) {
   throw new Error("Missing or invalid package version");
 }
+symlinkSync("/deps", `${root}/node/node_modules`);
 if (mode === "lint" || mode === "check") {
   // The linters resolve their configs' imports through node_modules beside them; preserving the symlinked
   // path lets each package find its siblings in /deps.
@@ -60,11 +64,17 @@ if (mode === "lint" || mode === "check") {
   };
   tool("prettier/bin/prettier.cjs", ["--check", "."]);
   tool("eslint/bin/eslint.js", ["--max-warnings", "0", "."]);
+  if (mode === "lint") {
+    execFileSync(
+      "node",
+      ["/deps/typescript/bin/tsc", "--noEmit", "-p", `${root}/node/tsconfig.json`],
+      { stdio: "inherit" },
+    );
+  }
 }
 if (mode === "lint") {
   process.exit(0);
 }
-symlinkSync("/deps", `${root}/node/node_modules`);
 execFileSync("node", ["/deps/typescript/bin/tsc", "-p", `${root}/node/tsconfig.json`], {
   stdio: "inherit",
 });
@@ -205,7 +215,7 @@ if (mode === "test" || mode === "check") {
     cpSync(path, target);
     return target;
   });
-  execFileSync("node", ["--test", "--test-concurrency=4", ...targets], {
+  execFileSync("node", ["--test", "--test-concurrency=4", ...testArgs, ...targets], {
     cwd: install,
     stdio: "inherit",
   });
