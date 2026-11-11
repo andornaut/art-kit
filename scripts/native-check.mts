@@ -198,7 +198,6 @@ try {
         "tests/container/node",
         "tests/container/markdown",
         "tests/container/load",
-        "scripts/check.sh",
         "scripts/pack.sh",
         "scripts/provision.sh",
       ],

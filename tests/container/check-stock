@@ -27,6 +27,6 @@ if [[ ${action} == check || ${action} == lint ]]; then
     stock_readonly "${shellcheck}" /bin/shellcheck -x -P SCRIPTDIR \
         tests/container/stock tests/container/check-stock tests/container/node \
         tests/container/markdown tests/container/load \
-        scripts/check.sh scripts/pack.sh scripts/provision.sh
+        scripts/pack.sh scripts/provision.sh
 fi
 stock_finish

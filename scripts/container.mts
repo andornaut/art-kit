@@ -1,12 +1,12 @@
-// Container orchestration for the check, packaging and provisioning commands.
+// Container orchestration for the packaging and provisioning commands.
 // Usage: node scripts/container.mts <command> <arguments...>; the scripts/*.sh wrappers document each command.
-// Host Node only assembles arguments, streams inputs and copies results; every test, build and download runs in a
+// Host Node only assembles arguments, streams inputs and copies results; every build and download runs in a
 // container as uid 19001, which owns nothing on the host. Host paths are read-only bind mounts readable through
 // their group or world bits. Writable state lives in a per-run named volume at /tmp (copied up from the image's
 // 1777 /tmp), results leave through docker cp as the host user, and the container and volume are removed on exit.
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createHash, randomInt } from "node:crypto";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -148,11 +148,6 @@ function emptyOutput(path: string): string {
   return output;
 }
 
-function evidenceDirectory(prefix: string): string {
-  mkdirSync(join(root, ".claude"), { recursive: true });
-  return mkdtempSync(join(root, ".claude", `${prefix}.`));
-}
-
 function revision(): string {
   return git(["rev-parse", "HEAD"]).trim();
 }
@@ -170,8 +165,6 @@ interface ContainerSpec {
   /** [host source, container target] pairs, each bound read-only with its group added. */
   mounts?: ReadonlyArray<readonly [string, string]>;
   env?: Readonly<Record<string, string>>;
-  /** Open-file limit, soft and hard; the image default when omitted. */
-  nofile?: number;
 }
 
 function policyArguments(spec: ContainerSpec, name: string): string[] {
@@ -196,9 +189,6 @@ function policyArguments(spec: ContainerSpec, name: string): string[] {
     "-w",
     "/tmp",
   ];
-  if (spec.nofile !== undefined) {
-    args.push("--ulimit", `nofile=${spec.nofile}:${spec.nofile}`);
-  }
   for (const [source, target] of spec.mounts ?? []) {
     args.push(
       "--mount",
@@ -312,64 +302,6 @@ interface Descriptor {
   peerDependencies: Record<string, string>;
 }
 
-async function checkTask(mode: string, dependencyPath: string): Promise<void> {
-  const dependencies = realpathSync(dependencyPath);
-  const evidence = evidenceDirectory("check");
-  guardSource();
-  const commit = revision();
-  // The listed top-level entries, so the format and lint gates see the whole tree.
-  const entries = [
-    ...new Set(
-      git(["ls-files", "--cached", "--others", "--exclude-standard", "-z"])
-        .split("\0")
-        .filter(Boolean)
-        .map((path) => path.split("/")[0]),
-    ),
-  ];
-  const spec: ContainerSpec = {
-    network: "none",
-    mounts: [
-      [root, "/app"],
-      [dependencies, "/deps"],
-    ],
-    env: {
-      npm_config_cache: "/tmp/npm-cache",
-      ART_KIT_TEST_FIXTURES: "/tmp/work/source/node/tests/fixtures",
-    },
-    // A low open-file limit, so the tests catch code that opens every input at once.
-    nofile: 256,
-  };
-  await withContainer(spec, `art-kit-${mode}`, NODE_IMAGE, async (container) => {
-    await exec({}, container, ["mkdir", "-p", "/tmp/work/source", "/tmp/out"]);
-    await exec({}, container, [
-      "cp",
-      "-R",
-      ...entries.map((entry) => `/app/${entry}`),
-      "/tmp/work/source/",
-    ]);
-    await exec({}, container, ["node", "/app/scripts/node-package.mts", mode, commit]);
-    await copyOut(container, "/tmp/out/.", evidence);
-  });
-  verifySource();
-  console.log(`Check evidence: ${evidence}`);
-}
-
-async function check(dependencyPath: string): Promise<void> {
-  await checkTask("check", dependencyPath);
-}
-
-async function lint(dependencyPath: string): Promise<void> {
-  await checkTask("lint", dependencyPath);
-}
-
-async function test(dependencyPath: string): Promise<void> {
-  await checkTask("test", dependencyPath);
-}
-
-async function build(dependencyPath: string): Promise<void> {
-  await checkTask("build", dependencyPath);
-}
-
 async function pack(dependencyPath: string, outputPath: string): Promise<void> {
   const dependencies = realpathSync(dependencyPath);
   const output = emptyOutput(outputPath);
@@ -427,19 +359,11 @@ async function provision(outputPath: string): Promise<void> {
 // Entry point
 
 const USAGE = {
-  check: "check <node_modules-directory>",
-  lint: "lint <node_modules-directory>",
-  test: "test <node_modules-directory>",
-  build: "build <node_modules-directory>",
   pack: "pack <node_modules-directory> <output-directory>",
   provision: "provision <output-directory>",
 } as const;
 
 const COMMANDS: Record<keyof typeof USAGE, (...args: string[]) => Promise<void>> = {
-  check,
-  lint,
-  test,
-  build,
   pack,
   provision,
 };
