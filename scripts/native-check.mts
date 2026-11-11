@@ -18,8 +18,13 @@ import { fileURLToPath } from "node:url";
 
 const root = realpathSync(fileURLToPath(new URL("..", import.meta.url)));
 const [mode, ...args] = process.argv.slice(2);
-if (!["check", "lint", "test", "build"].includes(mode) || (mode !== "test" && args.length)) {
-  throw new Error("Usage: node scripts/native-check.mts <check|lint|test|build> [testflags...]");
+if (
+  !["check", "lint", "lint-node", "test", "build"].includes(mode) ||
+  (mode !== "test" && args.length)
+) {
+  throw new Error(
+    "Usage: node scripts/native-check.mts <check|lint|lint-node|test|build> [testflags...]",
+  );
 }
 // Test selection flags are Node options, never executable code or positional source paths.
 for (let i = 0; i < args.length; i++) {
@@ -204,7 +209,12 @@ try {
   }
   const result = spawnSync(
     process.execPath,
-    [join(source, "scripts/node-package.mts"), mode, revision, ...args],
+    [
+      join(source, "scripts/node-package.mts"),
+      mode === "lint-node" ? "lint" : mode,
+      revision,
+      ...args,
+    ],
     options,
   );
   if (result.error) {
