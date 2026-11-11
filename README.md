@@ -172,7 +172,7 @@ await writeFile("body.fnt", font.xml);
 
 Node 24.22.2 or newer with the exact peers `pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas@4.0.0` for `fonts`. Source fonts and their licences stay in the client repositories.
 
-Automation and CI use `make check`, the only public Make target. It builds the custom image from `tests/container/Dockerfile` and runs the full package gate: lint, test and build. Format and TypeScript checks belong to lint; test builds and installs the package before testing its public imports. Checks do not publish or change the package version or consumer assets.
+Automation and CI use `make check` for the full package gate: lint, test and build. `make lint`, `make test` and `make build` run one phase; only `make build` writes into the checkout, replacing ignored `node/dist`. Format and TypeScript checks belong to lint; test builds and installs the package before testing its public imports. Checks do not publish or change the package version or consumer assets.
 
 The npm commands run directly on the host, without Make or Docker:
 
@@ -185,7 +185,9 @@ The npm commands run directly on the host, without Make or Docker:
 
 Supply the exact Node peers and development toolchain from `node/package.json` through `node/node_modules` or `ART_KIT_NODE_MODULES`. Native lint also requires ShellCheck on the host and the exact Markdown tools installed with `npm ci --prefix tests/container --ignore-scripts --no-audit --no-fund`. The scoped security overrides and their removal criteria are documented in [Markdown tooling](tests/container/README.md). The native CLI runs ShellCheck and the Markdown CLI against its sanitized scratch source, so ignored worktree paths do not suppress Markdown discovery.
 
-The container launcher in `tests/container/run` snapshots the source into `/work` and runs the project adapter at `/opt/check/run`. No host Git metadata, credentials, home directory or Docker socket is mounted. Container checks use uid 19001, read-only host inputs, bounded writable scratch and no runtime network. Source fingerprints must remain unchanged throughout the run. The library has no local time or load start gate; CPU, memory and concurrency limits remain in force. `make check` writes no outputs into the checkout.
+`node scripts/native-check.mts lint-node` runs formatting, ESLint and TypeScript without the ShellCheck and Markdown phases; native `lint` and `check` run all three.
+
+Make runs `tests/container/check-stock`, which uses stock images pinned in `tests/container/images` and no Dockerfile. One Node container installs the development and peer dependencies, downloads the Skia prebuild and runs native `lint-node`, `test` and `build`. Lint adds a Markdown container and a read-only ShellCheck container. The shared `tests/container/stock` functions copy the Git-listed source into `/work` without Git metadata or credentials and run each container as uid 19001 with a read-only root, four CPUs and bounded memory and scratch. Node and Markdown containers use the network to install dependencies; ShellCheck has none. Each container starts only while the one-minute load is below 20.
 
 The existing `scripts/provision.sh`, `scripts/check.sh` and `scripts/pack.sh` remain container controllers with explicit dependency paths for provisioning, checking and committed release packaging. They run `scripts/container.mts` with host Node through type stripping; it only orchestrates Docker and copies files. Their checks, builds and downloads run in a `node:24.22.2` container as uid 19001 (`--user 19001:19001 -e HOME=/tmp`), with four CPUs, a read-only root and no network except while provisioning. Host paths are read-only bind mounts. Writable state lives in a per-run `/tmp` volume, outputs leave through `docker cp`, and owned containers and volumes are removed on exit.
 
@@ -195,7 +197,7 @@ The existing `scripts/provision.sh`, `scripts/check.sh` and `scripts/pack.sh` re
 | `bash scripts/check.sh <node_modules>`                  | Copies the working tree, runs `prettier --check` and `eslint --max-warnings 0`, compiles, packs and installs the tarball, imports every subpath (all but `fonts` without Skia), checks the declarations and runs the Node tests |
 | `bash scripts/pack.sh <node_modules> <empty-directory>` | Builds `art-kit-<version>.tgz`, `SOURCE_COMMIT` and `SHA256SUMS` from the committed `HEAD`                                                                                                                                      |
 
-Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. CI runs `make check`, retains committed packaging and uploads its output. CI also retains the host ShellCheck action and attribution scanning. Game projects test their own adapters and authored output; no game build is part of the package gate.
+Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. CI runs `make check`, then provisions, packs and uploads the committed release artifacts, and scans for attributions. Game projects test their own adapters and authored output; no game build is part of the package gate.
 
 ## Version and licence
 

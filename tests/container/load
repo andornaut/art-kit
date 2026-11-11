@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+while ! awk '$1 < 20 { exit 0 } { exit 1 }' /proc/loadavg; do
+    printf '%s\n' 'Waiting for one-minute load below 20.' >&2
+    sleep 10
+done

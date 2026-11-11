@@ -1,0 +1,27 @@
+#!/bin/sh
+set -eu
+case "$1" in
+    check) modes='lint-node test build' ;;
+    lint) modes=lint-node ;;
+    test|build) modes=$1 ;;
+    *) exit 2 ;;
+esac
+mkdir -p /scratch/tools
+node --input-type=module -e '
+    import { readFileSync, writeFileSync } from "node:fs";
+    const p = JSON.parse(readFileSync("node/package.json", "utf8"));
+    writeFileSync("/scratch/tools/package.json", JSON.stringify({
+        private: true,
+        dependencies: { ...p.devDependencies, ...p.peerDependencies },
+    }));
+'
+npm install --prefix /scratch/tools --ignore-scripts --no-audit --no-fund --maxsockets=1 >&2
+(cd /scratch/tools/node_modules/skia-canvas && node lib/prebuild.mjs download) >&2
+export ART_KIT_NODE_MODULES=/scratch/tools/node_modules
+for mode in $modes; do
+    node scripts/native-check.mts "$mode"
+done
+if [ -d /outputs ]; then
+    cp -R node/dist /outputs/dist
+    chmod -R a+rwX /outputs/dist
+fi

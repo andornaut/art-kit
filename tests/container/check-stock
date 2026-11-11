@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+checkout=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
+action=${1:-check}
+case "${action}" in check|lint|test|build) ;; *) printf 'Unknown check: %s\n' "${action}" >&2; exit 2 ;; esac
+# shellcheck source=tests/container/images
+source "${checkout}/tests/container/images"
+# shellcheck source=tests/container/stock
+source "${checkout}/tests/container/stock"
+stock_begin "${checkout}"
+node=
+shellcheck=
+stock_image node "${NODE_IMAGE}"
+stock_image shellcheck "${SHELLCHECK_IMAGE}"
+if [[ ${action} == build ]]; then export STOCK_OUTPUT_DIR=${scratch}/outputs; fi
+sh "${checkout}/tests/container/load"
+STOCK_NETWORK=bridge stock_run "${node}" -- sh tests/container/node "${action}"
+if [[ ${action} == build ]]; then
+    rm -rf -- "${checkout}/node/dist"
+    cp -R -- "${STOCK_OUTPUT_DIR}/dist" "${checkout}/node/dist"
+    unset STOCK_OUTPUT_DIR
+fi
+if [[ ${action} == check || ${action} == lint ]]; then
+    sh "${checkout}/tests/container/load"
+    STOCK_NETWORK=bridge stock_run "${node}" -- sh tests/container/markdown
+    sh "${checkout}/tests/container/load"
+    stock_readonly "${shellcheck}" /bin/shellcheck -x -P SCRIPTDIR \
+        tests/container/stock tests/container/check-stock tests/container/node \
+        tests/container/markdown tests/container/load \
+        scripts/check.sh scripts/pack.sh scripts/provision.sh
+fi
+stock_finish
