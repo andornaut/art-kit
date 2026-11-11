@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = realpathSync(fileURLToPath(new URL("..", import.meta.url)));
-const NODE_IMAGE = "node:24.21.0";
+const NODE_IMAGE = "node:24.22.2";
 
 class Failure extends Error {
   readonly code: number;

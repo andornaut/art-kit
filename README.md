@@ -170,7 +170,7 @@ await writeFile("body.fnt", font.xml);
 
 ## Runtime and checks
 
-Node 24.21.0 or newer with the exact peers `pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas@4.0.0` for `fonts`. Source fonts and their licences stay in the client repositories.
+Node 24.22.2 or newer with the exact peers `pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas@4.0.0` for `fonts`. Source fonts and their licences stay in the client repositories.
 
 Automation and CI use `make check`, the only public Make target. It builds the custom image from `tests/container/Dockerfile` and runs the full package gate: lint, test and build. Format and TypeScript checks belong to lint; test builds and installs the package before testing its public imports. Checks do not publish or change the package version or consumer assets.
 
@@ -187,7 +187,7 @@ Supply the exact Node peers and development toolchain from `node/package.json` t
 
 The container launcher in `tests/container/run` snapshots the source into `/work` and runs the project adapter at `/opt/check/run`. No host Git metadata, credentials, home directory or Docker socket is mounted. Container checks use uid 19001, read-only host inputs, bounded writable scratch and no runtime network. Source fingerprints must remain unchanged throughout the run. The library has no local time or load start gate; CPU, memory and concurrency limits remain in force. `make check` writes no outputs into the checkout.
 
-The existing `scripts/provision.sh`, `scripts/check.sh` and `scripts/pack.sh` remain container controllers with explicit dependency paths for provisioning, checking and committed release packaging. They run `scripts/container.mts` with host Node through type stripping; it only orchestrates Docker and copies files. Their checks, builds and downloads run in a `node:24.21.0` container as uid 19001 (`--user 19001:19001 -e HOME=/tmp`), with four CPUs, a read-only root and no network except while provisioning. Host paths are read-only bind mounts. Writable state lives in a per-run `/tmp` volume, outputs leave through `docker cp`, and owned containers and volumes are removed on exit.
+The existing `scripts/provision.sh`, `scripts/check.sh` and `scripts/pack.sh` remain container controllers with explicit dependency paths for provisioning, checking and committed release packaging. They run `scripts/container.mts` with host Node through type stripping; it only orchestrates Docker and copies files. Their checks, builds and downloads run in a `node:24.22.2` container as uid 19001 (`--user 19001:19001 -e HOME=/tmp`), with four CPUs, a read-only root and no network except while provisioning. Host paths are read-only bind mounts. Writable state lives in a per-run `/tmp` volume, outputs leave through `docker cp`, and owned containers and volumes are removed on exit.
 
 | Command                                                 | Effect                                                                                                                                                                                                                          |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
