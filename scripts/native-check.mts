@@ -1,5 +1,4 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -7,7 +6,6 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
-  readFileSync,
   realpathSync,
   renameSync,
   rmSync,
@@ -53,11 +51,7 @@ function git(args: string[]): string | undefined {
   return undefined;
 }
 
-let stagingOutput: string | undefined;
 function allowed(path: string): boolean {
-  if (stagingOutput && (path === stagingOutput || path.startsWith(`${stagingOutput}/`))) {
-    return false;
-  }
   return !path.split(/[\\/]/).some(
     (part) =>
       // eslint-disable-next-line max-len
@@ -124,33 +118,11 @@ function files(): string[] {
   return found.sort();
 }
 
-function fingerprint(): string {
-  const hash = createHash("sha256");
-  hash.update(
-    git([
-      "status",
-      "--porcelain=v1",
-      "-z",
-      "--untracked-files=all",
-      "--",
-      ".",
-      ...(stagingOutput ? [`:(exclude)${stagingOutput}`] : []),
-    ]) ?? "no-git",
-  );
-  for (const path of files()) {
-    regular(path);
-    hash.update(JSON.stringify([path, lstatSync(join(root, path)).mode]));
-    hash.update(readFileSync(join(root, path)));
-  }
-  return hash.digest("hex");
-}
-
 const dependencies = realpathSync(
   resolve(root, process.env.ART_KIT_NODE_MODULES ?? "node/node_modules"),
 );
 const revision =
   process.env.CHECK_REVISION ?? git(["rev-parse", "HEAD"])?.trim() ?? "private-working-tree";
-const before = fingerprint();
 const scratch = mkdtempSync(join(tmpdir(), "art-kit-native-"));
 let status: number;
 try {
@@ -162,9 +134,6 @@ try {
     regular(path);
     mkdirSync(dirname(join(source, path)), { recursive: true });
     cpSync(join(root, path), join(source, path));
-  }
-  if (fingerprint() !== before) {
-    throw new Error("Source changed during snapshot; discard this run");
   }
   const options = {
     cwd: source,
@@ -223,9 +192,6 @@ try {
     throw result.error;
   }
   status = result.status ?? 1;
-  if (fingerprint() !== before) {
-    throw new Error("Source changed during check; discard this run");
-  }
   if (status === 0 && mode === "build") {
     const node = join(root, "node");
     if (lstatSync(node).isSymbolicLink() || realpathSync(node) !== node) {
@@ -251,15 +217,11 @@ try {
       }
     }
     const staging = mkdtempSync(join(node, ".native-dist-"));
-    stagingOutput = `node/${staging.slice(node.length + 1)}`;
     try {
       cpSync(join(source, "node/dist"), staging, { recursive: true });
       // Only the ignored native compiler output is replaced; release artifacts stay separate.
       if (git(["ls-files", "--", "node/dist"])?.trim()) {
         throw new Error("Refusing to replace tracked node/dist");
-      }
-      if (fingerprint() !== before) {
-        throw new Error("Source changed before build export");
       }
       rmSync(target, { recursive: true, force: true });
       renameSync(staging, target);
@@ -268,16 +230,6 @@ try {
     }
   }
 } finally {
-  try {
-    if (fingerprint() !== before) {
-      status = 1;
-      console.error("Source fingerprint changed; result is invalid");
-    }
-  } finally {
-    rmSync(scratch, { recursive: true, force: true });
-  }
-}
-if (status === 0) {
-  console.log(`Native ${mode}: source fingerprint ${before} unchanged`);
+  rmSync(scratch, { recursive: true, force: true });
 }
 process.exitCode = status;

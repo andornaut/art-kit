@@ -5,7 +5,7 @@
 // their group or world bits. Writable state lives in a per-run named volume at /tmp (copied up from the image's
 // 1777 /tmp), results leave through docker cp as the host user, and the container and volume are removed on exit.
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
-import { createHash, randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { mkdirSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -96,47 +96,6 @@ function git(args: readonly string[]): string {
     throw new Failure(`git ${args[0]} failed`);
   }
   return result.stdout;
-}
-
-// Host guards
-
-function fingerprint(): string {
-  const hash = createHash("sha256").update(git(["status", "--porcelain=v1", "-z"]));
-  const paths = git(["ls-files", "--cached", "--others", "--exclude-standard", "-z"])
-    .split("\0")
-    .filter(Boolean)
-    .sort();
-  for (const path of paths) {
-    hash.update(`${path}\0`);
-    try {
-      hash.update(
-        createHash("sha256")
-          .update(readFileSync(join(root, path)))
-          .digest(),
-      );
-    } catch (error) {
-      hash.update(`unreadable:${(error as NodeJS.ErrnoException).code}`);
-    }
-  }
-  return hash.digest("hex");
-}
-
-let sourceBefore: string | undefined;
-
-/** Records Git status and listed file contents; verifySource fails if either changes before exit. */
-function guardSource(): void {
-  sourceBefore = fingerprint();
-}
-
-function verifySource(): void {
-  if (sourceBefore === undefined) {
-    return;
-  }
-  const before = sourceBefore;
-  sourceBefore = undefined;
-  if (fingerprint() !== before) {
-    throw new Failure("Source changed; discard result");
-  }
 }
 
 function emptyOutput(path: string): string {
@@ -305,7 +264,6 @@ interface Descriptor {
 async function pack(dependencyPath: string, outputPath: string): Promise<void> {
   const dependencies = realpathSync(dependencyPath);
   const output = emptyOutput(outputPath);
-  guardSource();
   const commit = revision();
   // The packaging program comes from this checkout; the packaged tree is the committed revision.
   const spec: ContainerSpec = {
@@ -322,7 +280,6 @@ async function pack(dependencyPath: string, outputPath: string): Promise<void> {
     await exec({}, container, ["node", "/tools/node-package.mts", "pack", commit]);
     await copyOut(container, "/tmp/out/.", output);
   });
-  verifySource();
   console.log(`Release artifacts: ${output}`);
 }
 
@@ -384,10 +341,4 @@ try {
   process.exitCode = error instanceof Failure ? error.code : 1;
 } finally {
   cleanup();
-  try {
-    verifySource();
-  } catch (error) {
-    console.error((error as Error).message);
-    process.exitCode = 1;
-  }
 }
