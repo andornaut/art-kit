@@ -47,6 +47,37 @@ function bytes(values: Triple): [number, number, number] {
     return Math.floor(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055) + 0.5);
   }) as [number, number, number];
 }
+/** Convert D65 Oklab to sRGB bytes with explicit linear gamut and byte rounding policies. */
+export function oklabToSrgb(
+  options: { gamut: "clip" | "reject"; rounding: "half-even" | "half-up" },
+  colour: Triple,
+): [number, number, number] {
+  if (options?.gamut !== "clip" && options?.gamut !== "reject") {
+    throw new RangeError("Expected gamut clip or reject");
+  }
+  if (options?.rounding !== "half-even" && options?.rounding !== "half-up") {
+    throw new RangeError("Expected rounding half-even or half-up");
+  }
+  if (!Array.isArray(colour) || colour.length !== 3 || !Array.from(colour).every(Number.isFinite)) {
+    throw new RangeError("Expected three finite numbers");
+  }
+  const values = linearLab(colour);
+  if (!values.every(Number.isFinite)) {
+    throw new RangeError("Expected finite linear RGB channels");
+  }
+  if (options.gamut === "reject" && values.some((v) => v < 0 || v > 1)) {
+    throw new RangeError("Colour is outside the sRGB gamut");
+  }
+  return values.map((value) => {
+    const v = Math.max(0, Math.min(1, value));
+    const encoded = 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+    const floor = Math.floor(encoded);
+    if (options.rounding === "half-up") {
+      return Math.floor(encoded + 0.5);
+    }
+    return encoded - floor === 0.5 ? floor + (floor % 2) : Math.round(encoded);
+  }) as [number, number, number];
+}
 /** Convert sRGB bytes to D65 Oklab (L, a, b). */
 export function srgbToOklab(colour: Triple): [number, number, number] {
   triple(colour);
