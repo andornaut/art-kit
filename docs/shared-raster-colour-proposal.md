@@ -10,13 +10,13 @@ These additions need no new dependency or game-kit import. Geometry and image ty
 
 ## Reviewed inputs and consumer needs
 
-| Input | Exact revision or evidence | Present requirement |
-| --- | --- | --- |
-| Art-kit source | `16dc4af17c2920a2ad5a6c49b6a70540f4b43394` | Existing raster, drawing and colour contracts remain unchanged |
-| Published package | v0.22.0, source `30ccd1fa13f677d09190a2fd2582c3baf2fa1309` | Relevant production modules match current source |
-| Ada the Navigator | Art-confirmed baseline `e0673c7eb3c0dddf64eeca081fd9d982bd333a91` | Lanczos and blur byte semantics; inverse Oklab clips and rounds half-even |
-| Archie | Art-confirmed `54c911ea80627f95c9c568f68ec25f5c227334a4`, `art/tools/pixel.ts` | Inverse Oklab rejects out-of-gamut channels and rounds half-up |
-| Chibi | Art-owner needs reply | No current Lanczos, Gaussian, 3D or inverse-Oklab demand; current OKLCH path covers tonal ramps |
+| Input             | Exact revision or evidence                                                     | Present requirement                                                                             |
+| ----------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Art-kit source    | `16dc4af17c2920a2ad5a6c49b6a70540f4b43394`                                     | Existing raster, drawing and colour contracts remain unchanged                                  |
+| Published package | v0.22.0, source `30ccd1fa13f677d09190a2fd2582c3baf2fa1309`                     | Relevant production modules match current source                                                |
+| Ada the Navigator | Art-confirmed baseline `e0673c7eb3c0dddf64eeca081fd9d982bd333a91`              | Lanczos and blur byte semantics; inverse Oklab clips and rounds half-even                       |
+| Archie            | Art-confirmed `54c911ea80627f95c9c568f68ec25f5c227334a4`, `art/tools/pixel.ts` | Inverse Oklab rejects out-of-gamut channels and rounds half-up                                  |
+| Chibi             | Art-owner needs reply                                                          | No current Lanczos, Gaussian, 3D or inverse-Oklab demand; current OKLCH path covers tonal ramps |
 
 Ada's relevant files are `art/tools/paint.ts`, `oklab.ts`, `projection.ts`, `ship-raster.ts`, `ship-surface.ts` and `ship-paths.ts`. Read the frozen baseline, not concurrent basic-helper migration edits. Its current ship path is BSP/vector occlusion followed by material-region contours and nonzero-winding rasterization. No depth-buffer API is justified by that path.
 

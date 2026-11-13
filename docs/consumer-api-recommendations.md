@@ -35,15 +35,15 @@ Keep parsing/building pure and I/O explicit. Archie already uses `buildBitmapFon
 
 ## Migration and parity requirements
 
-| Mechanism | Required comparison | Caller-owned difference |
-| --- | --- | --- |
-| Filled images, crops and RGB parsing | Valid-domain RGBA and dimensions, including RGB under alpha zero | Ada's fractional truncation, byte wrapping and permissive hex remain named local adapters |
-| Grayscale | Exact luma plane and shape | A four-line opaque-RGBA adapter alone does not justify another public operation |
-| Paste and contact sheets | Partial-alpha rejection where required, frame order, cell bounds and feet | Archie's masked paste validates binary alpha; row-first-frame and largest-frame policies both have active uses |
-| Lanczos and Gaussian | Every RGBA byte, Float32 operation order, edge handling, nonmutation | Ada keeps expanded-ROI raw replacement; positive-sigma calls must be established before migration |
-| Inverse Oklab | Exact byte ties, clipping/rejection and quantized-header/body sequence | Archie keeps LCh conversion and picker values; Ada selects clip/half-even |
-| Bitmap fonts | Signed bearings, kerning, advances, pitch, ink bounds and tinted RGBA | Consumers retain font assets, samples and licences |
-| Alpha runs | Threshold, endpoints, row ordering and frame origin | Chibi retains physics/contact interpretation |
+| Mechanism                            | Required comparison                                                       | Caller-owned difference                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Filled images, crops and RGB parsing | Valid-domain RGBA and dimensions, including RGB under alpha zero          | Ada's fractional truncation, byte wrapping and permissive hex remain named local adapters                      |
+| Grayscale                            | Exact luma plane and shape                                                | A four-line opaque-RGBA adapter alone does not justify another public operation                                |
+| Paste and contact sheets             | Partial-alpha rejection where required, frame order, cell bounds and feet | Archie's masked paste validates binary alpha; row-first-frame and largest-frame policies both have active uses |
+| Lanczos and Gaussian                 | Every RGBA byte, Float32 operation order, edge handling, nonmutation      | Ada keeps expanded-ROI raw replacement; positive-sigma calls must be established before migration              |
+| Inverse Oklab                        | Exact byte ties, clipping/rejection and quantized-header/body sequence    | Archie keeps LCh conversion and picker values; Ada selects clip/half-even                                      |
+| Bitmap fonts                         | Signed bearings, kerning, advances, pitch, ink bounds and tinted RGBA     | Consumers retain font assets, samples and licences                                                             |
+| Alpha runs                           | Threshold, endpoints, row ordering and frame origin                       | Chibi retains physics/contact interpretation                                                                   |
 
 Encoded PNG equality is separate from decoded pixel equality and requires matching encoder settings and dependency pins. SVG and metadata text are separate comparisons. Art owners review affected actual outputs; Tech owners schedule approved consumer changes against published canonical artifacts. Consultation does not establish migration parity or adoption.
 
