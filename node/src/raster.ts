@@ -3,8 +3,9 @@ import type { Point, Rect } from "./geometry.js";
 import type { Frame } from "./grid.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
-// Straight (non-premultiplied) RGBA raster operations with exact integer rounding; Pillow 13.0.0 is
-// the parity reference. An opaque (RGB) image is an RgbaImage whose alpha is 255. fill, paste and
+// Straight (non-premultiplied) RGBA raster operations; the smooth filters use their documented
+// Float32 contracts, and other operations use Pillow 13.0.0 parity rounding.
+// An opaque (RGB) image is an RgbaImage whose alpha is 255. fill, paste and
 // composite mutate their target; every other function returns a new image or plane.
 
 /** One 8-bit channel, one byte per pixel, row by row from the top-left. */
@@ -385,6 +386,146 @@ export function resizeNearest(width: number, height: number, source: RgbaImage):
   size(height, "Height");
   image(source);
   return scaleAffine([source.width / width, 0, source.height / height, 0], width, height, source);
+}
+
+/** Encoded RGB premultiplied Lanczos-3, clipped normalized support, Float32 passes. */
+export function resizeLanczos3(width: number, height: number, source: RgbaImage): RgbaImage {
+  positive(width, "Width");
+  positive(height, "Height");
+  image(source);
+  positive(source.width, "Image width");
+  positive(source.height, "Image height");
+  const premultiplied = new Float32Array(source.width * source.height * 4);
+  for (let i = 0; i < source.width * source.height; i++) {
+    const a = source.data[i * 4 + 3] / 255;
+    premultiplied[i * 4] = source.data[i * 4] * a;
+    premultiplied[i * 4 + 1] = source.data[i * 4 + 1] * a;
+    premultiplied[i * 4 + 2] = source.data[i * 4 + 2] * a;
+    premultiplied[i * 4 + 3] = source.data[i * 4 + 3];
+  }
+  const across = lanczosPass(source.width, source.height, width, true, premultiplied);
+  const down = lanczosPass(width, source.height, height, false, across);
+  const out = { data: new Uint8Array(width * height * 4), height, width };
+  for (let i = 0; i < width * height; i++) {
+    const a = Math.min(255, Math.max(0, down[i * 4 + 3]));
+    const k = a > 0 ? 255 / a : 0;
+    for (let c = 0; c < 3; c++) {
+      out.data[i * 4 + c] = Math.min(255, Math.max(0, Math.round(down[i * 4 + c] * k)));
+    }
+    out.data[i * 4 + 3] = Math.round(a);
+  }
+  return out;
+}
+
+function lanczos(x: number): number {
+  if (x === 0) {
+    return 1;
+  }
+  if (x <= -3 || x >= 3) {
+    return 0;
+  }
+  const px = Math.PI * x;
+  return (3 * Math.sin(px) * Math.sin(px / 3)) / (px * px);
+}
+
+function lanczosPass(
+  width: number,
+  height: number,
+  size: number,
+  horizontal: boolean,
+  data: Float32Array,
+): Float32Array {
+  const length = horizontal ? width : height;
+  const other = horizontal ? height : width;
+  const scale = length / size;
+  const support = 3 * Math.max(1, scale);
+  const out = new Float32Array((horizontal ? size * height : width * size) * 4);
+  for (let i = 0; i < size; i++) {
+    const centre = (i + 0.5) * scale;
+    const from = Math.max(0, Math.floor(centre - support));
+    const to = Math.min(length, Math.ceil(centre + support));
+    const weights: number[] = [];
+    let total = 0;
+    for (let j = from; j < to; j++) {
+      const w = lanczos((j - centre + 0.5) / Math.max(1, scale));
+      weights.push(w);
+      total += w;
+    }
+    for (let o = 0; o < other; o++) {
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let a = 0;
+      for (let j = from; j < to; j++) {
+        const w = weights[j - from] / total;
+        const s = (horizontal ? o * width + j : j * width + o) * 4;
+        r += data[s] * w;
+        g += data[s + 1] * w;
+        b += data[s + 2] * w;
+        a += data[s + 3] * w;
+      }
+      const t = (horizontal ? o * size + i : i * width + o) * 4;
+      out[t] = r;
+      out[t + 1] = g;
+      out[t + 2] = b;
+      out[t + 3] = a;
+    }
+  }
+  return out;
+}
+
+/** Full-image straight RGBA Gaussian convolution with repeated edges and Float32 storage. */
+export function gaussianBlur({ sigma }: { sigma: number }, source: RgbaImage): RgbaImage {
+  if (!Number.isFinite(sigma) || sigma <= 0) {
+    throw new RangeError("Sigma must be finite and positive");
+  }
+  image(source);
+  const { height: h, width: w } = source;
+  const out = { data: new Uint8Array(source.data.length), height: h, width: w };
+  if (w === 0 || h === 0) {
+    return out;
+  }
+  const reach = Math.ceil(sigma * 3);
+  const kernel = Array.from({ length: 2 * reach + 1 }, (_, i) =>
+    i === reach ? 1 : Math.exp(-((i - reach) ** 2) / (2 * sigma * sigma)),
+  );
+  const sum = kernel.reduce((a, b) => a + b, 0);
+  const k = kernel.map((v) => v / sum);
+  const src = new Float32Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      for (let c = 0; c < 4; c++) {
+        src[(y * w + x) * 4 + c] = source.data[(y * w + x) * 4 + c];
+      }
+    }
+  }
+  // Repeat edge pixels for both passes.
+  const tmp = new Float32Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      for (let c = 0; c < 4; c++) {
+        let v = 0;
+        for (let i = -reach; i <= reach; i++) {
+          const sx = Math.min(w - 1, Math.max(0, x + i));
+          v += src[(y * w + sx) * 4 + c] * k[i + reach];
+        }
+        tmp[(y * w + x) * 4 + c] = v;
+      }
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      for (let c = 0; c < 4; c++) {
+        let v = 0;
+        for (let i = -reach; i <= reach; i++) {
+          const sy = Math.min(h - 1, Math.max(0, y + i));
+          v += tmp[(sy * w + x) * 4 + c] * k[i + reach];
+        }
+        out.data[(y * w + x) * 4 + c] = Math.round(v);
+      }
+    }
+  }
+  return out;
 }
 
 // The nearest 15-decimal value, ties to even. toFixed rounds an exact

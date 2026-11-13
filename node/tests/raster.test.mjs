@@ -269,9 +269,11 @@ test("fill, paste and composite mutate in place; other operations return new ima
     "fill",
     "filledImage",
     "frameToRgba",
+    "gaussianBlur",
     "grayscale",
     "opaque",
     "paste",
+    "resizeLanczos3",
     "resizeNearest",
     "rotateNearest",
   ]);
