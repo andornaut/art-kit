@@ -11,6 +11,12 @@ These fixtures are frozen reference outputs. Their generators are not in this tr
 | `gif-ico/pillow.json` | GIF and ICO inputs with Pillow 13.0.0 decodes of its own saves; generator cases with `disposal=2` are omitted | `tests/gif_ico_reference.py` |
 | `bmfont-packed.json` | Glyph inputs with art_kit v0.10.0 `fonts.pack` and `bmfont_xml` outputs (cases without antialiasing also match v0.5.0); its Liberation Sans cases are rasterized from the fonts below | `node/tests/bmfont_fixtures.py` |
 
+## Smooth filters and inverse Oklab
+
+`raster/filters.json` contains 14 synthetic RGBA reference cases from Ada the Navigator revision `e0673c7eb3c0dddf64eeca081fd9d982bd333a91`, `art/tools/paint.ts` blob `36fe6e77b036cfb7d67c12b91f8350a4a151eb9f`, run with Node 24.22.2. The original resize and full-image blur helpers produced the references independently of art-kit. Cases cover identity, up/down/anisotropic resizing, transparent and faint alpha, repeated edges and fractional sigma. The positive-subnormal-sigma test checks the shared mathematical contract separately, without claiming baseline parity for that invalid intermediate calculation.
+
+`colour-inverse.test.mjs` freezes synthetic vectors against Ada's same-revision `art/tools/oklab.ts` blob `e591b615d25be3ac5bd2ae2e6e226eff088c8f99` and Archie's `art/tools/pixel.ts` at `54c911ea80627f95c9c568f68ec25f5c227334a4`. It covers clipping/rejection, transfer branches and public Oklab inputs whose exact byte half-ties distinguish half-even from half-up. No consumer palette constants or art assets are included.
+
 ## Font pipelines and Skia composition
 
 `fonts/` holds the atlas PNG and BMFont XML of each game's font pipeline over the fonts below, produced with art-kit 0.16.0's Skia `fonts.buildBitmapFont`: `chibi-*` reproduce `chibis-way-home` `art/tools/fonts.ts` (antialiased, hinted, all-pair kerning, glyphs cropped to their ink with a 2 px bleed and whitened, packed layout) and `archie-*` reproduce `archies-dog-walks` `art/tools/fonts.ts` (binary, unhinted, glyphs trimmed with `opaqueRect`, padded layout). The PNGs are encoded with deflate level 9, strategy 3 and adaptive filtering; the tests compare their decoded RGBA and the XML. The contact sheet digests in `raster.test.mjs` are the RGBA of art-kit 0.16.0's Skia `frames.renderContactSheet` for the same sprites.

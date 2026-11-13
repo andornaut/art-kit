@@ -11,7 +11,7 @@ The package ships TypeScript declarations and these subpaths. Import each explic
 | `atlasBuild`  | Atlas page drawing and encoded page assembly                                                                                              | Read, decode and encode functions, blits, extrusion and metadata         |
 | `atlasLayout` | Shelf packing and candidate selection                                                                                                     | Items, order comparator, candidate widths and size limits                |
 | `build`       | Sequential art builds in dependency order, set table self-checks, snapshot and Git index checks, node process steps and a command wrapper | Named build steps, their needs, the module directory and the check paths |
-| `colour`      | Six-digit hex RGB, WCAG contrast, sRGB to Oklab and OKLCH, and OKLCH to sRGB                                                              | Resolved hex colours and colour triples                                  |
+| `colour`      | Six-digit hex RGB, WCAG contrast, sRGB to/from Oklab and OKLCH                                                              | Resolved hex colours and colour triples                                  |
 | `draw`        | Pillow 13.0.0-exact shape drawing into RGBA buffers                                                                                       | Colours, points, bounds, widths and the target image                     |
 | `fonts`       | Skia glyph rasterization, font coverage, line metrics and pair kerning                                                                    | Font path, size, characters, antialiasing, hinting and kerning           |
 | `gif`         | Animated GIF encoding with exact palettes and binary alpha                                                                                | Frames, durations and loop                                               |
@@ -20,12 +20,12 @@ The package ships TypeScript declarations and these subpaths. Import each explic
 | `ico`         | ICO encoding with PNG entries                                                                                                             | One pre-sized RGBA image per entry                                       |
 | `indexedPng`  | Indexed PNG encoding                                                                                                                      | RGBA image and compression options                                       |
 | `png`         | PNG decoding to RGBA, and RGBA and opaque RGB PNG encoding                                                                                | Encoded bytes, or an RGBA image and compression options                  |
-| `raster`      | Pillow 13.0.0-exact RGBA operations, frame rendering, sheets and contact sheets                                                           | Images, planes, colours, frames, colour resolver and geometry            |
+| `raster`      | RGBA operations, Float32 smooth filters, frame rendering, sheets and contact sheets                                                           | Images, planes, colours, frames, colour resolver and geometry            |
 | `rgbaImage`   | RGBA allocation, alpha bounds and extruded blitting                                                                                       | Image dimensions, pixels, rectangles and bounds                          |
 | `spriteSheet` | Sprite sheet PNG and json-hash data byte-identical to Aseprite 1.2.30, without Aseprite                                                   | Key, image name, tags, optional columns and slice margins, paths         |
 | `webp`        | Lossless WebP encoding                                                                                                                    | RGBA images                                                              |
 
-Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject; invalid geometry, colours and sizes throw `RangeError`. Only `fonts` needs Skia; every other subpath is canvas-free with exact integer arithmetic.
+Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject; invalid geometry, colours and sizes throw `RangeError`. Only `fonts` needs Skia; every other subpath is canvas-free. Numerical transforms use the rounding and intermediate precision specified below.
 
 ## Pixel frames and images
 
@@ -50,6 +50,8 @@ const image = frameToRgba(grid.palette, grid.outlined());
 | `raster.composeContactSheet(options, sprites, grounds)`                 | Opaque preview, one row per sprite and ground; `cellSize` is `"largest-frame"` or `"row-first-frame"`                                                                   |
 | `raster.fill`, `paste`, `composite`                                     | Mutate the target: replace or coverage-blend a rect through an optional plane, replace or blend a source by its own alpha (`mask: "alpha"`), straight-alpha source-over |
 | `raster.filledImage`, `crop`, `resizeNearest`, `rotateNearest`          | New images; crop zero-fills outside the source, resampling copies RGBA exactly including RGB under clear alpha                                                          |
+| `raster.resizeLanczos3(width, height, source)` | New image; positive safe-integer source/output dimensions; premultiplied encoded RGB, clipped normalized Lanczos-3 support and Float32 passes |
+| `raster.gaussianBlur({ sigma }, source)` | New full-image straight-RGBA blur; finite positive sigma, repeated edges, Float32 passes; empty images stay empty |
 | `raster.opaque`, `grayscale`, `channel`                                 | Alpha set to 255, ITU-R 601-2 luma plane, one channel plane                                                                                                             |
 | `draw.point`, `line`, `polygon`, `ellipse`, `rectangle`, `arc`          | Pillow `ImageDraw.Draw(image)` output byte for byte, ink written without blending. `Bounds` corners are inclusive; arcs run clockwise from three o'clock                |
 | `rgbaImage.blankImage(width, height)`                                   | A clear image                                                                                                                                                           |
@@ -58,7 +60,15 @@ const image = frameToRgba(grid.palette, grid.outlined());
 | `colour.rgb(hex)`                                                       | Bytes of exactly six hex digits without `#`; any other string throws                                                                                                    |
 | `colour.contrast`, `srgbToOklab`, `srgbToOklch`, `oklchToSrgb`          | WCAG contrast ratio and colour-space conversion; `oklchToSrgb` reduces chroma at fixed lightness and hue to reach the gamut                                             |
 
-The `raster` and `draw` fixtures in `node/tests/fixtures` are frozen Pillow 13.0.0 output, including partial alpha, and the tests compare every operation byte for byte.
+The Pillow fixtures in `node/tests/fixtures` cover the existing raster and drawing operations, including partial alpha. Separate frozen synthetic references cover the smooth filters and inverse Oklab.
+
+`resizeLanczos3` filters horizontally then vertically after premultiplying encoded RGB into Float32. It clips and renormalizes support at image edges, clamps alpha, and uses the unrounded alpha to unpremultiply before byte rounding. It preserves nonzero RGB when a positive alpha rounds to zero; same-size filtering does not copy hidden RGB under originally clear pixels. Use `resizeNearest` for exact RGBA sampling and binary-alpha masks.
+
+`gaussianBlur` filters straight channels independently with support `ceil(3*sigma)` and normalized Gaussian weights, horizontally then vertically. It repeats image edges, stores intermediate Float32 values and rounds final bytes. Kernel size is limited by array allocation and available memory. Bounds expansion, integer cropping and raw replacement remain caller-owned; do not replace an expanded region through alpha compositing when clear RGB must overwrite. Zero sigma throws instead of defining a legacy invalid-domain result.
+
+`colour.oklabToSrgb({ gamut, rounding }, lab)` requires finite Oklab channels and finite conversion results. `gamut: "clip"` clamps linear channels before sRGB transfer; `"reject"` throws for any out-of-range channel with no tolerance or chroma reduction. `rounding: "half-even"` rounds exact byte half-ties to even; `"half-up"` uses `floor(encoded*255 + 0.5)`. Both policies are required. Existing `oklchToSrgb` retains its chroma-reduction behavior. No operation changes its source.
+
+Decoded RGBA equality includes RGB under zero alpha. Encoded PNG equality additionally requires matching encoder settings and dependency pins; SVG and metadata text need separate comparisons.
 
 ## Encoders and atlases
 
