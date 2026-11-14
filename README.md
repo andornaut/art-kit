@@ -15,6 +15,7 @@ The package ships TypeScript declarations and these subpaths. Import each explic
 | `draw`        | Pillow 13.0.0-exact shape drawing into RGBA buffers                                                                                       | Colours, points, bounds, widths and the target image                     |
 | `fonts`       | Skia glyph rasterization, font coverage, line metrics and pair kerning                                                                    | Font path, size, characters, antialiasing, hinting and kerning           |
 | `gif`         | Animated GIF encoding with exact palettes and binary alpha                                                                                | Frames, durations and loop                                               |
+| `bitmapFont`  | Single-page BMFont XML reading, text measurement and tinted RGBA composition without Skia                                                 | XML, decoded atlas, text, missing-glyph/spacing policy, tint and target  |
 | `glyphAtlas`  | BMFont atlas packing and XML for supplied RGBA glyphs                                                                                     | Glyph images, offsets, advances and font metrics                         |
 | `grid`        | Pixel-frame drawing, outlines, opaque extents and mirroring                                                                               | Palette, colour names and edge colour rule                               |
 | `ico`         | ICO encoding with PNG entries                                                                                                             | One pre-sized RGBA image per entry                                       |
@@ -88,6 +89,22 @@ Decoded RGBA equality includes RGB under zero alpha. Encoded PNG equality additi
 | `atlasBuild.buildAtlasPages(dependencies, pages)`                         | Reads, decodes, draws and encodes each page with the supplied functions                                                                                                    |
 
 Callers choose indexed-first fallback, PNG versus WebP and output metadata. The sprite sheet tests compare with frozen Aseprite exports in `node/tests/fixtures/sprite-sheet`.
+
+## Bitmap text
+
+Import the canvas-free reader and compositor from `@andornaut/art-kit/bitmapFont`. Font generation remains in `fonts` and `glyphAtlas`; this module reads their XML without loading Skia or accessing files.
+
+`readBitmapFont(xml)` returns the single page name, atlas dimensions, base, line height, glyphs and kerning. It accepts one unpacked RGBA page (page 0, channel 15), including either atlas packing layout emitted by `glyphAtlas`. Multi-page and channel-packed fonts are unsupported. The reader validates counts, code points, metrics and atlas rectangles; it does not resolve page paths or load images.
+
+`measureBitmapText({ font, lineSpacing, missing }, text)` returns separate `lineAdvances`, total line-box `height` and optional `glyphBounds`. Bounds cover declared nonempty glyph rectangles, including any transparent padding; they are not a scan of visible pixels. Positions, advances and kerning preserve signed integer metrics. The origin is the first line box's top-left, not its baseline or ink bounds.
+
+Both text functions require explicit spacing and missing-glyph policy. `lineSpacing` is the integer gap between line boxes; the resulting pitch must be positive. Literal LF separates lines and retains blank and trailing lines. Empty text is one line. There is no wrapping, alignment or newline normalization.
+
+`missing` is `"reject"`, `"skip"`, or `{ fallback: codePoint, absent: "reject" | "skip" }`. Kerning uses the original input code points even when a fallback is drawn. Skipped characters neither advance nor update the previous character; LF resets both. Space and other empty glyphs retain their advances.
+
+`drawBitmapText({ font, lineSpacing, missing, atlas, at, tint }, text, target)` validates and lays out the text before mutating the target. The decoded RGBA atlas must match the XML dimensions and must not share the target's backing buffer. Each glyph keeps its alpha coverage, receives the supplied RGB tint and uses the existing straight-alpha compositor, including clipping and byte rounding. The atlas remains unchanged. Use existing alpha-bound helpers on rendered output when actual visible ink bounds are needed.
+
+Font files, samples, colours, line spacing, fallback selection and PNG encoder settings remain caller-owned. Parsing and measurement perform no I/O; drawing mutates only the target.
 
 ## Builds
 

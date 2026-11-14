@@ -17,6 +17,10 @@ These fixtures are frozen reference outputs. Their generators are not in this tr
 
 `colour-inverse.test.mjs` freezes synthetic vectors against Ada's same-revision `art/tools/oklab.ts` blob `e591b615d25be3ac5bd2ae2e6e226eff088c8f99` and Archie's `art/tools/pixel.ts` at `54c911ea80627f95c9c568f68ec25f5c227334a4`. It covers clipping/rejection, transfer branches and public Oklab inputs whose exact byte half-ties distinguish half-even from half-up. No consumer palette constants or art assets are included.
 
+## Bitmap text composition
+
+`bitmap-font.json` contains four full-RGBA synthetic references frozen from Chibi revision `55e0a3de72068bca5c46ba8d5b20d3b03aaf713f`, `art/tools/previewText.ts` blob `2a0afcb77a78e515f389e17c064860cb7980a5d2`. The pinned attribute-reader and drawLabel bodies ran with injected synthetic font, tint and line spacing, using the existing raster compositor independently of the new bitmapFont module. Cases preserve original-code fallback kerning, absent fallback skipping, literal line breaks, supplementary Unicode, signed metrics and origins, overlap, partial alpha and clipping. No game assets, font files or palette constants were copied into these references.
+
 ## Font pipelines and Skia composition
 
 `fonts/` holds the atlas PNG and BMFont XML of each game's font pipeline over the fonts below, produced with art-kit 0.16.0's Skia `fonts.buildBitmapFont`: `chibi-*` reproduce `chibis-way-home` `art/tools/fonts.ts` (antialiased, hinted, all-pair kerning, glyphs cropped to their ink with a 2 px bleed and whitened, packed layout) and `archie-*` reproduce `archies-dog-walks` `art/tools/fonts.ts` (binary, unhinted, glyphs trimmed with `opaqueRect`, padded layout). The PNGs are encoded with deflate level 9, strategy 3 and adaptive filtering; the tests compare their decoded RGBA and the XML. The contact sheet digests in `raster.test.mjs` are the RGBA of art-kit 0.16.0's Skia `frames.renderContactSheet` for the same sprites.
