@@ -55,6 +55,10 @@
       "types": "./dist/fonts.d.ts",
       "import": "./dist/fonts.js"
     },
+    "./bitmapFont": {
+      "types": "./dist/bitmapFont.d.ts",
+      "import": "./dist/bitmapFont.js"
+    },
     "./grid": {
       "types": "./dist/grid.d.ts",
       "import": "./dist/grid.js"
