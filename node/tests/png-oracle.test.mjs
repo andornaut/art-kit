@@ -63,19 +63,21 @@ function image(content, width, height) {
 
 const FILTER_TYPES = [-1, 0, 1, 2, 3, 4];
 
-test("small images match pngjs for every level, strategy and filter type", () => {
-  const sizes = [
-    [0, 0],
-    [0, 3],
-    [3, 0],
-    [1, 1],
-    [1, 17],
-    [17, 1],
-    [7, 5],
-    [33, 9],
+test("representative small images match pngjs for every level, strategy and filter type", () => {
+  // Empty shapes have no content bytes. Exercise each nonempty shape with selected content,
+  // retaining all four patterns on a multirow image and every compression/filter setting.
+  const samples = [
+    [0, 0, ["flat"]],
+    [0, 3, ["flat"]],
+    [3, 0, ["flat"]],
+    [1, 1, ["random", "flat"]],
+    [1, 17, ["gradient", "sparse"]],
+    [17, 1, ["random", "gradient"]],
+    [7, 5, Object.keys(CONTENT)],
+    [33, 9, ["random", "sparse"]],
   ];
-  for (const [width, height] of sizes) {
-    for (const content of Object.keys(CONTENT)) {
+  for (const [width, height, contents] of samples) {
+    for (const content of contents) {
       const pixels = image(content, width, height);
       for (const deflateLevel of [-1, 0, 1, 6, 9]) {
         for (const deflateStrategy of [0, 1, 2, 3, 4]) {

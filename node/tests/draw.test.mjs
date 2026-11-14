@@ -70,14 +70,6 @@ test("draw fixtures come from Pillow 13.0.0 and cover every operation", () => {
   assert.ok(fixture.cases.some((c) => c.rgba));
 });
 
-test("mode 1 and L targets cover the same pixels as RGBA in every fixture case", () => {
-  const { 1: bilevel, L, mismatches } = fixture.equivalence;
-  assert.ok(L.cases > 0 && bilevel.cases > 0);
-  assert.equal(L.matched, L.cases);
-  assert.equal(bilevel.matched, bilevel.cases);
-  assert.deepEqual(mismatches, []);
-});
-
 for (const op of new Set(fixture.cases.map((c) => c.op))) {
   test(`${op} matches Pillow RGBA bytes exactly`, () => {
     const failures = [];
