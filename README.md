@@ -4,7 +4,7 @@ Shared TypeScript mechanisms for scripted pixel art and atlas builds. Source liv
 
 ## Boundaries
 
-The package ships TypeScript declarations and these subpaths. Import each explicitly, for example `@andornaut/art-kit/raster`.
+The package ships TypeScript declarations and explicit leaf subpaths. Canonical art-kit APIs live under `build/*`: their supported purpose is asset development, including diagnostics used by tests. This category describes intended use, not platform portability. Current consumers need no in-game runtime or reusable testing API, so `runtime/*` and `test/*` are absent. Private fixtures and harnesses are not published. Import each explicitly, for example `@andornaut/art-kit/build/raster`.
 
 | Subpath       | Owns                                                                                                                                      | Client supplies                                                          |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
@@ -24,17 +24,19 @@ The package ships TypeScript declarations and these subpaths. Import each explic
 | `raster`      | RGBA operations, Float32 smooth filters, frame rendering, sheets and contact sheets                                                       | Images, planes, colours, frames, colour resolver and geometry            |
 | `rgbaImage`   | RGBA allocation, alpha bounds and extruded blitting                                                                                       | Image dimensions, pixels, rectangles and bounds                          |
 | `spriteSheet` | Sprite sheet PNG and json-hash data byte-identical to Aseprite 1.2.30, without Aseprite                                                   | Key, image name, tags, optional columns and slice margins, paths         |
-| `webp`        | Lossless WebP encoding                                                                                                                    | RGBA images                                                              |
+| `webp`        | Lossless and configurable lossy WebP encoding                                                                                             | RGBA images                                                              |
 
 Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject; invalid geometry, colours and sizes throw `RangeError`. Only `fonts` needs Skia; every other subpath is canvas-free. Numerical transforms use the rounding and intermediate precision specified below.
+
+See [API entry points](docs/api-entry-points.md) for the dependency audit, canonical route map and compatibility aliases. Existing flat routes continue to resolve to the same implementations while consumer owners migrate their pinned imports. The build orchestrator is `build/build`; comparison is `build/compareRgba`. Runtime APIs in the shared kit convention must not import build or test APIs, and no combined root barrel loads optional tooling.
 
 ## Pixel frames and images
 
 A `Frame` is rows of hex colours (opaque) or `null` (clear). An `RgbaImage` is `{ data, width, height }` with straight (non-premultiplied) RGBA bytes; an opaque (RGB) image has alpha 255. A `Tag` is `[name, frames, milliseconds]`, with one duration for every frame or one each.
 
 ```ts
-import { Grid } from "@andornaut/art-kit/grid";
-import { frameToRgba } from "@andornaut/art-kit/raster";
+import { Grid } from "@andornaut/art-kit/build/grid";
+import { frameToRgba } from "@andornaut/art-kit/build/raster";
 
 const grid = new Grid({ fill: "ffffff" }, 16, 16, { edge: () => "000000" });
 grid.ell(8, 8, 4, 4, "fill");
@@ -93,9 +95,19 @@ Decoded RGBA equality includes RGB under zero alpha. Encoded PNG equality additi
 
 Callers choose indexed-first fallback, PNG versus WebP and output metadata. The sprite sheet tests compare with frozen Aseprite exports in `node/tests/fixtures/sprite-sheet`.
 
+## Development image comparison
+
+Import `compareRgba` from `@andornaut/art-kit/build/compareRgba`. Call `compareRgba({ backgrounds }, expected, actual)` with decoded, normalized straight RGBA8 images and an explicit ordered array of opaque RGB backgrounds. An empty array requests raw comparison only. This dependency-free diagnostic performs no decoding, file access, colour-profile normalization or acceptance decision.
+
+Different dimensions return `{ kind: "dimension-mismatch", expected, actual }` without pixel metrics. Equal dimensions return `kind: "compared"`, width and height, plus `raw` equality, differing pixel/channel counts and maximum absolute byte error. Raw metrics include RGB under zero alpha; `raw.alpha` reports alpha-different pixels and maximum alpha error separately.
+
+Each `composites` entry copies its background and reports RGB RMSE and maximum absolute error. For channel `C`, opacity `a` and background `B`, compositing is `(C*a + B*(255-a))/255` in encoded byte levels using unrounded doubles. RMSE divides squared RGB error by three times the pixel count. These are deterministic encoded-channel metrics, not linear-light or perceptual measurements. Inputs remain unchanged; invalid dimensions, buffers or backgrounds throw `RangeError`.
+
+Use this tool during asset generation or compression review. Callers choose decoding policy, backgrounds, thresholds, byte budgets and visual acceptance. It is not a gameplay service, and tests using it do not turn it into a test-only API. Timing and memory measurements are separate from the report.
+
 ## Bitmap text
 
-Import the canvas-free reader and compositor from `@andornaut/art-kit/bitmapFont`. Font generation remains in `fonts` and `glyphAtlas`; this module reads their XML without loading Skia or accessing files.
+Import the canvas-free reader and compositor from `@andornaut/art-kit/build/bitmapFont`. Font generation remains in `fonts` and `glyphAtlas`; this module reads their XML without loading Skia or accessing files.
 
 `readBitmapFont(xml)` returns the single page name, atlas dimensions, base, line height, glyphs and kerning. It accepts one unpacked RGBA page (page 0, channel 15), including either atlas packing layout emitted by `glyphAtlas`. Multi-page and channel-packed fonts are unsupported. The reader validates counts, code points, metrics and atlas rectangles; it does not resolve page paths or load images.
 
@@ -138,7 +150,7 @@ The default check compares the tree before and after the rebuild without Git, so
 `index: true` adds the Git index state from before the run: tracked files under the check paths whose working tree content differs from the index (`dirty`, printed as `~\tpath`) and untracked files that `.gitignore` does not exclude (`untracked`, printed as `?\tpath`), keyed like the snapshot. Staged changes count as clean and ignored files are skipped. A pass then means the tree under the check paths matched the index before the run and the rebuild changed nothing, so it also works on a dirty checkout. It runs `git` in the working directory without taking the index lock; Git must be on `PATH` and must trust the repository (`safe.directory` when the checkout belongs to another user), and a Git failure propagates as an `Error`.
 
 ```ts
-import { buildCommand, nodeBuild } from "@andornaut/art-kit/build";
+import { buildCommand, nodeBuild } from "@andornaut/art-kit/build/build";
 
 const tools = { directory: "art/tools" };
 process.exitCode = await buildCommand(
@@ -175,9 +187,9 @@ Antialiasing and hinting default to true; synthesis and cross-glyph substitution
 ```ts
 import { writeFile } from "node:fs/promises";
 
-import { rasteriseGlyphs } from "@andornaut/art-kit/fonts";
-import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/glyphAtlas";
-import { encodeRgbaPng } from "@andornaut/art-kit/png";
+import { rasteriseGlyphs } from "@andornaut/art-kit/build/fonts";
+import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/build/glyphAtlas";
+import { encodeRgbaPng } from "@andornaut/art-kit/build/png";
 
 const { base, glyphs, kernings, lineHeight } = rasteriseGlyphs({
   characters: " ABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -200,7 +212,7 @@ await writeFile("body.fnt", font.xml);
 
 ## WOFF2 fonts
 
-Import `encodeWoff2(font: Uint8Array): Promise<Uint8Array>` from `@andornaut/art-kit/woff2`, with the optional exact peer `wawoff2@2.0.1` installed. This canvas-free Node build API encodes a complete static TrueType 1.0 font with `glyf`/`loca` tables. It does not subset, rasterize, replace fonts or expose fidelity settings. The peer is loaded only when encoding; other imports need neither it nor Skia. Input bytes are copied and remain unchanged; concurrent calls are serialized and return independent output bytes.
+Import `encodeWoff2(font: Uint8Array): Promise<Uint8Array>` from `@andornaut/art-kit/build/woff2`, with the optional exact peer `wawoff2@2.0.1` installed. This canvas-free Node build API encodes a complete static TrueType 1.0 font with `glyf`/`loca` tables. It does not subset, rasterize, replace fonts or expose fidelity settings. The peer is loaded only when encoding; other imports need neither it nor Skia. Input bytes are copied and remain unchanged; concurrent calls are serialized and return independent output bytes.
 
 Signed fonts with a `DSIG` table, CFF outlines, collections, variable fonts and malformed directories are rejected. Codec failures reject the promise without preventing later calls. The pinned WASM codec comes from Google's WOFF2 implementation; its packaged binary dates from 2022. Repeated output is pinned by regression hashes, rather than a promise that different codec versions produce identical bytes.
 
