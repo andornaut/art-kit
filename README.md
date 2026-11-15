@@ -198,9 +198,19 @@ await writeFile("body.fnt", font.xml);
 
 [Implementation notes](docs/implementation-comparison.md) cover font output quality and the rendering split.
 
+## WOFF2 fonts
+
+Import `encodeWoff2(font: Uint8Array): Promise<Uint8Array>` from `@andornaut/art-kit/woff2`, with the optional exact peer `wawoff2@2.0.1` installed. This canvas-free Node build API encodes a complete static TrueType 1.0 font with `glyf`/`loca` tables. It does not subset, rasterize, replace fonts or expose fidelity settings. The peer is loaded only when encoding; other imports need neither it nor Skia. Input bytes are copied and remain unchanged; concurrent calls are serialized and return independent output bytes.
+
+Signed fonts with a `DSIG` table, CFF outlines, collections, variable fonts and malformed directories are rejected. Codec failures reject the promise without preventing later calls. The pinned WASM codec comes from Google's WOFF2 implementation; its packaged binary dates from 2022. Repeated output is pinned by regression hashes, rather than a promise that different codec versions produce identical bytes.
+
+WOFF2 retains font content but may normalize SFNT serialization, including table offsets and padding, glyph encoding, location/metric representation and the head checksum and lossless-transform flag. Decoded TTF bytes need not equal the original file. Tests decode both full Liberation Sans fixtures and compare every glyph's geometry, components and hint instructions, Unicode coverage, advances, kerning, names, licence metadata and all remaining tables outside explicit serialization differences. These fixtures match the requested consumer originals. Font licensing remains unchanged; no font payload is included in the package.
+
+Callers own input font files, output paths, browser `FontFace` readiness, cache manifests and visual acceptance. Encoded file size is separate from network transfer and decoded memory. There is no public WOFF2 decoder or browser qualification claim.
+
 ## Runtime and checks
 
-Node 24.22.2 or newer with the exact peers `pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas@4.0.0` for `fonts`. Source fonts and their licences stay in the client repositories.
+Node 24.22.2 or newer with the exact peers `pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas@4.0.0` for `fonts` and `wawoff2@2.0.1` for `woff2`. Source fonts and their licences stay in the client repositories.
 
 Automation and CI use `make check` for the full package gate: lint, test and build. `make lint`, `make test` and `make build` run one phase; only `make build` writes into the checkout, replacing ignored `node/dist`. Format and TypeScript checks belong to lint; test builds and installs the package before testing its public imports. Checks do not publish or change the package version or consumer assets.
 
