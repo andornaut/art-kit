@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { encodeRgbaPng, encodeRgbPng } from "@andornaut/art-kit/png";
+import { encodeRgbaPng, encodeRgbPng } from "@andornaut/art-kit/build/png";
 import { PNG } from "pngjs";
 
 const ENCODERS = [

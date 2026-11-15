@@ -11,7 +11,7 @@ import {
   checkSets,
   nodeBuild,
   runBuilds,
-} from "@andornaut/art-kit/build";
+} from "@andornaut/art-kit/build/build";
 
 // The error classes are internal; callers identify them by name.
 const named = (caught, name) => caught instanceof Error && caught.name === name;
@@ -811,7 +811,7 @@ test("only the index check runs git", async (t) => {
 });
 
 test("build exports only its public API", async () => {
-  const build = await import("@andornaut/art-kit/build");
+  const build = await import("@andornaut/art-kit/build/build");
   assert.deepEqual(Object.keys(build).sort(), [
     "buildCommand",
     "buildOrder",

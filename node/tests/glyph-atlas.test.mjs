@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildBitmapFontFromGlyphs as build } from "@andornaut/art-kit/glyphAtlas";
+import { buildBitmapFontFromGlyphs as build } from "@andornaut/art-kit/build/glyphAtlas";
 const options = {
   key: 'a&"\n',
   face: "Body\tRegular",

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import * as raster from "@andornaut/art-kit/raster";
+import * as raster from "@andornaut/art-kit/build/raster";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required fixture directory");

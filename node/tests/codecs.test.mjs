@@ -3,8 +3,8 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 
-import { decodePng } from "@andornaut/art-kit/png";
-import { encodeLosslessWebp, encodeLossyWebp } from "@andornaut/art-kit/webp";
+import { decodePng } from "@andornaut/art-kit/build/png";
+import { encodeLosslessWebp, encodeLossyWebp } from "@andornaut/art-kit/build/webp";
 import decoderFactory from "@jsquash/webp/codec/dec/webp_dec.js";
 import encoderFactory from "@jsquash/webp/codec/enc/webp_enc.js";
 import { defaultOptions } from "@jsquash/webp/meta.js";

@@ -5,8 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { decodePng } from "@andornaut/art-kit/png";
-import { spriteSheet, writeSpriteSheet } from "@andornaut/art-kit/spriteSheet";
+import { decodePng } from "@andornaut/art-kit/build/png";
+import { spriteSheet, writeSpriteSheet } from "@andornaut/art-kit/build/spriteSheet";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required fixture directory");

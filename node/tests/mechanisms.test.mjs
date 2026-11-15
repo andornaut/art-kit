@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { buildAtlasPages, drawAtlasPage } from "@andornaut/art-kit/atlasBuild";
-import { packAtlas } from "@andornaut/art-kit/atlasLayout";
-import { decodePng, encodeRgbaPng } from "@andornaut/art-kit/png";
-import { blankImage, blitExtruded } from "@andornaut/art-kit/rgbaImage";
+import { buildAtlasPages, drawAtlasPage } from "@andornaut/art-kit/build/atlasBuild";
+import { packAtlas } from "@andornaut/art-kit/build/atlasLayout";
+import { decodePng, encodeRgbaPng } from "@andornaut/art-kit/build/png";
+import { blankImage, blitExtruded } from "@andornaut/art-kit/build/rgbaImage";
 
 const item = (value, ...sizes) => ({
   value,

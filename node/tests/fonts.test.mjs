@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, test } from "node:test";
 
-import { fontCoverage, rasteriseGlyphs } from "@andornaut/art-kit/fonts";
-import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/glyphAtlas";
-import { decodePng } from "@andornaut/art-kit/png";
+import { fontCoverage, rasteriseGlyphs } from "@andornaut/art-kit/build/fonts";
+import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/build/glyphAtlas";
+import { decodePng } from "@andornaut/art-kit/build/png";
 import { Canvas, FontLibrary } from "skia-canvas";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;

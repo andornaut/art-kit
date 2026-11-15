@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { oklchToSrgb, srgbToOklab, srgbToOklch } from "@andornaut/art-kit/colour";
+import { oklchToSrgb, srgbToOklab, srgbToOklch } from "@andornaut/art-kit/build/colour";
 test("reference vectors, byte roundtrips and neutral hue", () => {
   for (const [rgb, expected] of [
     [

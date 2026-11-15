@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { buildBitmapFontFromGlyphs as build } from "@andornaut/art-kit/glyphAtlas";
+import { buildBitmapFontFromGlyphs as build } from "@andornaut/art-kit/build/glyphAtlas";
 
 // Frozen packed-layout references; see fixtures/README.md.
 const fixtures = JSON.parse(

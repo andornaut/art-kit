@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { contrast, rgb } from "@andornaut/art-kit/colour";
-import { flipped, Grid, opaqueCols, opaqueRows } from "@andornaut/art-kit/grid";
-import { composeContactSheet, composeSheet, frameToRgba } from "@andornaut/art-kit/raster";
+import { contrast, rgb } from "@andornaut/art-kit/build/colour";
+import { flipped, Grid, opaqueCols, opaqueRows } from "@andornaut/art-kit/build/grid";
+import { composeContactSheet, composeSheet, frameToRgba } from "@andornaut/art-kit/build/raster";
 
 test("grid truncates coordinates, resolves own palette keys and keeps Bresenham ties", () => {
   const g = new Grid({ a: "ffffff" }, 4, 3);

@@ -7,6 +7,78 @@
     "node": ">=24.22.2"
   },
   "exports": {
+    "./build/atlasLayout": {
+      "types": "./dist/atlasLayout.d.ts",
+      "import": "./dist/atlasLayout.js"
+    },
+    "./build/atlasBuild": {
+      "types": "./dist/atlasBuild.d.ts",
+      "import": "./dist/atlasBuild.js"
+    },
+    "./build/rgbaImage": {
+      "types": "./dist/rgbaImage.d.ts",
+      "import": "./dist/rgbaImage.js"
+    },
+    "./build/indexedPng": {
+      "types": "./dist/indexedPng.d.ts",
+      "import": "./dist/indexedPng.js"
+    },
+    "./build/png": {
+      "types": "./dist/png.d.ts",
+      "import": "./dist/png.js"
+    },
+    "./build/webp": {
+      "types": "./dist/webp.d.ts",
+      "import": "./dist/webp.js"
+    },
+    "./build/woff2": {
+      "types": "./dist/woff2.d.ts",
+      "import": "./dist/woff2.js"
+    },
+    "./build/gif": {
+      "types": "./dist/gif.d.ts",
+      "import": "./dist/gif.js"
+    },
+    "./build/ico": {
+      "types": "./dist/ico.d.ts",
+      "import": "./dist/ico.js"
+    },
+    "./build/spriteSheet": {
+      "types": "./dist/spriteSheet.d.ts",
+      "import": "./dist/spriteSheet.js"
+    },
+    "./build/draw": {
+      "types": "./dist/draw.d.ts",
+      "import": "./dist/draw.js"
+    },
+    "./build/colour": {
+      "types": "./dist/colour.d.ts",
+      "import": "./dist/colour.js"
+    },
+    "./build/fonts": {
+      "types": "./dist/fonts.d.ts",
+      "import": "./dist/fonts.js"
+    },
+    "./build/bitmapFont": {
+      "types": "./dist/bitmapFont.d.ts",
+      "import": "./dist/bitmapFont.js"
+    },
+    "./build/grid": {
+      "types": "./dist/grid.d.ts",
+      "import": "./dist/grid.js"
+    },
+    "./build/raster": {
+      "types": "./dist/raster.d.ts",
+      "import": "./dist/raster.js"
+    },
+    "./build/glyphAtlas": {
+      "types": "./dist/glyphAtlas.d.ts",
+      "import": "./dist/glyphAtlas.js"
+    },
+    "./build/build": {
+      "types": "./dist/build.d.ts",
+      "import": "./dist/build.js"
+    },
     "./build/compareRgba": {
       "types": "./dist/build/compareRgba.d.ts",
       "import": "./dist/build/compareRgba.js"

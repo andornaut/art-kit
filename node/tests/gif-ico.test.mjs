@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { inflateSync } from "node:zlib";
 
-import { encodeGif } from "@andornaut/art-kit/gif";
-import { encodeIco } from "@andornaut/art-kit/ico";
-import { decodePng } from "@andornaut/art-kit/png";
+import { encodeGif } from "@andornaut/art-kit/build/gif";
+import { encodeIco } from "@andornaut/art-kit/build/ico";
+import { decodePng } from "@andornaut/art-kit/build/png";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");

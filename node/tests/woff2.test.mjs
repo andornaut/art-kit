@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { encodeWoff2 } from "@andornaut/art-kit/woff2";
+import { encodeWoff2 } from "@andornaut/art-kit/build/woff2";
 import decompress from "wawoff2/decompress.js";
 
 const root = process.env.ART_KIT_TEST_FIXTURES;

@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { arc, ellipse, line, point, polygon, rectangle } from "@andornaut/art-kit/draw";
+import { arc, ellipse, line, point, polygon, rectangle } from "@andornaut/art-kit/build/draw";
 
 const fixtures = process.env.ART_KIT_TEST_FIXTURES;
 assert.ok(fixtures, "Required ART_KIT_TEST_FIXTURES fixture directory");
@@ -113,7 +113,7 @@ test("colours must be four bytes", () => {
 });
 
 test("draw exports one function per operation", async () => {
-  const draw = await import("@andornaut/art-kit/draw");
+  const draw = await import("@andornaut/art-kit/build/draw");
   assert.deepEqual(Object.keys(draw).sort(), [
     "arc",
     "ellipse",

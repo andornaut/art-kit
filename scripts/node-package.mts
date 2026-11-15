@@ -22,7 +22,7 @@ interface Descriptor {
 }
 
 // Subpaths that import the optional Skia peer; every other export must import without the optional peers.
-const SKIA_SUBPATHS = ["fonts"];
+const SKIA_SUBPATHS = ["build/fonts", "fonts"];
 
 const [mode, revision, ...testArgs] = process.argv.slice(2);
 if (!["lint", "test", "build", "check", "pack"].includes(mode)) {

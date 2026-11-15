@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { drawBitmapText, measureBitmapText, readBitmapFont } from "@andornaut/art-kit/bitmapFont";
-import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/glyphAtlas";
-import { blankImage } from "@andornaut/art-kit/rgbaImage";
+import {
+  drawBitmapText,
+  measureBitmapText,
+  readBitmapFont,
+} from "@andornaut/art-kit/build/bitmapFont";
+import { buildBitmapFontFromGlyphs } from "@andornaut/art-kit/build/glyphAtlas";
+import { blankImage } from "@andornaut/art-kit/build/rgbaImage";
 
 const root = process.env.ART_KIT_TEST_FIXTURES;
 const fixture = JSON.parse(readFileSync(`${root}/bitmap-font.json`, "utf8"));

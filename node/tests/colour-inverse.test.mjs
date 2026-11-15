@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { oklabToSrgb, oklchToSrgb } from "@andornaut/art-kit/colour";
+import { oklabToSrgb, oklchToSrgb } from "@andornaut/art-kit/build/colour";
 
 // Synthetic vectors frozen with Ada the Navigator e0673c7eb3c0dddf64eeca081fd9d982bd333a91,
 // art/tools/oklab.ts blob e591b615d25be3ac5bd2ae2e6e226eff088c8f99 (clip/half-even).
