@@ -1,4 +1,4 @@
-// Lossless non-SIMD WebP encoding for Node build tools.
+// Non-SIMD WebP encoding for Node build tools.
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 
@@ -37,14 +37,63 @@ const LOSSLESS = {
   quality: 95,
 };
 
-// The image as a lossless WebP.
-export async function encodeLosslessWebp({ data, height, width }: RgbaImage): Promise<Uint8Array> {
+async function encode(
+  options: Parameters<WebPEncoder["encode"]>[3],
+  { data, height, width }: RgbaImage,
+): Promise<Uint8Array> {
   encoder ??= wasmModule("enc/webp_enc.wasm").then((wasm) =>
     initEmscriptenModule(encoderFactory, wasm),
   );
-  const bytes = (await encoder).encode(new Uint8Array(data), width, height, LOSSLESS);
+  const bytes = (await encoder).encode(new Uint8Array(data), width, height, options);
   if (bytes === null) {
     throw new Error(`libwebp could not encode a ${width}x${height} image`);
   }
   return new Uint8Array(bytes);
+}
+
+// The image as a lossless WebP.
+export async function encodeLosslessWebp(image: RgbaImage): Promise<Uint8Array> {
+  return encode(LOSSLESS, image);
+}
+
+/** Lossy RGB WebP; alphaQuality 100 preserves alpha bytes. RGB, including hidden RGB, can change. */
+export async function encodeLossyWebp(
+  options: { quality: number; method: number; alphaQuality: number; exact: boolean },
+  image: RgbaImage,
+): Promise<Uint8Array> {
+  if (!Number.isFinite(options?.quality) || options.quality < 0 || options.quality > 100) {
+    throw new RangeError("Quality must be finite in 0..100");
+  }
+  if (!Number.isInteger(options.method) || options.method < 0 || options.method > 6) {
+    throw new RangeError("Method must be an integer in 0..6");
+  }
+  if (
+    !Number.isInteger(options.alphaQuality) ||
+    options.alphaQuality < 0 ||
+    options.alphaQuality > 100
+  ) {
+    throw new RangeError("Alpha quality must be an integer in 0..100");
+  }
+  if (typeof options.exact !== "boolean") {
+    throw new RangeError("Exact must be a boolean");
+  }
+  const { data, height, width } = image;
+  // libwebp encode.h: WEBP_MAX_DIMENSION is 16383, inclusive.
+  if (![width, height].every((v) => Number.isSafeInteger(v) && v > 0 && v <= 16383)) {
+    throw new RangeError("Image dimensions must be integers in 1..16383");
+  }
+  if (!(data instanceof Uint8Array) || data.length !== width * height * 4) {
+    throw new RangeError("Image data must contain exactly width * height * 4 RGBA bytes");
+  }
+  return encode(
+    {
+      ...defaultOptions,
+      alpha_quality: options.alphaQuality,
+      exact: options.exact ? 1 : 0,
+      lossless: 0,
+      method: options.method,
+      quality: options.quality,
+    },
+    image,
+  );
 }
