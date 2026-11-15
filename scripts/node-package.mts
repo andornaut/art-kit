@@ -176,7 +176,7 @@ const contractFile = `${install}/contracts.mts`;
 writeFileSync(
   contractFile,
   subpaths
-    .map((subpath) => `import * as ${subpath} from '@andornaut/art-kit/${subpath}';`)
+    .map((subpath, index) => `import * as export${index} from '@andornaut/art-kit/${subpath}';`)
     .join("\n"),
 );
 execFileSync(

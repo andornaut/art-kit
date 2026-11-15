@@ -7,6 +7,10 @@
     "node": ">=24.22.2"
   },
   "exports": {
+    "./build/compareRgba": {
+      "types": "./dist/build/compareRgba.d.ts",
+      "import": "./dist/build/compareRgba.js"
+    },
     "./atlasLayout": {
       "types": "./dist/atlasLayout.d.ts",
       "import": "./dist/atlasLayout.js"
