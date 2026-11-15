@@ -67,14 +67,9 @@ Immutable v0.27 release artifacts and pins remain unchanged and usable, includin
 compatibility paths. Consumers can migrate imports while staying on v0.27, then adopt a
 verified v0.28 immutable pin without another import change.
 
-Keep the published v0.27 compatibility aliases until every known consumer owner confirms
-canonical imports on a verified immutable pin and supplies an actual publication/integration
-receipt, including normal gates, push, CI and deployment where applicable. Source counts,
-branch READY and checked local main alone are insufficient.
-
-The v0.28 removal stays isolated preparation until all those owner receipts are collected.
-Only then integrate and publish the coordinated incompatible release with migration notes;
-consumer owners retain responsibility for their own adoption and checks.
+Consumer owners migrate all imports, including build configuration, tests and mocks, before
+upgrading their immutable pin. Publishing v0.28 does not change existing pins or establish
+consumer adoption. Each owner retains responsibility for integration, checks and delivery.
 
 Fixtures, source fonts, test decoders, semantics assertions and local build/test harnesses
 remain unpublished. Private production helpers may ship in `dist` for internal imports;
