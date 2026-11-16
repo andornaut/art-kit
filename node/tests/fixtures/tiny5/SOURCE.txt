@@ -1,0 +1,19 @@
+Tiny5 test fixture provenance
+
+Source: Archie, art/fonts/tiny5/Tiny5.ttf and art/fonts/tiny5/OFL.txt.
+Both files are copied unchanged from that authoritative source pair.
+
+SHA256:
+588626f2c1b164f55927c0d8123f4bc134651aad7d257da68fc19b0824b0d8fa  Tiny5.ttf
+690fda321d0ebce403249c8d61dadddcee09dc8813424cc5a8f982efcff9a9a3  OFL.txt
+
+Tiny5.ttf name ID 0:
+Copyright 2026 The Tiny5 Project Authors (https://github.com/Gissio/font_Tiny5)
+
+Companion OFL.txt notice:
+Copyright 2022-2024 The Tiny5 Project Authors (https://github.com/Gissio/font_tiny5)
+
+These are distinct notices present in the unchanged source files. Neither notice
+is amended or reconciled here. The font remains under the SIL Open Font License
+1.1 in OFL.txt. The helper code's MIT licence does not apply to this font.
+The fixture and its companion files are test-only and excluded from the package.
