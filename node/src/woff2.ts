@@ -41,8 +41,8 @@ function validate(font: Uint8Array): void {
     }
     end = Math.max(end, table.offset + table.length);
   }
-  if (["DSIG", "CFF ", "CFF2", "fvar", "gvar"].some((tag) => tables.has(tag))) {
-    throw new RangeError("Signed, CFF and variable fonts are not supported");
+  if (["DSIG", "CFF ", "CFF2"].some((tag) => tables.has(tag))) {
+    throw new RangeError("Signed and CFF fonts are not supported");
   }
   const table = (tag: string, minimum: number) => {
     const entry = tables.get(tag);
@@ -85,8 +85,8 @@ function validate(font: Uint8Array): void {
 }
 
 /**
- * Full static TrueType 1.0 (glyf/loca) to WOFF2, using optional wawoff2 2.0.1. No subsetting,
- * rasterization or public decoder. Signed/DSIG, CFF and variable fonts are rejected.
+ * Full static or variable TrueType 1.0 (glyf/loca) to WOFF2, using optional wawoff2 2.0.1.
+ * No subsetting, rasterization or public decoder. Signed/DSIG and CFF fonts are rejected.
  * Google WOFF2 can normalize SFNT offsets, padding, glyf/loca/hmtx and head (checksum adjustment, flag
  * bit 11 and possibly loca format); decoded SFNT bytes need not equal the original serialization.
  * Font tables, Unicode mapping, glyph order/geometry, metrics, hinting and names are retained.
