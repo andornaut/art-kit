@@ -2,6 +2,8 @@
 
 Shared TypeScript mechanisms for scripted pixel art and atlas builds. Source lives in `node/src` and compiles to the ESM package `@andornaut/art-kit`, released as a GitHub release tarball with no registry publication.
 
+Design summaries by area, with an index of their work items, are in [docs/design](docs/design/README.md); each approved task is a work file in [docs/work](docs/work/README.md).
+
 ## Boundaries
 
 The package ships TypeScript declarations and explicit leaf subpaths. Canonical art-kit APIs live under `build/*`: their supported purpose is asset development, including diagnostics used by tests. This category describes intended use, not platform portability. Current consumers need no in-game runtime or reusable testing API, so `runtime/*` and `test/*` are absent. Private fixtures and harnesses are not published. Import each explicitly, for example `@andornaut/art-kit/build/raster`.
@@ -283,7 +285,7 @@ Make runs `tests/container/check-stock`, which uses stock images pinned in `test
 | `bash scripts/provision.sh <empty-directory>`           | Downloads the pinned dependencies from `node/package.json` into `<empty-directory>/node/node_modules` |
 | `bash scripts/pack.sh <node_modules> <empty-directory>` | Builds `art-kit-<version>.tgz`, `SOURCE_COMMIT` and `SHA256SUMS` from the committed `HEAD`            |
 
-Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. CI runs `make check`, then provisions, packs and uploads the committed release artifacts, and scans for attributions. Game projects test their own adapters and authored output; no game build is part of the package gate.
+Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. CI classifies the changed paths first. A change only under `docs/` runs `make lint` and the attribution scan; any other change also runs `make check`, then provisions, packs and uploads the committed release artifacts. Game projects test their own adapters and authored output; no game build is part of the package gate.
 
 ## Version and licence
 

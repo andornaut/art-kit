@@ -9,7 +9,62 @@ permissions:
   contents: read
 
 jobs:
+  # A push or pull request that changes only docs/ runs lint alone; verify reports as skipped.
+  # Anything it cannot classify runs every job.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+          # Full history, so the event's base commit is present to diff against.
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          FORCED: ${{ github.event.forced }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A forced push, a new branch or tag (an all-zero before), a manual run or a base this
+          # clone does not have leaves base empty, which runs everything.
+          base=
+          if [ "$EVENT" = pull_request ]; then
+            base=$PR_BASE
+          elif [ "$EVENT" = push ] && [ "$FORCED" != true ]; then
+            base=$BEFORE
+          fi
+          code=true
+          if [ -n "$base" ] && [ -n "${base//0/}" ] \
+            && git merge-base --is-ancestor "$base" HEAD 2>/dev/null \
+            && paths=$(git diff --name-only --no-renames "$base" HEAD) \
+            && [ -n "$paths" ] && ! grep -qv '^docs/' <<<"$paths"; then
+            code=false
+          fi
+          echo "code=$code" >>"$GITHUB_OUTPUT"
+          echo "changed paths outside docs/: $code"
+  lint:
+    runs-on: ubuntu-latest
+    # Lint installs the development dependencies in a stock container as verify does; a job still
+    # running at fifteen minutes has hung.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v5.7.0
+        with:
+          version: v29.9.3
+      - name: Check formatting, types, Markdown and shell in stock images
+        run: make lint
   verify:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     # Provisioning, checks and packaging normally complete within fifteen minutes;
     # a job still running at fifteen has hung rather than completed its bounded work.
