@@ -212,17 +212,33 @@ await writeFile("body.fnt", font.xml);
 
 ## WOFF2 fonts
 
-Import `encodeWoff2(font: Uint8Array): Promise<Uint8Array>` from `@andornaut/art-kit/build/woff2`, with the optional exact peer `wawoff2@2.0.1` installed. This canvas-free Node build API encodes a complete static or variable TrueType 1.0 font with `glyf`/`loca` tables. It does not subset, rasterize, replace fonts or expose fidelity settings. The peer is loaded only when encoding; other imports need neither it nor Skia. Input bytes are copied and remain unchanged; concurrent calls are serialized and return independent output bytes.
+Import `encodeWoff2(font: Uint8Array): Promise<Uint8Array>` from `@andornaut/art-kit/build/woff2`, with the optional exact peer `wawoff2@2.0.1` installed. This canvas-free Node build API encodes a complete static or variable TrueType 1.0 font with `glyf`/`loca` tables. It does not rasterize, replace fonts or expose fidelity settings. The peer is loaded only when encoding; other imports need neither it nor Skia. Input bytes are copied and remain unchanged; concurrent calls are serialized and return independent output bytes.
 
 Signed fonts with a `DSIG` table, CFF outlines, collections and malformed directories are rejected. Variable fonts retain their variation tables and axes; encoding does not select an instance or strip variation data. Codec failures reject the promise without preventing later calls. The pinned WASM codec comes from Google's WOFF2 implementation; its packaged binary dates from 2022. Repeated output is pinned by regression hashes, rather than a promise that different codec versions produce identical bytes.
 
 WOFF2 retains font content but may normalize SFNT serialization, including table offsets and padding, glyph encoding, location/metric representation and the head checksum and lossless-transform flag. Decoded TTF bytes need not equal the original file. Tests decode both full Liberation Sans fixtures and the full variable Tiny5 fixture and compare every glyph's geometry, components and hint instructions, Unicode coverage, advances, kerning, names, licence metadata and all remaining tables outside explicit serialization differences. Tiny5 checks include complete `fvar`, `gvar` and `HVAR` table bytes, preserving axes, named instances and variation metrics. These fixtures match the requested consumer originals. Font licensing remains unchanged; no font payload is included in the package.
 
+### Subsetting
+
+`subsetWoff2({ strings, label? }, font): Promise<Uint8Array>` also needs the optional exact peer `harfbuzzjs@1.6.4`. It keeps only the code points of `strings`, subsets through HarfBuzz hb-subset defaults and encodes the result like `encodeWoff2`. HarfBuzz keeps the glyphs those characters reach through composites and default GSUB features, their GPOS and `kern` adjustments, hinting, every variation axis and named instance, and name records 0 to 25 (including copyright, licence and licence URL). C0 and C1 controls such as newline are ignored.
+
+Before subsetting it throws `RangeError` naming every other character the font's cmap does not map, as `<label> has no glyph for U+XXXX "c", ...` (`label` defaults to `Font`). Passing every player-visible string therefore fails the build instead of letting the browser fall back to another font. Tests check that a Liberation Sans subset maps exactly the requested characters and renders the same glyph pixels, metrics and kerning as the full font through `rasteriseGlyphs`, and that a Tiny5 subset keeps `fvar`, `gvar`, `HVAR`, its five axes and nine instances. A subset is a modified font: callers check their font licence (for example a Reserved Font Name) before shipping one.
+
+```ts
+import { readFile, writeFile } from "node:fs/promises";
+
+import { subsetWoff2 } from "@andornaut/art-kit/build/woff2";
+
+const strings = ["Play", "Settings", "Volume: 80%"]; // every player-visible string
+const font = await readFile("art/fonts/LiberationSans-Regular.ttf");
+await writeFile("public/fonts/body.woff2", await subsetWoff2({ label: "Body", strings }, font));
+```
+
 Callers own input font files, output paths, browser `FontFace` readiness, cache manifests and visual acceptance. Encoded file size is separate from network transfer and decoded memory. There is no public WOFF2 decoder or browser qualification claim.
 
 ## Runtime and checks
 
-Node 24.22.2 or newer with the exact peers `pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas@4.0.0` for `fonts` and `wawoff2@2.0.1` for `woff2`. Source fonts and their licences stay in the client repositories.
+Node 24.22.2 or newer with the exact peers `pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas@4.0.0` for `fonts`, `wawoff2@2.0.1` for `woff2` and `harfbuzzjs@1.6.4` for `subsetWoff2`. Source fonts and their licences stay in the client repositories.
 
 Automation and CI use `make check` for the full package gate: lint, test and build. `make lint`, `make test` and `make build` run one phase; only `make build` writes into the checkout, replacing ignored `node/dist`. Format and TypeScript checks belong to lint; test builds and installs the package before testing its public imports. Checks do not publish or change the package version or consumer assets.
 

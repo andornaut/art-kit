@@ -1,6 +1,6 @@
 {
   "name": "@andornaut/art-kit",
-  "version": "0.29.0",
+  "version": "0.30.0",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -91,11 +91,15 @@
   ],
   "peerDependencies": {
     "@jsquash/webp": "1.5.0",
+    "harfbuzzjs": "1.6.4",
     "pngjs": "7.0.0",
     "skia-canvas": "4.0.0",
     "wawoff2": "2.0.1"
   },
   "peerDependenciesMeta": {
+    "harfbuzzjs": {
+      "optional": true
+    },
     "skia-canvas": {
       "optional": true
     },

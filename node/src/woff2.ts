@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
+
+import { coverageOf } from "./cmap.js";
 
 const require = createRequire(import.meta.url);
 type Compressor = (font: Uint8Array) => Promise<Uint8Array>;
@@ -101,4 +104,131 @@ export async function encodeWoff2(font: Uint8Array): Promise<Uint8Array> {
   });
   encoding = result.catch(() => undefined);
   return result;
+}
+
+export interface SubsetOptions {
+  /** Every string the font renders. Their code points, except C0/C1 controls, are kept. */
+  strings: Iterable<string>;
+  /** Names the font in the missing-character error. */
+  label?: string;
+}
+
+interface Subsetter {
+  memory: WebAssembly.Memory;
+  malloc(size: number): number;
+  free(pointer: number): void;
+  hb_blob_create(data: number, length: number, mode: number, user: number, destroy: number): number;
+  hb_blob_destroy(blob: number): void;
+  hb_blob_get_data(blob: number, length: number): number;
+  hb_blob_get_length(blob: number): number;
+  hb_face_create(blob: number, index: number): number;
+  hb_face_destroy(face: number): void;
+  hb_face_reference_blob(face: number): number;
+  hb_set_add(set: number, value: number): void;
+  hb_subset_input_create_or_fail(): number;
+  hb_subset_input_destroy(input: number): void;
+  hb_subset_input_set(input: number, kind: number): number;
+  hb_subset_input_unicode_set(input: number): number;
+  hb_subset_or_fail(face: number, input: number): number;
+}
+
+let subsetter: Promise<Subsetter> | undefined;
+const HB_MEMORY_MODE_READONLY = 1;
+const HB_SUBSET_SETS_NAME_ID = 4;
+
+function loadSubsetter(): Promise<Subsetter> {
+  subsetter ??= WebAssembly.instantiate(
+    readFileSync(require.resolve("harfbuzzjs/dist/harfbuzz-subset.wasm")),
+  ).then(({ instance }) => instance.exports as unknown as Subsetter);
+  return subsetter;
+}
+
+/** The subset TrueType bytes for code points, through HarfBuzz hb-subset defaults. */
+function subset(hb: Subsetter, codePoints: readonly number[], font: Uint8Array): Uint8Array {
+  const data = hb.malloc(font.byteLength);
+  let blob = 0,
+    face = 0,
+    input = 0,
+    result = 0,
+    output = 0;
+  try {
+    new Uint8Array(hb.memory.buffer).set(font, data);
+    blob = hb.hb_blob_create(data, font.byteLength, HB_MEMORY_MODE_READONLY, 0, 0);
+    face = hb.hb_face_create(blob, 0);
+    input = hb.hb_subset_input_create_or_fail();
+    if (!input) {
+      throw new Error("HarfBuzz could not allocate a subset input");
+    }
+    const unicodes = hb.hb_subset_input_unicode_set(input);
+    for (const codePoint of codePoints) {
+      hb.hb_set_add(unicodes, codePoint);
+    }
+    // Keep the standard name records (0 to 25), including copyright, licence and licence URL.
+    const names = hb.hb_subset_input_set(input, HB_SUBSET_SETS_NAME_ID);
+    for (let id = 0; id <= 25; id++) {
+      hb.hb_set_add(names, id);
+    }
+    result = hb.hb_subset_or_fail(face, input);
+    if (!result) {
+      throw new Error("HarfBuzz could not subset the font");
+    }
+    output = hb.hb_face_reference_blob(result);
+    const at = hb.hb_blob_get_data(output, 0),
+      length = hb.hb_blob_get_length(output);
+    return new Uint8Array(hb.memory.buffer, at, length).slice();
+  } finally {
+    if (output) {
+      hb.hb_blob_destroy(output);
+    }
+    if (result) {
+      hb.hb_face_destroy(result);
+    }
+    if (input) {
+      hb.hb_subset_input_destroy(input);
+    }
+    if (face) {
+      hb.hb_face_destroy(face);
+    }
+    if (blob) {
+      hb.hb_blob_destroy(blob);
+    }
+    hb.free(data);
+  }
+}
+
+/**
+ * WOFF2 of a TrueType 1.0 (glyf/loca) font reduced to the code points of options.strings, using
+ * the optional exact peers harfbuzzjs 1.6.4 (hb-subset) and wawoff2 2.0.1. HarfBuzz keeps the
+ * glyphs those characters reach through composites and default GSUB features, their GPOS and kern
+ * adjustments, hinting and every variation axis; name records 0 to 25 are kept. C0 and C1
+ * controls (such as newline) are ignored. Throws RangeError naming every other character the font's
+ * cmap does not map, before subsetting, so a build fails instead of falling back to another font.
+ * The input font is not modified.
+ */
+export async function subsetWoff2(options: SubsetOptions, font: Uint8Array): Promise<Uint8Array> {
+  validate(font);
+  const label = options.label ?? "Font";
+  const wanted = new Set<number>();
+  for (const text of options.strings) {
+    if (typeof text !== "string") {
+      throw new TypeError("Subset strings must be strings");
+    }
+    for (const char of text) {
+      const codePoint = char.codePointAt(0)!;
+      if (!(codePoint < 0x20 || (codePoint >= 0x7f && codePoint < 0xa0))) {
+        wanted.add(codePoint);
+      }
+    }
+  }
+  const codePoints = [...wanted].sort((a, b) => a - b);
+  const covered = coverageOf(label, font);
+  const missing = codePoints.filter((codePoint) => !covered.has(codePoint));
+  if (missing.length) {
+    const list = missing.map(
+      (codePoint) =>
+        `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")} ${JSON.stringify(String.fromCodePoint(codePoint))}`,
+    );
+    throw new RangeError(`${label} has no glyph for ${list.join(", ")}`);
+  }
+  return encodeWoff2(subset(await loadSubsetter(), codePoints, font));
 }

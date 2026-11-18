@@ -12,10 +12,15 @@ const SFNT_VERSIONS = new Set([0x00010000, 0x74727565, 0x4f54544f]); // 1.0, "tr
  * formats are rejected.
  */
 export function readCoverage(path: string): Set<number> {
-  const bytes = readFileSync(path);
+  return coverageOf(path, readFileSync(path));
+}
+
+/** readCoverage for font bytes already in memory; label names the font in errors. */
+export function coverageOf(label: string, font: Uint8Array): Set<number> {
+  const bytes = Buffer.from(font.buffer, font.byteOffset, font.byteLength);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const fail = (reason: string): never => {
-    throw new RangeError(`${path} is not a supported font: ${reason}`);
+    throw new RangeError(`${label} is not a supported font: ${reason}`);
   };
   const check = (at: number, length: number, what: string): void => {
     if (at < 0 || at + length > bytes.byteLength) {
