@@ -38,6 +38,25 @@ test("atomic multirect placement rolls back and retries on a new page", () => {
   assert.equal(packAtlas(policy, [item("atomic", [8, 8], [8, 8])]), undefined);
 });
 
+test("padding separates neighbouring cells and shelves but not page edges", () => {
+  const items = [item("a", [2, 2]), item("b", [2, 2]), item("c", [2, 2])];
+  const [page] = packAtlas({ ...policy, padding: 1 }, items).pages;
+  assert.deepEqual(
+    page.placed.map(({ at }) => at[0]),
+    [
+      { x: 1, y: 1 },
+      { x: 6, y: 1 },
+      { x: 1, y: 6 },
+    ],
+  );
+  assert.equal(page.height, 9);
+  assert.deepEqual(packAtlas({ ...policy, padding: 0 }, items), packAtlas(policy, items));
+  assert.equal(packAtlas({ ...policy, padding: 2, maxSize: 9 }, items).pages.length, 2);
+  for (const padding of [-1, 0.5, Number.NaN]) {
+    assert.throws(() => packAtlas({ ...policy, padding }, items), RangeError);
+  }
+});
+
 test("layout chooses page count then area then first width and preserves input order", () => {
   const items = [item("b", [2, 2]), item("a", [2, 2])];
   assert.equal(

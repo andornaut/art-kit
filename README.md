@@ -88,6 +88,7 @@ Decoded RGBA equality includes RGB under zero alpha. Encoded PNG equality additi
 | `spriteSheet.spriteSheet({ key, image, columns, margins }, tags)`         | `{ sheet, data }`: the PNG and json-hash text that Aseprite 1.2.30's command-line sheet export writes, byte for byte, including its zlib deflate stream                    |
 | `spriteSheet.writeSpriteSheet({ sheet, data }, options, tags)`            | Writes both files, creating directories, with the sheet's file name as `meta.image`                                                                                        |
 | `atlasLayout.packAtlas(policy, items)`                                    | Items sorted by `compare` and shelf-packed at each candidate width, each item on one page; the candidate with fewest pages, then least area, or `undefined` when none fits |
+| `padding` (default 0)                                                     | Transparent pixels between neighbouring cells on a shelf and between shelves, outside `extrude`, never at page edges; a non-negative safe integer, else `RangeError`       |
 | `atlasBuild.drawAtlasPage(extrude, images, page)`                         | One page of extruded blits                                                                                                                                                 |
 | `atlasBuild.buildAtlasPages(dependencies, pages)`                         | Reads, decodes, draws and encodes each page with the supplied functions                                                                                                    |
 
@@ -149,17 +150,23 @@ The default check compares the tree before and after the rebuild without Git, so
 
 `index: true` adds the Git index state from before the run: tracked files under the check paths whose working tree content differs from the index (`dirty`, printed as `~\tpath`) and untracked files that `.gitignore` does not exclude (`untracked`, printed as `?\tpath`), keyed like the snapshot. Staged changes count as clean and ignored files are skipped. A pass then means the tree under the check paths matched the index before the run and the rebuild changed nothing, so it also works on a dirty checkout. It runs `git` in the working directory without taking the index lock; Git must be on `PATH` and must trust the repository (`safe.directory` when the checkout belongs to another user), and a Git failure propagates as an `Error`.
 
+`outputs: true` catches stale outputs without Git: each set lists the files and directories it writes in `outputs`, and `static` lists hand-kept files under the check paths, such as a licence. After the rebuild, every file under the check paths must equal or sit inside one of them, or the check fails with it in `unclaimed`, printed as `!\tpath`. Every set's `outputs` count, selected or not, so a partial rebuild does not flag other sets' files. A file a set stopped writing therefore fails the check even though the rebuild left it unchanged. Nothing is deleted.
+
 ```ts
 import { buildCommand, nodeBuild } from "@andornaut/art-kit/build/build";
 
 const tools = { directory: "art/tools" };
 process.exitCode = await buildCommand(
   {
-    check: { paths: ["public/art"] },
+    check: { outputs: true, paths: ["public/art"], static: ["public/art/fonts/OFL.txt"] },
     modules: { ...tools, nonSets: ["build", "pixel"] },
     sets: {
-      sprites: { build: nodeBuild(tools, "sprites") },
-      silhouettes: { build: nodeBuild(tools, "silhouettes"), needs: ["sprites"] },
+      sprites: { build: nodeBuild(tools, "sprites"), outputs: ["public/art/sprites"] },
+      silhouettes: {
+        build: nodeBuild(tools, "silhouettes"),
+        needs: ["sprites"],
+        outputs: ["public/art/silhouettes.json"],
+      },
     },
     strictOrder: true,
     usage: "Usage: node art/tools/build.ts [--check] [SET...]",
@@ -222,7 +229,9 @@ WOFF2 retains font content but may normalize SFNT serialization, including table
 
 `subsetWoff2({ strings, label? }, font): Promise<Uint8Array>` also needs the optional exact peer `harfbuzzjs@1.6.4`. It keeps only the code points of `strings`, subsets through HarfBuzz hb-subset defaults and encodes the result like `encodeWoff2`. HarfBuzz keeps the glyphs those characters reach through composites and default GSUB features, their GPOS and `kern` adjustments, hinting, every variation axis and named instance, and name records 0 to 25 (including copyright, licence and licence URL). C0 and C1 controls such as newline are ignored.
 
-Before subsetting it throws `RangeError` naming every other character the font's cmap does not map, as `<label> has no glyph for U+XXXX "c", ...` (`label` defaults to `Font`). Passing every player-visible string therefore fails the build instead of letting the browser fall back to another font. Tests check that a Liberation Sans subset maps exactly the requested characters and renders the same glyph pixels, metrics and kerning as the full font through `rasteriseGlyphs`, and that a Tiny5 subset keeps `fvar`, `gvar`, `HVAR`, its five axes and nine instances. A subset is a modified font: callers check their font licence (for example a Reserved Font Name) before shipping one.
+Before subsetting it throws `RangeError` naming every other character the font's cmap does not map, as `<label> has no glyph for U+XXXX "c", ...` (`label` defaults to `Font`). Passing every player-visible string therefore fails the build instead of letting the browser fall back to another font. Tests check that a Liberation Sans subset maps exactly the requested characters and renders the same glyph pixels, metrics and kerning as the full font through `rasteriseGlyphs`, and that a Tiny5 subset keeps `fvar`, `gvar`, `HVAR`, its five axes and nine instances. A subset is a modified font: callers check their font licence before shipping one.
+
+`names: { family, fullName, postScriptName, uniqueId, version?, reserved? }` renames the subset, as a SIL OFL Reserved Font Name requires. It replaces name IDs 1 (family), 3 (unique ID), 4 (full name), 6 (PostScript name), 16 (typographic family, when present) and, with `version`, 5 in every Unicode, Windows and Mac Roman record. Copyright, licence and the other records (0, 13, 14 and the rest) stay unchanged, and the file is reassembled with valid table checksums. It throws `RangeError` when a replaced name, the subfamily (2) or the typographic subfamily (17) contains a `reserved` name (case-insensitive), when a name is empty or has control characters, and when the PostScript name is not 1 to 63 printable ASCII characters without spaces or `[](){}<>/%`.
 
 ```ts
 import { readFile, writeFile } from "node:fs/promises";
@@ -231,7 +240,17 @@ import { subsetWoff2 } from "@andornaut/art-kit/build/woff2";
 
 const strings = ["Play", "Settings", "Volume: 80%"]; // every player-visible string
 const font = await readFile("art/fonts/LiberationSans-Regular.ttf");
-await writeFile("public/fonts/body.woff2", await subsetWoff2({ label: "Body", strings }, font));
+const names = {
+  family: "GameUI",
+  fullName: "GameUI Regular",
+  postScriptName: "GameUI-Regular",
+  reserved: ["Liberation"],
+  uniqueId: "GameUI Regular 1",
+};
+await writeFile(
+  "public/fonts/body.woff2",
+  await subsetWoff2({ label: "Body", names, strings }, font),
+);
 ```
 
 Callers own input font files, output paths, browser `FontFace` readiness, cache manifests and visual acceptance. Encoded file size is separate from network transfer and decoded memory. There is no public WOFF2 decoder or browser qualification claim.

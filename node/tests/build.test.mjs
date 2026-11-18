@@ -810,6 +810,55 @@ test("only the index check runs git", async (t) => {
   );
 });
 
+test("outputs check fails on files no set output or static entry claims", async (t) => {
+  const dir = await scratch(t);
+  const out = (...parts) => join(dir, "out", ...parts);
+  await writeFile(out("LICENSE.txt"), "licence");
+  const sets = {
+    keep: { build: () => writeFile(out("keep.txt"), "same"), outputs: [out("keep.txt")] },
+    // Not selected below, yet its outputs still count.
+    other: { build: () => {}, outputs: [out("edit.txt"), out("link")] },
+  };
+  const check = { outputs: true, paths: [out()], static: [out("LICENSE.txt")] };
+  await assert.rejects(runBuilds({ check, log: () => {}, sets }, ["keep"]), (caught) => {
+    assert.ok(named(caught, "CheckError"));
+    assert.deepEqual(caught.changes, {
+      added: [],
+      changed: [],
+      removed: [],
+      unclaimed: [out("nested", "gone.txt")],
+    });
+    assert.equal(
+      caught.message,
+      "the check found 1 path outside every set output and static entry",
+    );
+    return true;
+  });
+  const lines = [];
+  const errors = [];
+  const command = {
+    check,
+    error: (line) => errors.push(line),
+    log: (line) => lines.push(line),
+    sets,
+  };
+  assert.equal(await buildCommand(command, ["--check", "keep"]), 1);
+  assert.deepEqual(lines.slice(-1), [`!\t${out("nested", "gone.txt")}`]);
+  await rm(out("nested"), { recursive: true });
+  assert.deepEqual(
+    (await runBuilds({ check, log: () => {}, sets }, ["keep"])).changes.unclaimed,
+    [],
+  );
+  const directory = { ...sets, keep: { ...sets.keep, outputs: [out()] } };
+  await writeFile(out("stray.txt"), "x");
+  assert.equal((await runBuilds({ check, log: () => {}, sets: directory })).order.length, 2);
+  await assert.rejects(runBuilds({ check, log: () => {}, sets }), (caught) =>
+    named(caught, "CheckError"),
+  );
+  // Without outputs: true, unclaimed files are not checked.
+  await runBuilds({ check: { paths: [out()] }, log: () => {}, sets });
+});
+
 test("build exports only its public API", async () => {
   const build = await import("@andornaut/art-kit/build/build");
   assert.deepEqual(Object.keys(build).sort(), [

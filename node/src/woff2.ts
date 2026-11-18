@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 import { coverageOf } from "./cmap.js";
+import { type FontNames, nameReplacements, renameFont } from "./fontNames.js";
+
+export type { FontNames } from "./fontNames.js";
 
 const require = createRequire(import.meta.url);
 type Compressor = (font: Uint8Array) => Promise<Uint8Array>;
@@ -111,6 +114,11 @@ export interface SubsetOptions {
   strings: Iterable<string>;
   /** Names the font in the missing-character error. */
   label?: string;
+  /**
+   * Renames the subset, for licences such as a SIL OFL Reserved Font Name: IDs 1, 3, 4, 6 and 16
+   * (when present) and optionally 5 are replaced; copyright and licence records stay unchanged.
+   */
+  names?: FontNames;
 }
 
 interface Subsetter {
@@ -203,10 +211,12 @@ function subset(hb: Subsetter, codePoints: readonly number[], font: Uint8Array):
  * adjustments, hinting and every variation axis; name records 0 to 25 are kept. C0 and C1
  * controls (such as newline) are ignored. Throws RangeError naming every other character the font's
  * cmap does not map, before subsetting, so a build fails instead of falling back to another font.
- * The input font is not modified.
+ * With options.names it also throws RangeError when a family, subfamily, full, unique, version,
+ * PostScript or typographic name still contains one of names.reserved. The input is not modified.
  */
 export async function subsetWoff2(options: SubsetOptions, font: Uint8Array): Promise<Uint8Array> {
   validate(font);
+  const replacements = options.names === undefined ? undefined : nameReplacements(options.names);
   const label = options.label ?? "Font";
   const wanted = new Set<number>();
   for (const text of options.strings) {
@@ -230,5 +240,10 @@ export async function subsetWoff2(options: SubsetOptions, font: Uint8Array): Pro
     );
     throw new RangeError(`${label} has no glyph for ${list.join(", ")}`);
   }
-  return encodeWoff2(subset(await loadSubsetter(), codePoints, font));
+  const subsetted = subset(await loadSubsetter(), codePoints, font);
+  return encodeWoff2(
+    replacements === undefined
+      ? subsetted
+      : renameFont(replacements, options.names?.reserved ?? [], subsetted),
+  );
 }

@@ -83,3 +83,74 @@ test("Subset WOFF2 names every unmapped character and ignores controls", async (
     new Set([0x6f, 0x6b]),
   );
 });
+
+function names(font) {
+  const name = tables(font).get("name");
+  const result = new Map();
+  const storage = name.readUInt16BE(4);
+  for (let i = 0; i < name.readUInt16BE(2); i++) {
+    const at = 6 + 12 * i;
+    const [platform, encoding, id] = [0, 2, 6].map((offset) => name.readUInt16BE(at + offset));
+    const offset = storage + name.readUInt16BE(at + 10);
+    const bytes = name.subarray(offset, offset + name.readUInt16BE(at + 8));
+    const value =
+      platform === 1 ? bytes.toString("latin1") : Buffer.from(bytes).swap16().toString("utf16le");
+    result.set(`${platform}.${encoding}.${name.readUInt16BE(at + 4)}.${id}`, value);
+  }
+  return result;
+}
+
+const ada = {
+  family: "AdaUI",
+  fullName: "AdaUI Regular",
+  postScriptName: "AdaUI-Regular",
+  reserved: ["Liberation"],
+  uniqueId: "AdaUI Regular 2026",
+};
+
+test("Subset WOFF2 renames family, full, unique and PostScript names and keeps licence records", async () => {
+  const input = readFileSync(`${root}/LiberationSans-Regular.ttf`);
+  const plain = readFileSync(await decodedFile("plain.ttf", await subsetWoff2({ strings }, input)));
+  const output = await subsetWoff2({ names: ada, strings }, input);
+  assert.deepEqual(output, await subsetWoff2({ names: ada, strings }, input));
+  const renamed = readFileSync(await decodedFile("renamed.ttf", output));
+  const [before, after] = [names(plain), names(renamed)];
+  assert.deepEqual([...after.keys()], [...before.keys()], "Same naming records");
+  const expected = { 1: ada.family, 3: ada.uniqueId, 4: ada.fullName, 6: ada.postScriptName };
+  for (const [key, value] of after) {
+    const id = Number(key.split(".").at(-1));
+    if (id in expected) {
+      assert.equal(value, expected[id], key);
+    } else {
+      assert.equal(value, before.get(key), `${key} unchanged`);
+    }
+    if ([1, 2, 3, 4, 6, 16, 17].includes(id)) {
+      assert.ok(!/liberation/i.test(value), `${key}: ${value}`);
+    }
+  }
+  for (const id of [0, 13, 14]) {
+    assert.ok(
+      [...after.keys()].some((key) => key.endsWith(`.${id}`)),
+      `name ID ${id} kept`,
+    );
+  }
+  assert.deepEqual(new Set(fontCoverage(join(scratch, "renamed.ttf"))), wanted);
+  // Valid SFNT checksum adjustment: the whole file sums to 0xB1B0AFBA.
+  const padded = Buffer.concat([renamed, Buffer.alloc((4 - (renamed.length % 4)) % 4)]);
+  let sum = 0;
+  for (let i = 0; i < padded.length; i += 4) {
+    sum = (sum + padded.readUInt32BE(i)) >>> 0;
+  }
+  assert.equal(sum, 0xb1b0afba);
+});
+
+test("Subset WOFF2 rejects reserved names and invalid PostScript names before subsetting", async () => {
+  const input = readFileSync(`${root}/LiberationSans-Regular.ttf`);
+  const rename = (names) => subsetWoff2({ names: { ...ada, ...names }, strings: ["a"] }, input);
+  await assert.rejects(rename({ family: "Liberation UI" }), /Name ID 1 contains the reserved name/);
+  await assert.rejects(rename({ reserved: ["regular"] }), /Name ID 2 contains the reserved name/);
+  await assert.rejects(rename({ postScriptName: "Ada UI" }), /PostScript name/);
+  await assert.rejects(rename({ postScriptName: "AdaUI(1)" }), /PostScript name/);
+  await assert.rejects(rename({ fullName: "" }), RangeError);
+  await assert.rejects(rename({ reserved: [""] }), RangeError);
+});

@@ -25,11 +25,13 @@ export interface AtlasPolicy<T> {
   compare: (left: AtlasItem<T>, right: AtlasItem<T>) => number;
   extrude: number;
   maxSize: number;
+  /** Transparent pixels between neighbouring cells on a shelf and between shelves; default 0. */
+  padding?: number;
   widths: readonly number[];
 }
 
 function packShelves<T>(
-  { extrude, maxSize }: AtlasPolicy<T>,
+  { extrude, maxSize, padding = 0 }: AtlasPolicy<T>,
   width: number,
   items: readonly AtlasItem<T>[],
 ): AtlasCandidate<T> | undefined {
@@ -42,16 +44,17 @@ function packShelves<T>(
     for (const rectangle of item.rectangles) {
       const cellWidth = rectangle.width + 2 * extrude;
       const cellHeight = rectangle.height + 2 * extrude;
-      if (nextX + cellWidth > width) {
-        nextY += nextHeight;
+      if (nextX + (nextX ? padding : 0) + cellWidth > width) {
+        nextY += nextHeight + padding;
         nextX = 0;
         nextHeight = 0;
       }
-      if (nextX + cellWidth > width || nextY + cellHeight > maxSize) {
+      const gap = nextX ? padding : 0;
+      if (nextX + gap + cellWidth > width || nextY + cellHeight > maxSize) {
         return undefined;
       }
-      at.push({ x: nextX + extrude, y: nextY + extrude });
-      nextX += cellWidth;
+      at.push({ x: nextX + gap + extrude, y: nextY + extrude });
+      nextX += gap + cellWidth;
       nextHeight = Math.max(nextHeight, cellHeight);
     }
     return { at, height: nextHeight, x: nextX, y: nextY };
@@ -77,11 +80,16 @@ function packShelves<T>(
   return { pages, width };
 }
 
-// Each item stays on one page; failed attempts leave the shelf unchanged.
+// Each item stays on one page; failed attempts leave the shelf unchanged. Padding separates
+// neighbouring cells and shelves, never page edges.
 export function packAtlas<T>(
   policy: AtlasPolicy<T>,
   items: readonly AtlasItem<T>[],
 ): AtlasCandidate<T> | undefined {
+  const padding = policy.padding ?? 0;
+  if (!Number.isSafeInteger(padding) || padding < 0) {
+    throw new RangeError("Atlas padding must be a non-negative safe integer");
+  }
   const sorted = [...items].sort(policy.compare);
   let best: AtlasCandidate<T> | undefined;
   const area = (candidate: AtlasCandidate<T>) =>

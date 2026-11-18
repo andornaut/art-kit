@@ -7,10 +7,12 @@ import { readdirSync } from "node:fs";
 import { lstat, readdir, readFile, readlink } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-/** One build set: its build step and the sets whose outputs it reads. */
+/** One build set: its build step, the sets whose outputs it reads and the paths it writes. */
 export interface BuildSet {
   readonly build: () => unknown;
   readonly needs?: readonly string[];
+  /** Files and directories this set writes, for a check with `outputs: true`. */
+  readonly outputs?: readonly string[];
 }
 
 /** Build sets by name. Declaration (insertion) order breaks ties in the build order. */
@@ -25,6 +27,14 @@ export interface BuildCheck {
    * default, which keeps the check Git-free.
    */
   readonly index?: boolean;
+  /**
+   * Also fail on files under the paths, after the rebuild, that no set's `outputs` and no `static`
+   * entry contains, such as a file a set no longer writes. Every set counts, selected or not; false
+   * by default.
+   */
+  readonly outputs?: boolean;
+  /** Hand-kept files and directories under the paths that no set writes, such as a licence. */
+  readonly static?: readonly string[];
 }
 
 /** A directory of one module per set, named `<set><extension>`. */
@@ -76,6 +86,8 @@ export interface Changes {
   readonly dirty?: readonly string[];
   /** With `index: true`: untracked, unignored files present before the run, sorted. */
   readonly untracked?: readonly string[];
+  /** With `outputs: true`: files after the rebuild that no set output or static entry contains. */
+  readonly unclaimed?: readonly string[];
 }
 
 export interface BuildResult {
@@ -111,12 +123,16 @@ class CheckError extends Error {
   constructor(readonly changes: Changes) {
     const changed = changes.added.length + changes.removed.length + changes.changed.length;
     const unclean = (changes.dirty?.length ?? 0) + (changes.untracked?.length ?? 0);
+    const unclaimed = changes.unclaimed?.length ?? 0;
     const parts = [
-      ...(changed || !unclean
+      ...(changed || (!unclean && !unclaimed)
         ? [`the rebuild changed ${pathCount(changed)} under the check paths`]
         : []),
       ...(unclean
         ? [`${pathCount(unclean)} under the check paths differed from the Git index before the run`]
+        : []),
+      ...(unclaimed
+        ? [`the check found ${pathCount(unclaimed)} outside every set output and static entry`]
         : []),
     ];
     super(parts.join("; "));
@@ -405,10 +421,29 @@ function formatChanges(changes: Changes): string[] {
     ...changes.changed.map((path) => [path, "M"] as const),
     ...(changes.dirty ?? []).map((path) => [path, "~"] as const),
     ...(changes.untracked ?? []).map((path) => [path, "?"] as const),
+    ...(changes.unclaimed ?? []).map((path) => [path, "!"] as const),
   ];
   return lines
     .sort(([a, x], [b, y]) => byCodeUnit(a, b) || byCodeUnit(x, y))
     .map(([path, status]) => `${status}\t${path}`);
+}
+
+/** Snapshot keys that no set output and no static entry equals or contains, sorted. */
+function unclaimedFiles(
+  sets: BuildSets,
+  check: BuildCheck,
+  after: ReadonlyMap<string, string>,
+): string[] {
+  const claims = [
+    ...Object.values(sets).flatMap((set) => set.outputs ?? []),
+    ...(check.static ?? []),
+  ].map((path) => resolve(path));
+  return [...after.keys()]
+    .filter((key) => {
+      const file = resolve(key);
+      return !claims.some((claim) => file === claim || file.startsWith(claim + sep));
+    })
+    .sort(byCodeUnit);
 }
 
 // Run the sets in order after the self-checks, with the snapshot (and index) check around them.
@@ -433,13 +468,19 @@ async function execute(options: BuildOptions, selected?: readonly string[]): Pro
   if (!check || !before) {
     return { order };
   }
-  const changes = { ...compareSnapshots(before, await snapshot(check.paths)), ...unclean };
+  const after = await snapshot(check.paths);
+  const changes = {
+    ...compareSnapshots(before, after),
+    ...unclean,
+    ...(check.outputs && { unclaimed: unclaimedFiles(sets, check, after) }),
+  };
   const found = [
     changes.added,
     changes.removed,
     changes.changed,
     changes.dirty ?? [],
     changes.untracked ?? [],
+    changes.unclaimed ?? [],
   ].some((list) => list.length);
   if (found) {
     throw new CheckError(changes);
@@ -452,7 +493,8 @@ async function execute(options: BuildOptions, selected?: readonly string[]): Pro
  * `build <set>` before each, after `checkSets` with the options' `strictOrder` and `modules`. A
  * failing build stops the run with `BuildError`. With `check`, the files under its paths are
  * snapshotted before the first build and after the last, and any difference throws `CheckError`;
- * with `check.index`, so do files that differed from the Git index or were untracked before the run.
+ * with `check.index`, so do files that differed from the Git index or were untracked before the run,
+ * and with `check.outputs`, files after the run that no set's `outputs` or `check.static` contains.
  */
 export async function runBuilds(
   options: BuildOptions,
