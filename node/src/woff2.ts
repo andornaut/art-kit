@@ -207,8 +207,9 @@ function subset(hb: Subsetter, codePoints: readonly number[], font: Uint8Array):
 /**
  * WOFF2 of a TrueType 1.0 (glyf/loca) font reduced to the code points of options.strings, using
  * the optional exact peers harfbuzzjs 1.6.4 (hb-subset) and wawoff2 2.0.1. HarfBuzz keeps the
- * glyphs those characters reach through composites and default GSUB features, their GPOS and kern
- * adjustments, hinting and every variation axis; name records 0 to 25 are kept. C0 and C1
+ * glyphs those characters reach through composites and default GSUB features, their GPOS
+ * adjustments, hinting and every variation axis; name records 0 to 25 are kept. HarfBuzz drops the
+ * legacy kern table (and FFTM), so kerning survives only where GPOS carries it. C0 and C1
  * controls (such as newline) are ignored. Throws RangeError naming every other character the font's
  * cmap does not map, before subsetting, so a build fails instead of falling back to another font.
  * With options.names it also throws RangeError when a family, subfamily, full, unique, version,
