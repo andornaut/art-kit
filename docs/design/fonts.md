@@ -14,14 +14,15 @@ fonts](../../README.md#woff2-fonts), [implementation notes](../implementation-co
 
 ## Work items
 
-| ID      | Title                                                      | Link                             |
-| ------- | ---------------------------------------------------------- | -------------------------------- |
-| ak-0008 | Add a packed glyph atlas layout                            | [ak-0008.md](../work/ak-0008.md) |
-| ak-0014 | Remove strict font coverage, kerningPairs and maxHeight    | [ak-0014.md](../work/ak-0014.md) |
-| ak-0016 | Replace buildBitmapFont with rasteriseGlyphs               | [ak-0016.md](../work/ak-0016.md) |
-| ak-0020 | Add fontCoverage and reject characters a font does not map | [ak-0020.md](../work/ak-0020.md) |
-| ak-0030 | Add canvas-free bitmap font reading and text composition   | [ak-0030.md](../work/ak-0030.md) |
-| ak-0032 | Add WOFF2 encoding for complete static TrueType fonts      | [ak-0032.md](../work/ak-0032.md) |
-| ak-0036 | Encode full variable TrueType fonts to WOFF2               | [ak-0036.md](../work/ak-0036.md) |
-| ak-0037 | Subset fonts to their strings with subsetWoff2             | [ak-0037.md](../work/ak-0037.md) |
-| ak-0039 | Rename subset fonts with subsetWoff2 names                 | [ak-0039.md](../work/ak-0039.md) |
+| ID                                     | Title                                                      | Link                                                                                           |
+| -------------------------------------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| ak-0008                                | Add a packed glyph atlas layout                            | [ak-0008.md](../work/ak-0008.md)                                                               |
+| ak-0014                                | Remove strict font coverage, kerningPairs and maxHeight    | [ak-0014.md](../work/ak-0014.md)                                                               |
+| ak-0016                                | Replace buildBitmapFont with rasteriseGlyphs               | [ak-0016.md](../work/ak-0016.md)                                                               |
+| ak-0020                                | Add fontCoverage and reject characters a font does not map | [ak-0020.md](../work/ak-0020.md)                                                               |
+| ak-0030                                | Add canvas-free bitmap font reading and text composition   | [ak-0030.md](../work/ak-0030.md)                                                               |
+| ak-0032                                | Add WOFF2 encoding for complete static TrueType fonts      | [ak-0032.md](../work/ak-0032.md)                                                               |
+| ak-0036                                | Encode full variable TrueType fonts to WOFF2               | [ak-0036.md](../work/ak-0036.md)                                                               |
+| ak-0037                                | Subset fonts to their strings with subsetWoff2             | [ak-0037.md](../work/ak-0037.md)                                                               |
+| ak-0039                                | Rename subset fonts with subsetWoff2 names                 | [ak-0039.md](../work/ak-0039.md)                                                               |
+| art-kit-variable-woff2-029-publication | Publish full variable TrueType WOFF2 encoding              | [art-kit-variable-woff2-029-publication.md](../work/art-kit-variable-woff2-029-publication.md) |
