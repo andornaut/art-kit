@@ -36,3 +36,4 @@ dependency](../../README.md#released-dependency), [API entry points](../api-entr
 | ak-0034 | Add canonical build entry points                            | [ak-0034.md](../work/ak-0034.md) |
 | ak-0035 | Remove the flat import aliases                              | [ak-0035.md](../work/ak-0035.md) |
 | ak-0041 | Adopt the design and work file convention                   | [ak-0041.md](../work/ak-0041.md) |
+| ak-0042 | Record every user request as a work file                    | [ak-0042.md](../work/ak-0042.md) |

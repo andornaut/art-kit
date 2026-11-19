@@ -25,3 +25,4 @@ recommendations](../consumer-api-recommendations.md).
 | ak-0015 | Rework frames, grid and raster and remove the Canvas subpaths | [ak-0015.md](../work/ak-0015.md) |
 | ak-0028 | Add Lanczos-3 resizing, Gaussian blur and inverse Oklab       | [ak-0028.md](../work/ak-0028.md) |
 | ak-0033 | Add build RGBA comparison with explicit backgrounds           | [ak-0033.md](../work/ak-0033.md) |
+| ak-0043 | Export pixel frames as SVG                                    | [ak-0043.md](../work/ak-0043.md) |
