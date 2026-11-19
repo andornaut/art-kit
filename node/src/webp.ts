@@ -1,7 +1,10 @@
-// Non-SIMD WebP encoding for Node build tools.
+// Non-SIMD WebP encoding and decoding for Node build tools.
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 
+import decoderFactory, {
+  type WebPModule as WebPDecoder,
+} from "@jsquash/webp/codec/dec/webp_dec.js";
 import encoderFactory, {
   type WebPModule as WebPEncoder,
 } from "@jsquash/webp/codec/enc/webp_enc.js";
@@ -25,6 +28,7 @@ async function wasmModule(path: string): Promise<CompiledWasm> {
 }
 
 let encoder: Promise<WebPEncoder> | undefined;
+let decoder: Promise<WebPDecoder> | undefined;
 
 // Lossless with every pixel's colour kept, under clear alpha too, so the file decodes to the
 // exact RGBA it was given. Method 6 searches hardest; quality 95 rather than 100 encodes a
@@ -96,4 +100,25 @@ export async function encodeLossyWebp(
     },
     image,
   );
+}
+
+/**
+ * The RGBA image a WebP file decodes to, through the same non-SIMD libwebp build as the encoders,
+ * so repeated decodes of the same bytes are identical. Throws RangeError for empty input and Error
+ * when libwebp cannot decode the bytes.
+ */
+export async function decodeWebp(bytes: Uint8Array): Promise<RgbaImage> {
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
+    throw new RangeError("Expected nonempty WebP bytes");
+  }
+  decoder ??= wasmModule("dec/webp_dec.wasm").then((wasm) =>
+    initEmscriptenModule(decoderFactory, wasm),
+  );
+  const image = (await decoder).decode(new Uint8Array(bytes));
+  if (image === null) {
+    throw new Error("libwebp could not decode the WebP bytes");
+  }
+  // The decoder returns a view of WASM memory; copy before the next call can reuse it.
+  const data = new Uint8Array(image.data.buffer, image.data.byteOffset, image.data.byteLength);
+  return { data: data.slice(), height: image.height, width: image.width };
 }

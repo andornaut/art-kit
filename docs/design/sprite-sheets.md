@@ -23,3 +23,4 @@ Reference: [Encoders and atlases](../../README.md#encoders-and-atlases).
 | ak-0022 | Remove the spriteSheet Tag alias and unused container options | [ak-0022.md](../work/ak-0022.md) |
 | ak-0031 | Add configurable lossy WebP encoding                          | [ak-0031.md](../work/ak-0031.md) |
 | ak-0040 | Pad packAtlas cells and shelves                               | [ak-0040.md](../work/ak-0040.md) |
+| ak-0044 | Decode WebP to RGBA                                           | [ak-0044.md](../work/ak-0044.md) |

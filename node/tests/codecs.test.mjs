@@ -4,7 +4,11 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 
 import { decodePng } from "@andornaut/art-kit/build/png";
-import { encodeLosslessWebp, encodeLossyWebp } from "@andornaut/art-kit/build/webp";
+import {
+  decodeWebp as decodeWebpExport,
+  encodeLosslessWebp,
+  encodeLossyWebp,
+} from "@andornaut/art-kit/build/webp";
 import decoderFactory from "@jsquash/webp/codec/dec/webp_dec.js";
 import encoderFactory from "@jsquash/webp/codec/enc/webp_enc.js";
 import { defaultOptions } from "@jsquash/webp/meta.js";
@@ -154,4 +158,27 @@ test("lossy WebP matches direct pinned codec settings, repeats bytes and preserv
   assert.notDeepEqual(opaqueRgb(decoded.data), opaqueRgb(data));
   assert.notDeepEqual(alpha((await decodeWebp(lowBytes)).data), alpha(data));
   assert.deepEqual(data, before);
+});
+
+test("decodeWebp returns the pinned decoder's RGBA, repeats exactly and rejects bad input", async () => {
+  const width = 3,
+    height = 2;
+  const data = Uint8Array.from({ length: width * height * 4 }, (_, i) => (i * 37 + 11) % 256);
+  const image = { data, height, width };
+  const lossless = await encodeLosslessWebp(image);
+  assert.deepEqual(await decodeWebpExport(lossless), image, "Lossless round trip");
+  const lossy = await encodeLossyWebp(
+    { alphaQuality: 100, exact: true, method: 6, quality: 80 },
+    image,
+  );
+  const decoded = await decodeWebpExport(lossy);
+  const oracle = await decodeWebp(lossy);
+  assert.deepEqual(decoded, { data: oracle.data, height: oracle.height, width: oracle.width });
+  assert.deepEqual(await decodeWebpExport(lossy), decoded, "Repeated decode");
+  const first = await decodeWebpExport(lossless);
+  await decodeWebpExport(lossy);
+  assert.deepEqual(first.data, data, "Earlier results are independent copies");
+  await assert.rejects(decodeWebpExport(new Uint8Array()), RangeError);
+  await assert.rejects(decodeWebpExport([1, 2, 3]), RangeError);
+  await assert.rejects(decodeWebpExport(Uint8Array.from([1, 2, 3, 4])), /could not decode/);
 });
