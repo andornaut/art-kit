@@ -192,7 +192,7 @@ process.exitCode = await buildCommand(
 | `layout: "padded"` (default)                                                     | Insets and spaces glyphs by `padding` (default 1), fits the height to the last row and always writes a kernings element                                                                                                                                    |
 | `layout: "packed"`                                                               | Requires `antialias`, rejects `padding`: 1 px spacing from (0, 0), a power-of-two height, every info attribute, and no kernings element when there are none                                                                                                |
 
-Antialiasing and hinting default to true; synthesis and cross-glyph substitutions are disabled. Requiring every character in the file's cmap keeps Skia from substituting a system font. The tests run both games' font pipelines over the fixture fonts and compare them byte for byte with frozen references in `node/tests/fixtures/fonts` and `node/tests/fixtures/bmfont-packed.json`.
+Antialiasing and hinting default to true; synthesis and cross-glyph substitutions are disabled. Requiring every character in the file's cmap keeps Skia from substituting a system font. Supply each ordered kerning pair at most once. The tests compare valid output byte for byte with frozen references in `node/tests/fixtures/fonts` and `node/tests/fixtures/bmfont-packed.json` and verify that a legacy duplicate pair is rejected.
 
 ```ts
 import { writeFile } from "node:fs/promises";
