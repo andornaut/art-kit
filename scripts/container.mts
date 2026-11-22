@@ -135,6 +135,8 @@ function policyArguments(spec: ContainerSpec, name: string): string[] {
     "--read-only",
     "--cpus",
     "4",
+    "--memory",
+    "4g",
     "--user",
     "19001:19001",
     "-e",
