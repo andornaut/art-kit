@@ -177,6 +177,7 @@ async function withContainer<T>(
   image: string,
   body: (container: Container) => Promise<T>,
 ): Promise<T> {
+  await run({}, "sh", [join(root, "tests/container/load")]);
   const name = `${prefix}-${process.pid}-${randomInt(1 << 30)}`;
   containers.add(name);
   try {
@@ -267,19 +268,25 @@ async function pack(dependencyPath: string, outputPath: string): Promise<void> {
   const dependencies = realpathSync(dependencyPath);
   const output = emptyOutput(outputPath);
   const commit = revision();
-  // The packaging program comes from this checkout; the packaged tree is the committed revision.
   const spec: ContainerSpec = {
     network: "none",
     env: { npm_config_cache: "/tmp/npm-cache" },
-    mounts: [
-      [dependencies, "/deps"],
-      [join(root, "scripts/node-package.mts"), "/tools/node-package.mts"],
-    ],
+    mounts: [[dependencies, "/deps"]],
   };
   await withContainer(spec, "art-kit-pack", NODE_IMAGE, async (container) => {
     await exec({}, container, ["mkdir", "-p", "/tmp/work/source", "/tmp/out"]);
-    await extractArchive(container, commit, ["node", "LICENSE"], "/tmp/work/source");
-    await exec({}, container, ["node", "/tools/node-package.mts", "pack", commit]);
+    await extractArchive(
+      container,
+      commit,
+      ["node", "LICENSE", "scripts/node-package.mts"],
+      "/tmp/work/source",
+    );
+    await exec({}, container, [
+      "node",
+      "/tmp/work/source/scripts/node-package.mts",
+      "pack",
+      commit,
+    ]);
     await copyOut(container, "/tmp/out/.", output);
   });
   console.log(`Release artifacts: ${output}`);
