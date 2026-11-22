@@ -7,7 +7,7 @@ import { basename, dirname, resolve } from "node:path";
 import { rgb } from "./colour.js";
 import { deflateChunks } from "./deflate.js";
 import type { Frame } from "./grid.js";
-import { pngFile } from "./pngChunks.js";
+import { pngFile, predict } from "./pngChunks.js";
 import type { Tag } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
@@ -165,32 +165,6 @@ function json(
 
 // ---------- PNG as Aseprite 1.2.30 writes it through libpng 1.6.38 ----------
 
-function predict(type: number, previous: Uint8Array, row: Uint8Array, x: number): number {
-  const left = x >= 4 ? row[x - 4]! : 0;
-  const above = previous[x]!;
-  switch (type) {
-    case 1:
-      return left;
-    case 2:
-      return above;
-    case 3:
-      return (left + above) >> 1;
-    case 4: {
-      const upLeft = x >= 4 ? previous[x - 4]! : 0;
-      const p = left + above - upLeft;
-      const pLeft = Math.abs(p - left);
-      const pAbove = Math.abs(p - above);
-      const pUpLeft = Math.abs(p - upLeft);
-      if (pLeft <= pAbove && pLeft <= pUpLeft) {
-        return left;
-      }
-      return pAbove <= pUpLeft ? above : upLeft;
-    }
-    default:
-      return 0;
-  }
-}
-
 // libpng's filter choice: the lowest sum of filtered bytes read as signed magnitudes, the earliest
 // type on a tie. A single row cannot use the row above, and a single column the pixel to the left.
 function filteredRows(image: RgbaImage): Uint8Array[] {
@@ -213,7 +187,7 @@ function filteredRows(image: RgbaImage): Uint8Array[] {
       for (const type of types) {
         let sum = 0;
         for (let x = 0; x < rowBytes; x++) {
-          const v = (row[x]! - predict(type, previous, row, x)) & 0xff;
+          const v = (row[x]! - predict(type, 4, previous, row, x)) & 0xff;
           sum += v < 128 ? v : 256 - v;
         }
         if (sum < min) {
@@ -225,7 +199,7 @@ function filteredRows(image: RgbaImage): Uint8Array[] {
     const out = new Uint8Array(rowBytes + 1);
     out[0] = selected;
     for (let x = 0; x < rowBytes; x++) {
-      out[x + 1] = row[x]! - predict(selected, previous, row, x);
+      out[x + 1] = row[x]! - predict(selected, 4, previous, row, x);
     }
     rows.push(out);
     previous = row;

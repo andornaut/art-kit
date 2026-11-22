@@ -4,7 +4,7 @@ import { constants, createDeflate, type Deflate } from "node:zlib";
 
 import { PNG } from "pngjs";
 
-import { pngFile } from "./pngChunks.js";
+import { pngFile, predict } from "./pngChunks.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
 // A PNG's pixels, whatever its colour type, as 8-bit RGBA.
@@ -199,38 +199,6 @@ function filterSum(type: number, bpp: number, previous: Uint8Array, row: Uint8Ar
   return sum;
 }
 
-function predict(
-  type: number,
-  bpp: number,
-  previous: Uint8Array,
-  row: Uint8Array,
-  x: number,
-): number {
-  switch (type) {
-    case 1:
-      return x >= bpp ? row[x - bpp] : 0;
-    case 2:
-      return previous[x];
-    case 3:
-      return ((x >= bpp ? row[x - bpp] : 0) + previous[x]) >> 1;
-    case 4: {
-      const left = x >= bpp ? row[x - bpp] : 0;
-      const above = previous[x];
-      const upLeft = x >= bpp ? previous[x - bpp] : 0;
-      const paeth = left + above - upLeft;
-      const pLeft = Math.abs(paeth - left);
-      const pAbove = Math.abs(paeth - above);
-      const pUpLeft = Math.abs(paeth - upLeft);
-      if (pLeft <= pAbove && pLeft <= pUpLeft) {
-        return left;
-      }
-      return pAbove <= pUpLeft ? above : upLeft;
-    }
-    default:
-      return 0;
-  }
-}
-
 // Signature, IHDR, one IDAT holding the whole zlib stream, then IEND.
 function assemble(colourType: number, deflater: SyncDeflater, image: RgbaImage): Uint8Array {
   const header = Uint8Array.of(0, 0, 0, 0, 0, 0, 0, 0, BIT_DEPTH, colourType, 0, 0, 0);
@@ -268,7 +236,6 @@ interface DeflateEngine {
 // pieces.
 class SyncDeflater {
   readonly pieces: Uint8Array[] = [];
-  length = 0;
   private readonly engine: Deflate;
   private readonly handle: ZlibHandle;
   private readonly state: Uint32Array;
@@ -323,7 +290,6 @@ class SyncDeflater {
       if (have > 0) {
         this.pieces.push(this.buffer.subarray(this.offset, this.offset + have));
         this.offset += have;
-        this.length += have;
       }
       if (availOut !== 0) {
         return;
