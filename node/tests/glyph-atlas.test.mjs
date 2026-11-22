@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { readBitmapFont } from "@andornaut/art-kit/build/bitmapFont";
 import { buildBitmapFontFromGlyphs as build } from "@andornaut/art-kit/build/glyphAtlas";
 const options = {
   key: 'a&"\n',
@@ -64,6 +65,23 @@ test("rejects invalid inputs and bounded packing overflow", () => {
   ]) {
     assert.throws(() => build(options, new Map([[key, value]])), RangeError);
   }
+});
+test("rejects duplicate ordered kerning pairs even when their amounts differ", () => {
+  const glyphs = new Map([
+    ["j", glyph],
+    [" ", space],
+  ]);
+  const kernings = [
+    { first: 106, second: 32, amount: -2 },
+    { first: 32, second: 106, amount: 2 },
+    { first: 106, second: 106, amount: 0 },
+  ];
+  assert.deepEqual(readBitmapFont(build({ ...options, kernings }, glyphs).xml).kernings, kernings);
+  assert.throws(
+    () =>
+      build({ ...options, kernings: [...kernings, { first: 106, second: 32, amount: 0 }] }, glyphs),
+    { name: "RangeError", message: /Duplicate kerning pair \(106, 32\)/ },
+  );
 });
 test("supports empty glyph sets and zero padding without inventing metrics", () => {
   const result = build({ ...options, padding: 0 }, new Map([[" ", space]]));

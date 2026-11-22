@@ -2,7 +2,7 @@
 // `aseprite -b <key>.aseprite --sheet <png> --data <json> --format json-hash --list-tags`, with
 // `--list-slices` when margins are given and `--sheet-columns` when columns are given.
 import { mkdir, writeFile } from "node:fs/promises";
-import { basename, dirname } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 
 import { rgb } from "./colour.js";
 import { deflateChunks } from "./deflate.js";
@@ -313,6 +313,9 @@ export async function writeSpriteSheet(
   options: Omit<SpriteSheetOptions, "image">,
   tags: readonly Tag[],
 ): Promise<void> {
+  if (resolve(paths.sheet) === resolve(paths.data)) {
+    throw new RangeError("Sprite sheet PNG and JSON must resolve to different paths");
+  }
   const { data, sheet } = spriteSheet({ ...options, image: basename(paths.sheet) }, tags);
   for (const path of [paths.sheet, paths.data]) {
     // eslint-disable-next-line no-await-in-loop

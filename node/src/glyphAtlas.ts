@@ -38,7 +38,8 @@ export interface PaddedGlyphAtlasOptions extends GlyphAtlasCommonOptions {
 }
 /**
  * From (0, 0) with 1 px spacing, a power-of-two height and the full info attribute set, with
- * `smooth` and `aa` from `antialias`; byte-identical to the frozen `bmfont-packed.json` references.
+ * `smooth` and `aa` from `antialias`. The frozen packed references match byte for byte for
+ * unique kerning pairs.
  */
 export interface PackedGlyphAtlasOptions extends GlyphAtlasCommonOptions {
   layout: "packed";
@@ -173,12 +174,18 @@ export function buildBitmapFontFromGlyphs(
   if (height > limit) {
     throw new RangeError("Glyph atlas exceeds maximum height");
   }
+  const pairs = new Set<string>();
   const kernings = (options.kernings ?? []).map((k) => {
     const first = scalar(k.first),
       second = scalar(k.second);
     if (!glyphs.has(String.fromCodePoint(first)) || !glyphs.has(String.fromCodePoint(second))) {
       throw new RangeError("Kerning pair must belong to supplied glyphs");
     }
+    const pair = `${first},${second}`;
+    if (pairs.has(pair)) {
+      throw new RangeError(`Duplicate kerning pair (${first}, ${second})`);
+    }
+    pairs.add(pair);
     return { amount: integer(k.amount, "Kerning amount"), first, second };
   });
   const image = blankImage(width, height);

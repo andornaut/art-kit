@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import test from "node:test";
 
 import { decodePng } from "@andornaut/art-kit/build/png";
@@ -82,6 +82,21 @@ test("writeSpriteSheet creates directories and names the sheet file as meta.imag
     const expected = spriteSheet({ key: "b", image: "b sheet.png", columns: 2 }, tags);
     assert.equal(await readFile(paths.data, "utf8"), expected.data);
     assert.deepEqual(new Uint8Array(await readFile(paths.sheet)), expected.sheet);
+  } finally {
+    await rm(scratch, { recursive: true, force: true });
+  }
+});
+
+test("writeSpriteSheet rejects colliding paths before creating outputs", async () => {
+  const scratch = await mkdtemp(join(tmpdir(), "sprite-sheet-test-"));
+  try {
+    const sheet = join(scratch, "output", "sheet.png");
+    const data = [relative(process.cwd(), scratch), "other", "..", "output", "sheet.png"].join(sep);
+    await assert.rejects(writeSpriteSheet({ sheet, data }, { key: "b" }, tags), {
+      name: "RangeError",
+      message: /PNG and JSON must resolve to different paths/,
+    });
+    assert.deepEqual(await readdir(scratch), []);
   } finally {
     await rm(scratch, { recursive: true, force: true });
   }
