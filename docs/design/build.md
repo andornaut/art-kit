@@ -3,9 +3,9 @@
 `build` runs a game's art build sets one at a time in dependency order and uses only Node built-ins.
 `buildCommand` handles `[--check] [SET...]` and `--help`, and `nodeBuild` runs a set in its own Node
 process. Opt-in self-checks reconcile the declared order and a modules directory with the set table.
-The default `--check` compares a snapshot of the check paths before and after the rebuild without
-Git; `index: true` adds the Git index state, and `outputs: true` fails on any file under the check
-paths that no set's `outputs` or `check.static` claims. The check never deletes files.
+The `--check` flag compares a snapshot of the check paths before and after the rebuild.
+With `outputs: true`, the check also fails on any file under the check paths that no set's
+`outputs` or `check.static` claims. The check never deletes files.
 
 Reference: [Builds](../../README.md#builds).
 

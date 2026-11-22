@@ -1,11 +1,10 @@
 // Sequential art build runner: dependency order, downstream selection, set table self-checks and a
-// byte-snapshot check. Node built-ins only. Git runs only for a check with `index: true`, and a
-// process is spawned only by a `nodeBuild` build.
+// byte-snapshot check. Node built-ins only. Only `nodeBuild` spawns a process.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { lstat, readdir, readFile, readlink } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 /** One build set: its build step, the sets whose outputs it reads and the paths it writes. */
 export interface BuildSet {
@@ -21,12 +20,6 @@ export type BuildSets = Readonly<Record<string, BuildSet>>;
 /** Files and directories to snapshot before and after the rebuild. */
 export interface BuildCheck {
   readonly paths: readonly string[];
-  /**
-   * Also fail on files under the paths that differed from the Git index (`dirty`) or were untracked
-   * and not ignored (`untracked`) before the run. Runs `git` in the working directory; false by
-   * default, which keeps the check Git-free.
-   */
-  readonly index?: boolean;
   /**
    * Also fail on files under the paths, after the rebuild, that no set's `outputs` and no `static`
    * entry contains, such as a file a set no longer writes. Every set counts, selected or not; false
@@ -82,10 +75,6 @@ export interface Changes {
   readonly added: readonly string[];
   readonly removed: readonly string[];
   readonly changed: readonly string[];
-  /** With `index: true`: tracked files that differed from the Git index before the run, sorted. */
-  readonly dirty?: readonly string[];
-  /** With `index: true`: untracked, unignored files present before the run, sorted. */
-  readonly untracked?: readonly string[];
   /** With `outputs: true`: files after the rebuild that no set output or static entry contains. */
   readonly unclaimed?: readonly string[];
 }
@@ -117,19 +106,15 @@ class BuildError extends Error {
 
 const pathCount = (count: number): string => `${count} path${count === 1 ? "" : "s"}`;
 
-/** The rebuild changed files under the check paths, or, with `index: true`, they were not clean. */
+/** The rebuild changed files under the check paths or left unclaimed files. */
 class CheckError extends Error {
   override name = "CheckError";
   constructor(readonly changes: Changes) {
     const changed = changes.added.length + changes.removed.length + changes.changed.length;
-    const unclean = (changes.dirty?.length ?? 0) + (changes.untracked?.length ?? 0);
     const unclaimed = changes.unclaimed?.length ?? 0;
     const parts = [
-      ...(changed || (!unclean && !unclaimed)
+      ...(changed || !unclaimed
         ? [`the rebuild changed ${pathCount(changed)} under the check paths`]
-        : []),
-      ...(unclean
-        ? [`${pathCount(unclean)} under the check paths differed from the Git index before the run`]
         : []),
       ...(unclaimed
         ? [`the check found ${pathCount(unclaimed)} outside every set output and static entry`]
@@ -356,71 +341,12 @@ function compareSnapshots(
   };
 }
 
-function git(args: readonly string[]): string {
-  const result = spawnSync("git", ["--literal-pathspecs", ...args], {
-    encoding: "utf8",
-    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
-    maxBuffer: 256 * 1024 * 1024,
-  });
-  if (result.error) {
-    throw new Error(`git ${args[0]} failed: ${result.error.message}`, { cause: result.error });
-  }
-  if (result.status !== 0) {
-    const reason = result.stderr.trim() || `exit ${result.status ?? result.signal}`;
-    throw new Error(`git ${args[0]} failed: ${reason}`);
-  }
-  return result.stdout;
-}
-
-/**
- * The tracked files under `paths` that differ from the Git index and the untracked, unignored files
- * under them, keyed like `snapshot` (each joined to the check path that holds it) and sorted. Runs
- * `git` in the working directory without taking the index lock.
- */
-function indexState(paths: readonly string[]): Pick<Changes, "dirty" | "untracked"> {
-  if (!paths.length) {
-    return { dirty: [], untracked: [] };
-  }
-  // Paths are compared in a virtual tree rooted at the repository top, so symbolic links in the
-  // working directory's path do not matter.
-  const cwd = resolve(sep, git(["rev-parse", "--show-prefix"]).trim());
-  const roots = paths.map((path) => [path, resolve(cwd, relative(process.cwd(), resolve(path)))]);
-  const keyed = (output: string): string[] => {
-    const keys = new Set<string>();
-    for (const file of output.split("\0").filter(Boolean)) {
-      const target = resolve(sep, file);
-      for (const [path, root] of roots) {
-        const inner = relative(root, target);
-        if (inner !== ".." && !inner.startsWith(`..${sep}`) && !isAbsolute(inner)) {
-          keys.add(inner ? join(path, inner) : path);
-          break;
-        }
-      }
-    }
-    return [...keys].sort(byCodeUnit);
-  };
-  return {
-    dirty: keyed(
-      git(["diff", "--no-ext-diff", "--no-relative", "--name-only", "-z", "--", ...paths]),
-    ),
-    untracked: keyed(
-      git(["ls-files", "--others", "--exclude-standard", "--full-name", "-z", "--", ...paths]),
-    ),
-  };
-}
-
-/**
- * Lines `A\tpath`, `D\tpath` and `M\tpath` for the rebuild's changes, and with `index: true`
- * `~\tpath` for a file that differed from the Git index and `?\tpath` for an untracked file before
- * the run, sorted by path.
- */
+/** Change lines for added (A), removed (D), changed (M) and unclaimed (!) files, sorted by path. */
 function formatChanges(changes: Changes): string[] {
   const lines = [
     ...changes.added.map((path) => [path, "A"] as const),
     ...changes.removed.map((path) => [path, "D"] as const),
     ...changes.changed.map((path) => [path, "M"] as const),
-    ...(changes.dirty ?? []).map((path) => [path, "~"] as const),
-    ...(changes.untracked ?? []).map((path) => [path, "?"] as const),
     ...(changes.unclaimed ?? []).map((path) => [path, "!"] as const),
   ];
   return lines
@@ -446,11 +372,13 @@ function unclaimedFiles(
     .sort(byCodeUnit);
 }
 
-// Run the sets in order after the self-checks, with the snapshot (and index) check around them.
+// Run the sets in order after the self-checks, with the snapshot check around them.
 async function execute(options: BuildOptions, selected?: readonly string[]): Promise<BuildResult> {
   const { check, log = console.log, sets } = options;
+  if (check && "index" in check && check.index === true) {
+    throw new RangeError("check.index has been removed");
+  }
   const order = buildOrder(sets, selected);
-  const unclean = check?.index ? indexState(check.paths) : {};
   const before = check && (await snapshot(check.paths));
   const started = performance.now();
   for (const name of order) {
@@ -471,17 +399,11 @@ async function execute(options: BuildOptions, selected?: readonly string[]): Pro
   const after = await snapshot(check.paths);
   const changes = {
     ...compareSnapshots(before, after),
-    ...unclean,
     ...(check.outputs && { unclaimed: unclaimedFiles(sets, check, after) }),
   };
-  const found = [
-    changes.added,
-    changes.removed,
-    changes.changed,
-    changes.dirty ?? [],
-    changes.untracked ?? [],
-    changes.unclaimed ?? [],
-  ].some((list) => list.length);
+  const found = [changes.added, changes.removed, changes.changed, changes.unclaimed ?? []].some(
+    (list) => list.length,
+  );
   if (found) {
     throw new CheckError(changes);
   }
@@ -493,8 +415,7 @@ async function execute(options: BuildOptions, selected?: readonly string[]): Pro
  * `build <set>` before each, after `checkSets` with the options' `strictOrder` and `modules`. A
  * failing build stops the run with `BuildError`. With `check`, the files under its paths are
  * snapshotted before the first build and after the last, and any difference throws `CheckError`;
- * with `check.index`, so do files that differed from the Git index or were untracked before the run,
- * and with `check.outputs`, files after the run that no set's `outputs` or `check.static` contains.
+ * with `check.outputs`, so do files after the run that no set's `outputs` or `check.static` contains.
  */
 export async function runBuilds(
   options: BuildOptions,
@@ -510,7 +431,7 @@ const HELP: ReadonlySet<string> = new Set(["--help", "-h"]);
  * Command line wrapper for `[--check] [SET...]`. A sole `--help` or `-h` prints `usage` (or a
  * default line) to `log` and returns 0. Otherwise it runs `checkSets`, then the builds, and returns
  * the exit status: 0 on success, 1 when a self-check fails, a build fails, the check finds
- * differences or the sets are invalid, and 2 on a usage error (an unknown option or set, or
+ * differences or the build configuration is invalid, and 2 on a usage error (an unknown option or set, or
  * `--check` without `check` paths). Other errors propagate.
  */
 export async function buildCommand(

@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -593,221 +592,23 @@ test("nodeBuild failures become a BuildError naming the set", async (t) => {
   });
 });
 
-function gitIn(dir, ...args) {
-  const result = spawnSync("git", args, { cwd: dir, encoding: "utf8" });
-  assert.equal(result.status, 0, result.stderr);
-}
-
-// A committed repository: out/{clean,dirty,staged}.txt, single.txt, and out/ignored/ in .gitignore.
-async function repository(t) {
-  const dir = await mkdtemp(join(tmpdir(), "art-kit-index-"));
-  t.after(() => rm(dir, { recursive: true, force: true }));
-  await mkdir(join(dir, "out", "ignored"), { recursive: true });
-  await mkdir(join(dir, "elsewhere"));
-  await writeFile(join(dir, ".gitignore"), "out/ignored/\n");
-  for (const file of ["clean.txt", "dirty.txt", "staged.txt", "gone.txt"]) {
-    // eslint-disable-next-line no-await-in-loop
-    await writeFile(join(dir, "out", file), file);
-  }
-  await writeFile(join(dir, "single.txt"), "one");
-  await writeFile(join(dir, "elsewhere", "outside.txt"), "x");
-  gitIn(dir, "-c", "init.defaultBranch=main", "init", "-q");
-  gitIn(dir, "add", ".");
-  gitIn(dir, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init");
-  return dir;
-}
-
-const indexChecks = [
-  { name: "a clean checkout and rebuild pass", before: async () => {}, edit: async () => {} },
-  {
-    name: "staged changes match the index",
-    before: async (dir) => {
-      await writeFile(join(dir, "out", "staged.txt"), "staged edit");
-      gitIn(dir, "add", "out/staged.txt");
-    },
-    edit: async () => {},
-  },
-  {
-    name: "ignored and outside files are not flagged",
-    before: async (dir) => {
-      await writeFile(join(dir, "out", "ignored", "cache.bin"), "x");
-      await writeFile(join(dir, "elsewhere", "outside.txt"), "edited");
-      await writeFile(join(dir, "elsewhere", "new.txt"), "new");
-    },
-    edit: async () => {},
-  },
-  {
-    name: "dirty and untracked files before the run are flagged",
-    before: async (dir) => {
-      await writeFile(join(dir, "out", "dirty.txt"), "edited");
-      await rm(join(dir, "out", "gone.txt"));
-      await writeFile(join(dir, "out", "new.txt"), "new");
-      await writeFile(join(dir, "out", "..dots.txt"), "dots");
-      await writeFile(join(dir, "single.txt"), "two");
-    },
-    edit: async () => {},
-    changes: {
-      added: [],
-      removed: [],
-      changed: [],
-      dirty: ["out/dirty.txt", "out/gone.txt", "single.txt"],
-      untracked: ["out/..dots.txt", "out/new.txt"],
-    },
-    lines: [
-      "?\tout/..dots.txt",
-      "~\tout/dirty.txt",
-      "~\tout/gone.txt",
-      "?\tout/new.txt",
-      "~\tsingle.txt",
-    ],
-    message: "5 paths under the check paths differed from the Git index before the run",
-  },
-  {
-    name: "rebuild changes and earlier dirt are both reported",
-    before: async (dir) => {
-      await writeFile(join(dir, "out", "dirty.txt"), "edited");
-    },
-    edit: async (dir) => {
-      await writeFile(join(dir, "out", "dirty.txt"), "rebuilt");
-      await writeFile(join(dir, "out", "made.txt"), "made");
-    },
-    changes: {
-      added: ["out/made.txt"],
-      removed: [],
-      changed: ["out/dirty.txt"],
-      dirty: ["out/dirty.txt"],
-      untracked: [],
-    },
-    lines: ["M\tout/dirty.txt", "~\tout/dirty.txt", "A\tout/made.txt"],
-    message: [
-      "the rebuild changed 2 paths under the check paths",
-      "1 path under the check paths differed from the Git index before the run",
-    ].join("; "),
-  },
-  {
-    name: "files the rebuild creates are only rebuild changes",
-    before: async () => {},
-    edit: async (dir) => {
-      await writeFile(join(dir, "out", "made.txt"), "made");
-    },
-    changes: { added: ["out/made.txt"], removed: [], changed: [], dirty: [], untracked: [] },
-    lines: ["A\tout/made.txt"],
-    message: "the rebuild changed 1 path under the check paths",
-  },
-];
-
-for (const { before, changes, edit, lines: expected, message, name } of indexChecks) {
-  test(`buildCommand --check with index prints: ${name}`, async (t) => {
-    const dir = await repository(t);
-    const previous = process.cwd();
-    process.chdir(dir);
-    t.after(() => process.chdir(previous));
-    await before(dir);
-    const lines = [];
-    const errors = [];
-    const options = {
-      check: { index: true, paths: ["out", "single.txt", "missing.txt"] },
-      error: (line) => errors.push(line),
-      log: (line) => lines.push(line),
-      sets: { only: { build: () => edit(dir) } },
-    };
-    assert.equal(await buildCommand(options, ["--check"]), changes ? 1 : 0);
-    assert.deepEqual(
-      lines.filter((line) => line.includes("\t")),
-      expected ?? [],
-    );
-    assert.deepEqual(errors, changes ? [message] : []);
-  });
-
-  test(`runBuilds index check: ${name}`, async (t) => {
-    const dir = await repository(t);
-    const previous = process.cwd();
-    process.chdir(dir);
-    t.after(() => process.chdir(previous));
-    await before(dir);
-    const sets = { only: { build: () => edit(dir) } };
-    const check = { index: true, paths: ["out", "single.txt", "missing.txt"] };
-    const run = runBuilds({ check, log: () => {}, sets });
-    if (!changes) {
-      assert.deepEqual((await run).changes, {
-        added: [],
-        removed: [],
-        changed: [],
-        dirty: [],
-        untracked: [],
-      });
-      return;
-    }
-    await assert.rejects(run, (caught) => {
-      assert.ok(named(caught, "CheckError"));
-      assert.deepEqual(caught.changes, changes);
-      assert.equal(caught.message, message);
-      return true;
-    });
-  });
-}
-
-test("buildCommand --check with index prints the earlier dirt and exits 1", async (t) => {
-  const dir = await repository(t);
-  const previous = process.cwd();
-  process.chdir(dir);
-  t.after(() => process.chdir(previous));
-  await writeFile(join(dir, "out", "new.txt"), "new");
-  const lines = [];
+test("checked builds reject the removed index mode before running any set", async () => {
+  const ran = [];
   const errors = [];
   const options = {
-    sets: { only: { build: () => {} } },
-    check: { index: true, paths: ["out"] },
-    log: (line) => lines.push(line),
+    check: { index: true, paths: [] },
     error: (line) => errors.push(line),
+    log: () => {},
+    sets: table([["only"]], ran),
   };
+
+  await assert.rejects(runBuilds(options), {
+    message: "check.index has been removed",
+    name: "RangeError",
+  });
   assert.equal(await buildCommand(options, ["--check"]), 1);
-  assert.deepEqual(lines.slice(-1), ["?\tout/new.txt"]);
-  assert.deepEqual(errors, [
-    "1 path under the check paths differed from the Git index before the run",
-  ]);
-});
-
-test("runBuilds index check reports changes keyed like the snapshot", async (t) => {
-  const dir = await repository(t);
-  const previous = process.cwd();
-  process.chdir(join(dir, "elsewhere"));
-  t.after(() => process.chdir(previous));
-  await writeFile(join(dir, "out", "dirty.txt"), "edited");
-  await writeFile(join(dir, "out", "new.txt"), "new");
-  const check = { index: true, paths: [join(dir, "out"), "../single.txt"] };
-  await writeFile(join(dir, "single.txt"), "two");
-  await assert.rejects(runBuilds({ check, log: () => {}, sets: {} }), (caught) => {
-    assert.ok(named(caught, "CheckError"));
-    assert.deepEqual(caught.changes, {
-      added: [],
-      removed: [],
-      changed: [],
-      dirty: ["../single.txt", join(dir, "out", "dirty.txt")],
-      untracked: [join(dir, "out", "new.txt")],
-    });
-    return true;
-  });
-});
-
-test("only the index check runs git", async (t) => {
-  const dir = await scratch(t);
-  const path = process.env.PATH;
-  process.env.PATH = "";
-  t.after(() => {
-    process.env.PATH = path;
-  });
-  const sets = { only: { build: () => {} } };
-  const check = { paths: [join(dir, "out")] };
-  assert.deepEqual((await runBuilds({ check, log: () => {}, sets })).changes, {
-    added: [],
-    removed: [],
-    changed: [],
-  });
-  await assert.rejects(
-    runBuilds({ check: { ...check, index: true }, log: () => {}, sets }),
-    /^Error: git rev-parse failed: .*ENOENT/,
-  );
+  assert.deepEqual(errors, ["check.index has been removed"]);
+  assert.deepEqual(ran, []);
 });
 
 test("outputs check fails on files no set output or static entry claims", async (t) => {
