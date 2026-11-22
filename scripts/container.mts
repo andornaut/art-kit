@@ -171,12 +171,11 @@ function remove(name: string): void {
 }
 
 /** Starts an idle policy container, runs body against it and removes the container and its volume. */
-async function withContainer<T>(
+async function withContainer(
   spec: ContainerSpec,
   prefix: string,
-  image: string,
-  body: (container: Container) => Promise<T>,
-): Promise<T> {
+  body: (container: Container) => Promise<void>,
+): Promise<void> {
   await run({}, "sh", [join(root, "tests/container/load")]);
   const name = `${prefix}-${process.pid}-${randomInt(1 << 30)}`;
   containers.add(name);
@@ -185,11 +184,11 @@ async function withContainer<T>(
       "run",
       "--detach",
       ...policyArguments(spec, name),
-      image,
+      NODE_IMAGE,
       "sleep",
       "infinity",
     ]);
-    return await body({ name });
+    await body({ name });
   } finally {
     remove(name);
   }
@@ -273,7 +272,7 @@ async function pack(dependencyPath: string, outputPath: string): Promise<void> {
     env: { npm_config_cache: "/tmp/npm-cache" },
     mounts: [[dependencies, "/deps"]],
   };
-  await withContainer(spec, "art-kit-pack", NODE_IMAGE, async (container) => {
+  await withContainer(spec, "art-kit-pack", async (container) => {
     await exec({}, container, ["mkdir", "-p", "/tmp/work/source", "/tmp/out"]);
     await extractArchive(
       container,
@@ -299,7 +298,7 @@ async function provision(outputPath: string): Promise<void> {
     private: true,
     dependencies: { ...descriptor.devDependencies, ...descriptor.peerDependencies },
   });
-  await withContainer({ network: "bridge" }, "art-kit-provision", NODE_IMAGE, async (container) => {
+  await withContainer({ network: "bridge" }, "art-kit-provision", async (container) => {
     await exec({}, container, ["mkdir", "/tmp/tools"]);
     await writeFile(container, "/tmp/tools/package.json", manifest);
     await exec({ workdir: "/tmp/tools" }, container, [

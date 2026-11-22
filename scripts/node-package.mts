@@ -72,10 +72,8 @@ if (mode === "lint" || mode === "check") {
       [`${dependencies}/typescript/bin/tsc`, "--noEmit", "-p", `${root}/node/tsconfig.json`],
       { stdio: "inherit" },
     );
+    process.exit(0);
   }
-}
-if (mode === "lint") {
-  process.exit(0);
 }
 execFileSync(
   process.execPath,
@@ -141,6 +139,17 @@ for (const subpath of SKIA_SUBPATHS) {
     throw new Error(`Skia subpath ${subpath} is not exported`);
   }
 }
+function checkImport(subpath: string): void {
+  execFileSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "-e",
+      `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`,
+    ],
+    { cwd: install, stdio: "inherit" },
+  );
+}
 const optionalPeers = Object.keys(descriptor.peerDependenciesMeta ?? {}).filter(
   (name) => descriptor.peerDependenciesMeta?.[name].optional,
 );
@@ -148,29 +157,13 @@ for (const name of optionalPeers) {
   unlinkSync(`${install}/node_modules/${name}`);
 }
 for (const subpath of subpaths.filter((subpath) => !SKIA_SUBPATHS.includes(subpath))) {
-  execFileSync(
-    process.execPath,
-    [
-      "--input-type=module",
-      "-e",
-      `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`,
-    ],
-    { cwd: install, stdio: "inherit" },
-  );
+  checkImport(subpath);
 }
 for (const name of optionalPeers) {
   symlinkSync(`${dependencies}/${name}`, `${install}/node_modules/${name}`);
 }
 for (const subpath of subpaths) {
-  execFileSync(
-    process.execPath,
-    [
-      "--input-type=module",
-      "-e",
-      `await import(${JSON.stringify(`@andornaut/art-kit/${subpath}`)})`,
-    ],
-    { cwd: install, stdio: "inherit" },
-  );
+  checkImport(subpath);
 }
 const contractFile = `${install}/contracts.mts`;
 writeFileSync(
