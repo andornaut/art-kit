@@ -281,6 +281,14 @@ The package version is the `version` in `node/package.json`. Compatible fixes in
 
 ## Released dependency
 
+### Upgrading to 0.33
+
+- Sprite sheets preserve decoded RGBA and exact JSON. The shared PNG encoder can produce different
+  PNG bytes, so rebuild checks against older generated sheets may need a reviewed output refresh.
+- Remove `check.index` and any use of `changes.dirty` or `changes.untracked`. Snapshot checks and
+  `outputs: true` still check for changed and stale outputs.
+- Run Art-kit source checks through `make check`, `make lint`, `make test` or `make build`.
+
 The release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`. Consumers pin that URL with the tarball's SHA-256 from `SHA256SUMS`, plus the exact peers, through their own dependency integration. The tarball holds compiled ESM, `.d.ts` files, `LICENSE` and `SOURCE_COMMIT`; no source, fonts, game assets or tooling.
 
 Tag `v<version>` only after every required CI workflow has passed on the exact release commit on `main`. Publish that commit's CI-built tarball, `SHA256SUMS` and `SOURCE_COMMIT` as release assets after checking the checksums and a fresh install.
