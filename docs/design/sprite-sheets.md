@@ -25,3 +25,4 @@ Reference: [Encoders and atlases](../../README.md#encoders-and-atlases).
 | ak-0031 | Add configurable lossy WebP encoding                          | [ak-0031.md](../work/ak-0031.md) |
 | ak-0040 | Pad packAtlas cells and shelves                               | [ak-0040.md](../work/ak-0040.md) |
 | ak-0044 | Decode WebP to RGBA                                           | [ak-0044.md](../work/ak-0044.md) |
+| ak-0048 | Use the shared encoder for sprite-sheet PNGs                  | [ak-0048.md](../work/ak-0048.md) |

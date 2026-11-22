@@ -37,3 +37,7 @@ dependency](../../README.md#released-dependency), [API entry points](../api-entr
 | ak-0035 | Remove the flat import aliases                              | [ak-0035.md](../work/ak-0035.md) |
 | ak-0041 | Adopt the design and work file convention                   | [ak-0041.md](../work/ak-0041.md) |
 | ak-0042 | Record every user request as a work file                    | [ak-0042.md](../work/ak-0042.md) |
+| ak-0045 | Cap Art-kit containers at 4 GiB                             | [ak-0045.md](../work/ak-0045.md) |
+| ak-0046 | Harden Art-kit build tooling and asset output validation    | [ak-0046.md](../work/ak-0046.md) |
+| ak-0047 | Simplify PNG filtering and package tooling                  | [ak-0047.md](../work/ak-0047.md) |
+| ak-0050 | Standardize Art-kit checks on Make                          | [ak-0050.md](../work/ak-0050.md) |

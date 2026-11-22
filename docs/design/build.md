@@ -16,3 +16,4 @@ Reference: [Builds](../../README.md#builds).
 | ak-0017 | Add the build subpath with a byte-snapshot check                 | [ak-0017.md](../work/ak-0017.md) |
 | ak-0021 | Add build self-checks, nodeBuild, --help and an index check mode | [ak-0021.md](../work/ak-0021.md) |
 | ak-0038 | Declare build outputs and fail on unclaimed files                | [ak-0038.md](../work/ak-0038.md) |
+| ak-0049 | Remove Git-index checks from art builds                          | [ak-0049.md](../work/ak-0049.md) |
