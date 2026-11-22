@@ -24,20 +24,19 @@ interface Descriptor {
 // Subpaths that import the optional Skia peer; every other export must import without the optional peers.
 const SKIA_SUBPATHS = ["build/fonts"];
 
-const [mode, revision, ...testArgs] = process.argv.slice(2);
-if (!["lint", "test", "build", "check", "pack"].includes(mode)) {
-  throw new Error("Expected lint, test, build, check or pack mode");
+const [mode, revision, ...args] = process.argv.slice(2);
+if (!["lint", "test", "build", "pack"].includes(mode)) {
+  throw new Error("Expected lint, test, build or pack mode");
 }
-if (mode !== "test" && testArgs.length) {
-  throw new Error(`Extra arguments are only supported in test mode, not ${mode}`);
+if (args.length) {
+  throw new Error(`Unexpected arguments for ${mode} mode`);
 }
 // Dependencies are mounted outside a conventional node_modules directory.
 const dependencies = process.env.ART_KIT_PACKAGE_NODE_MODULES ?? "/deps";
 process.env.NODE_PATH = dependencies;
-// Inputs and outputs live in the container's writable /tmp volume; the caller copies /tmp/out out.
+// Pack uses the writable /tmp volume and exports /tmp/out. Checks use a separate scratch tree.
 const work = process.env.ART_KIT_PACKAGE_WORK ?? "/tmp/work";
-const out = process.env.ART_KIT_PACKAGE_OUT ?? "/tmp/out";
-const root = process.env.ART_KIT_PACKAGE_ROOT ?? `${work}/source`;
+const root = `${work}/source`;
 const descriptor: Descriptor = JSON.parse(readFileSync(`${root}/node/package.json`, "utf8"));
 for (const [name, expected] of Object.entries<string>({
   ...descriptor.devDependencies,
@@ -53,7 +52,7 @@ if (!/^\d+\.\d+\.\d+$/.test(version ?? "")) {
   throw new Error("Missing or invalid package version");
 }
 symlinkSync(dependencies, `${root}/node/node_modules`);
-if (mode === "lint" || mode === "check") {
+if (mode === "lint") {
   // The linters resolve their configs' imports through node_modules beside them; preserving the symlinked
   // path lets each package find its siblings in /deps.
   symlinkSync(dependencies, `${root}/node_modules`);
@@ -66,14 +65,12 @@ if (mode === "lint" || mode === "check") {
   };
   tool("prettier/bin/prettier.cjs", ["--check", "."]);
   tool("eslint/bin/eslint.js", ["--max-warnings", "0", "."]);
-  if (mode === "lint") {
-    execFileSync(
-      process.execPath,
-      [`${dependencies}/typescript/bin/tsc`, "--noEmit", "-p", `${root}/node/tsconfig.json`],
-      { stdio: "inherit" },
-    );
-    process.exit(0);
-  }
+  execFileSync(
+    process.execPath,
+    [`${dependencies}/typescript/bin/tsc`, "--noEmit", "-p", `${root}/node/tsconfig.json`],
+    { stdio: "inherit" },
+  );
+  process.exit(0);
 }
 execFileSync(
   process.execPath,
@@ -193,7 +190,7 @@ execFileSync(
   ],
   { cwd: install, stdio: "inherit" },
 );
-if (mode === "test" || mode === "check") {
+if (mode === "test") {
   const tests: string[] = [];
   function collect(dir: string): void {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -214,12 +211,13 @@ if (mode === "test" || mode === "check") {
     cpSync(path, target);
     return target;
   });
-  execFileSync(process.execPath, ["--test", ...testArgs, "--test-concurrency=4", ...targets], {
+  execFileSync(process.execPath, ["--test", "--test-concurrency=4", ...targets], {
     cwd: install,
     stdio: "inherit",
   });
 }
 if (mode === "pack") {
+  const out = "/tmp/out";
   const tarball = `art-kit-${version}.tgz`;
   cpSync(archive, `${out}/${tarball}`);
   writeFileSync(`${out}/SOURCE_COMMIT`, `${revision}\n`);
@@ -234,6 +232,4 @@ if (mode === "pack") {
       )
       .join(""),
   );
-} else {
-  cpSync(archive, `${out}/andornaut-art-kit-${version}.tgz`);
 }
