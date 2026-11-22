@@ -2,8 +2,9 @@
 
 `atlasLayout` shelf-packs items against candidate widths and size limits, with optional padding
 between cells, and `atlasBuild` draws and encodes the pages with at most 16 reads and encodes in
-flight. `spriteSheet` writes the PNG and json-hash data Aseprite 1.2.30 writes, byte for byte,
-without Aseprite. The encoders are `png` (decoding, RGBA and opaque RGB encoding, streamed and
+flight. `spriteSheet` reproduces Aseprite 1.2.30's decoded RGBA and exact json-hash text without
+Aseprite. It uses the shared RGBA PNG encoder, so PNG bytes can differ from Aseprite's exports.
+The encoders are `png` (decoding, RGBA and opaque RGB encoding, streamed and
 byte-identical to pngjs 7.0.0), `indexedPng`, `webp` (lossless, and lossy with four explicit
 settings), `gif` (exact palettes and binary alpha) and `ico` (PNG entries). Callers choose formats,
 fallback order, paths and metadata.

@@ -1,13 +1,12 @@
-// Sprite sheet PNG and JSON in the bytes Aseprite 1.2.30's command line writes for
+// Sprite sheet pixels and json-hash text matching Aseprite 1.2.30's command-line export:
 // `aseprite -b <key>.aseprite --sheet <png> --data <json> --format json-hash --list-tags`, with
 // `--list-slices` when margins are given and `--sheet-columns` when columns are given.
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
 import { rgb } from "./colour.js";
-import { deflateChunks } from "./deflate.js";
 import type { Frame } from "./grid.js";
-import { pngFile, predict } from "./pngChunks.js";
+import { encodeRgbaPng } from "./png.js";
 import type { Tag } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
 
@@ -34,8 +33,7 @@ export interface SpriteSheet {
 
 const APP = "http://www.aseprite.org/";
 const VERSION = "1.2.30-x64";
-// libpng's default compression buffer, which sizes every IDAT chunk but the last.
-const IDAT_SIZE = 8192;
+const PNG_OPTIONS = { deflateLevel: 6, deflateStrategy: 0, filterType: -1 };
 
 // Aseprite's escape_for_json: backslashes and double quotes only.
 function escape(text: string): string {
@@ -163,101 +161,6 @@ function json(
   return `${text}\n }\n}\n`;
 }
 
-// ---------- PNG as Aseprite 1.2.30 writes it through libpng 1.6.38 ----------
-
-// libpng's filter choice: the lowest sum of filtered bytes read as signed magnitudes, the earliest
-// type on a tie. A single row cannot use the row above, and a single column the pixel to the left.
-function filteredRows(image: RgbaImage): Uint8Array[] {
-  const { data, height, width } = image;
-  const rowBytes = width * 4;
-  let types = [0, 1, 2, 3, 4];
-  if (height === 1) {
-    types = types.filter((type) => type < 2);
-  }
-  if (width === 1) {
-    types = types.filter((type) => type === 0 || type === 2);
-  }
-  const rows: Uint8Array[] = [];
-  let previous: Uint8Array = new Uint8Array(rowBytes);
-  for (let y = 0; y < height; y++) {
-    const row = data.subarray(y * rowBytes, (y + 1) * rowBytes);
-    let selected = types[0]!;
-    if (types.length > 1) {
-      let min = Infinity;
-      for (const type of types) {
-        let sum = 0;
-        for (let x = 0; x < rowBytes; x++) {
-          const v = (row[x]! - predict(type, 4, previous, row, x)) & 0xff;
-          sum += v < 128 ? v : 256 - v;
-        }
-        if (sum < min) {
-          min = sum;
-          selected = type;
-        }
-      }
-    }
-    const out = new Uint8Array(rowBytes + 1);
-    out[0] = selected;
-    for (let x = 0; x < rowBytes; x++) {
-      out[x + 1] = row[x]! - predict(selected, 4, previous, row, x);
-    }
-    rows.push(out);
-    previous = row;
-  }
-  return rows;
-}
-
-// libpng compresses with the smallest window that holds the image data plus zlib's lookahead, then
-// rewrites the first IDAT's header to the smallest window that holds the data alone.
-function idat(rows: readonly Uint8Array[]): Uint8Array {
-  const size = rows.reduce((total, row) => total + row.length, 0);
-  let windowBits = 15;
-  if (size <= 16384) {
-    let half = 1 << (windowBits - 1);
-    while (size + 262 <= half) {
-      half >>= 1;
-      windowBits--;
-    }
-  }
-  const stream = deflateChunks(Math.max(9, windowBits), rows);
-  if (size <= 16384) {
-    let cmf = stream[0]!;
-    if ((cmf & 0x0f) === 8 && (cmf & 0xf0) <= 0x70) {
-      let cinfo = cmf >> 4;
-      let half = 1 << (cinfo + 7);
-      if (size <= half) {
-        do {
-          half >>= 1;
-          cinfo--;
-        } while (cinfo > 0 && size <= half);
-        cmf = (cmf & 0x0f) | (cinfo << 4);
-        stream[0] = cmf;
-        const flags = stream[1]! & 0xe0;
-        stream[1] = flags + 0x1f - (((cmf << 8) + flags) % 0x1f);
-      }
-    }
-  }
-  return stream;
-}
-
-function png(image: RgbaImage): Uint8Array {
-  const header = new Uint8Array(13);
-  const view = new DataView(header.buffer);
-  view.setUint32(0, image.width);
-  view.setUint32(4, image.height);
-  header.set([8, 6, 0, 0, 0], 8);
-  const stream = idat(filteredRows(image));
-  const chunks: [string, Uint8Array[]][] = [
-    ["IHDR", [header]],
-    ["sRGB", [Uint8Array.of(0)]],
-  ];
-  for (let at = 0; at < stream.length; at += IDAT_SIZE) {
-    chunks.push(["IDAT", [stream.subarray(at, at + IDAT_SIZE)]]);
-  }
-  chunks.push(["IEND", []]);
-  return pngFile(chunks);
-}
-
 // ---------- public interface ----------
 
 // The sheet PNG and its json-hash data. Frames are laid out left to right in tag order, wrapping
@@ -277,7 +180,7 @@ export function spriteSheet(options: SpriteSheetOptions, tags: readonly Tag[]): 
   }
   const across = columns ?? layout.frames.length;
   const image = render(across, layout);
-  return { data: json(options, across, layout, image), sheet: png(image) };
+  return { data: json(options, across, layout, image), sheet: encodeRgbaPng(PNG_OPTIONS, image) };
 }
 
 // Writes spriteSheet's PNG to sheet and its data to data, creating their directories. meta.image is

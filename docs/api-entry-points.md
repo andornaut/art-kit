@@ -52,9 +52,8 @@ This is a static portability distinction, not a browser qualification claim.
 
 The other eight modules require Node directly or transitively. `fonts` statically loads
 optional Skia; `woff2` loads its optional codec only on encoding. `spriteSheet` includes
-filesystem writing and reaches Node zlib through its PNG CRC helper. Separating its writer
-alone would not make its encoder portable. The PNG, WebP and WOFF2 APIs retain their current
-Node codec contracts. Namespace paths do not change package-wide engine or peer requirements.
+filesystem writing and uses the Node RGBA PNG encoder. The PNG, WebP and WOFF2 APIs retain
+their Node codec contracts. Namespace paths do not change package-wide engine or peer requirements.
 
 ## Compatibility and publication
 

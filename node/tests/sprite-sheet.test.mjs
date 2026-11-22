@@ -30,10 +30,9 @@ function generatedTags({ palette, tags }) {
   ]);
 }
 
-// A game export's tags, read back from its sheet and data.
-function exportedTags({ data, sheet }) {
+// A frozen export's tags, read back from its decoded sheet and metadata.
+function exportedTags(data, image) {
   const json = JSON.parse(data);
-  const image = decodePng(sheet);
   const entries = Object.values(json.frames);
   const frames = entries.map(({ frame: r }) =>
     Array.from({ length: r.h }, (_, y) =>
@@ -55,13 +54,15 @@ function exportedTags({ data, sheet }) {
 }
 
 for (const c of cases) {
-  test(`${c.name} (${c.source}) reproduces Aseprite's data, pixels and PNG bytes`, () => {
+  test(`${c.name} (${c.source}) preserves JSON and RGBA with repeatable PNG bytes`, () => {
     const expected = reference(c.name);
-    const tags = c.source === "generated" ? generatedTags(c) : exportedTags(expected);
-    const { data, sheet } = spriteSheet({ key: c.key, image: c.image, ...c.options }, tags);
-    assert.equal(data, expected.data);
-    assert.deepEqual(decodePng(sheet), decodePng(expected.sheet));
-    assert.deepEqual(sheet, expected.sheet);
+    const pixels = decodePng(expected.sheet);
+    const tags = c.source === "generated" ? generatedTags(c) : exportedTags(expected.data, pixels);
+    const options = { key: c.key, image: c.image, ...c.options };
+    const actual = spriteSheet(options, tags);
+    assert.equal(actual.data, expected.data);
+    assert.deepEqual(decodePng(actual.sheet), pixels);
+    assert.deepEqual(spriteSheet(options, tags), actual);
   });
 }
 
