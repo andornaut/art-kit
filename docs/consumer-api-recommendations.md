@@ -1,12 +1,12 @@
 # Consumer API recommendations
 
-Status: consultation only, based on Ada the Navigator, Archie and Chibi Art-owner findings. The three raster/colour functions already approved for implementation remain independent. No additional implementation, deletion, consumer migration or publication is approved here.
+This consultation records the Ada the Navigator, Archie and Chibi Art-owner findings from before the numerical and bitmap-font APIs shipped. The consultation granted no additional implementation, deletion, migration or publication approval. For the supported contracts, see [Pixel frames and images](../README.md#pixel-frames-and-images) and [Bitmap text](../README.md#bitmap-text).
 
 ## Ranked recommendations
 
 1. **Use existing mechanisms before adding interfaces.** Ada and Archie retain small adapters where legacy numeric domains or alpha rules differ. Chibi has already replaced its local hex parser with `colour.rgb(hex)`, with exact colour/material comparisons and unchanged served assets. Keep strict shared validation, one image representation and context before the subject. Document domains, alpha semantics and output shapes rather than adding permissive modes or parser aliases.
-2. **Finish the approved numerical additions.** `resizeLanczos3(width, height, image)` and `gaussianBlur({ sigma }, image)` serve demonstrated Ada needs; `oklabToSrgb({ gamut, rounding }, colour)` also serves Archie. Preserve Float32 intermediates, hidden RGB and explicit rounding/gamut policies. Keep nearest sampling and existing OKLCH gamut mapping unchanged. These are the only additions currently being implemented.
-3. **Evaluate a small bitmap-font reader and compositor next.** Chibi duplicates BMFont XML parsing, kerning, measurement and tinted glyph composition in `previewText.ts` and `fonts.ts`. First specify the supported BMFont dialect, page/image inputs, signed bearings, advances, line height, kerning, ink bounds, tint and alpha composition. A reader independent of runtime manifests would also support build-only fonts. This is the strongest new capability candidate, but no second consumer requirement or implementation approval is established.
+2. **Finish the approved numerical additions.** `resizeLanczos3(width, height, image)` and `gaussianBlur({ sigma }, image)` serve demonstrated Ada needs; `oklabToSrgb({ gamut, rounding }, colour)` also serves Archie. Preserve Float32 intermediates, hidden RGB and explicit rounding/gamut policies. Keep nearest sampling and existing OKLCH gamut mapping unchanged. These were the only additions in implementation at the time.
+3. **Evaluate a small bitmap-font reader and compositor next.** Chibi duplicates BMFont XML parsing, kerning, measurement and tinted glyph composition in `previewText.ts` and `fonts.ts`. First specify the supported BMFont dialect, page/image inputs, signed bearings, advances, line height, kerning, ink bounds, tint and alpha composition. A reader independent of runtime manifests would also support build-only fonts. The consultation ranked this as the strongest new capability candidate. At that point, it had no second identified consumer or implementation approval.
 4. **Consider horizontal alpha runs as a separate small primitive.** Chibi's `contactSilhouettes.ts` extracts binary-alpha row runs. A shared function could return `{ y, x, width }[]`, with explicit alpha threshold and coordinates relative to the supplied image. Freeze the actual endpoint, row-order and origin contract before selecting the signature. These masks affect physics; contacts, grouping and world placement remain local. Its small size makes retaining a local helper reasonable until reuse is demonstrated.
 5. **Defer CLI and utility consolidation.** Chibi's deferred build/preview dispatch may belong with the existing build CLI if another caller has the same needs. Preserve deferred imports, help and exit codes. Floor modulo, stable JSON and rounding do not justify a utility subpath without distinct shared consumers. No generic backend, preview or 3D framework is needed.
 
@@ -23,7 +23,7 @@ const blurred = raster.gaussianBlur({ sigma: 1.25 }, image);
 const picker = colour.oklabToSrgb({ gamut: "reject", rounding: "half-up" }, lab);
 ```
 
-Potential font interface for a separate design review, not an implemented contract:
+Candidate font interface considered in the consultation:
 
 ```ts
 const font = fonts.readBitmapFont(xml, pages);

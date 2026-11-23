@@ -1,16 +1,8 @@
 # Packaging
 
-The package is `@andornaut/art-kit`: TypeScript compiled to ESM with declarations, released as a
-GitHub release tarball with no registry publication. Every API is an explicit `build/<name>`
-subpath; `runtime/*` and `test/*` are absent and there is no root barrel. Peers are exact:
-`pngjs@7.0.0` and `@jsquash/webp@1.5.0`, plus the optional `skia-canvas`, `wawoff2` and
-`harfbuzzjs`. `make check`, `lint`, `test` and `build` run `tests/container/check-stock`, which uses
-pinned stock images and the shared `stock` core: Git-listed source, uid 19001, a read-only root,
-bounded CPU, memory and scratch, and a container start only while the one-minute load is below 20.
-CI classifies the changed paths first: a change only under `docs/` runs lint and the attribution
-scan, and anything else also runs `make check` and builds the committed release artifacts. The
-tarball holds compiled ESM, declarations, `LICENSE` and `SOURCE_COMMIT`, and no docs. A release is
-tagged only after every required CI workflow passes on the exact `main` commit.
+Art-kit ships an ESM package with declarations and explicit build subpaths. Source checks use
+container-backed Make targets. Release packaging uses committed source and produces a GitHub
+release tarball.
 
 Reference: [Boundaries](../../README.md#boundaries), [Runtime and
 checks](../../README.md#runtime-and-checks), [Version and

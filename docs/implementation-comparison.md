@@ -2,7 +2,7 @@
 
 ## Rendering split
 
-`fonts` is the only module that renders with a CPU Skia canvas. `grid`, `raster`, `draw`, `glyphAtlas` and the codecs work on `RgbaImage` buffers with exact integer arithmetic, so composition copies exact bytes and is not limited by a canvas. Pillow 13.0.0 is the parity reference for the frozen `raster`, `draw`, GIF and ICO fixtures.
+`fonts` is the only module that renders with a CPU Skia canvas. `grid`, `raster`, `draw`, `glyphAtlas` and the codecs work on `RgbaImage` buffers without a canvas. Atlas assembly copies RGBA bytes, alpha compositing blends channels, and the smooth filters use Float32 intermediate buffers. Pillow 13.0.0 is the parity reference for the frozen `raster`, `draw`, GIF and ICO fixtures.
 
 Fonts take two calls: `fonts.rasteriseGlyphs` returns trimmed glyph images, metrics and kernings, and `glyphAtlas.buildBitmapFontFromGlyphs` packs them into the atlas and writes the BMFont XML. Callers own glyph policy between the two calls, such as recolouring, metric adjustments and the line box. Glyph rasterization has no custom alpha arithmetic or Pillow-specific rounding.
 

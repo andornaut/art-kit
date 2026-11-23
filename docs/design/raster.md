@@ -1,13 +1,10 @@
 # Raster
 
-A `Frame` is rows of hex colours or `null`, drawn with `grid` and resolved to an `RgbaImage` by
-`raster.frameToRgba`. An `RgbaImage` is `{ data, width, height }` with straight RGBA bytes.
-`raster`, `rgbaImage` and `draw` operate on those buffers with exact integer arithmetic and no
-canvas, and Pillow 13.0.0 is the parity reference for their frozen fixtures. The Float32 smooth
-filters and inverse Oklab follow frozen synthetic references and take explicit gamut and rounding
-policies. `build/compareRgba` reports raw and composite differences between decoded images and makes
-no acceptance decision. Options and context come before the subject, and invalid geometry, colours
-and sizes throw `RangeError`.
+`grid` draws pixel frames and `raster` resolves and processes straight RGBA images without a
+canvas. Frozen Pillow 13.0.0 fixtures cover raster and drawing parity. Separate synthetic
+references cover the Float32 smooth filters and inverse Oklab, which takes explicit gamut and
+rounding policies. `build/compareRgba` reports raw and composite differences between decoded
+images for callers to evaluate.
 
 Reference: [Pixel frames and images](../../README.md#pixel-frames-and-images), [Development image
 comparison](../../README.md#development-image-comparison), [implementation

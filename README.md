@@ -12,7 +12,7 @@ The package ships TypeScript declarations and explicit leaf subpaths. Canonical 
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | `atlasBuild`  | Atlas page drawing and encoded page assembly                                                                                              | Read, decode and encode functions, blits, extrusion and metadata         |
 | `atlasLayout` | Shelf packing and candidate selection                                                                                                     | Items, order comparator, candidate widths and size limits                |
-| `build`       | Sequential art builds in dependency order, set table self-checks, snapshot and Git index checks, node process steps and a command wrapper | Named build steps, their needs, the module directory and the check paths |
+| `build`       | Sequential game art builds in dependency order, set table self-checks, snapshot and output ownership checks, Node process steps and a CLI | Named build steps, their needs, the module directory and the check paths |
 | `colour`      | Six-digit hex RGB, WCAG contrast, sRGB to/from Oklab and OKLCH                                                                            | Resolved hex colours and colour triples                                  |
 | `draw`        | Pillow 13.0.0-exact shape drawing into RGBA buffers                                                                                       | Colours, points, bounds, widths and the target image                     |
 | `fonts`       | Skia glyph rasterization, font coverage, line metrics and pair kerning                                                                    | Font path, size, characters, antialiasing, hinting and kerning           |
@@ -27,10 +27,12 @@ The package ships TypeScript declarations and explicit leaf subpaths. Canonical 
 | `rgbaImage`   | RGBA allocation, alpha bounds and extruded blitting                                                                                       | Image dimensions, pixels, rectangles and bounds                          |
 | `spriteSheet` | Sprite sheet PNG with Aseprite 1.2.30 decoded pixels and exact json-hash text                                                             | Key, image name, tags, optional columns and slice margins, paths         |
 | `webp`        | Lossless and lossy WebP encoding, and decoding                                                                                            | RGBA images                                                              |
+| `woff2`       | WOFF2 encoding and optional text-driven subsetting                                                                                        | TrueType bytes, strings and optional font names                          |
+| `compareRgba` | Raw and composited RGBA comparisons for asset development                                                                                 | Decoded images and comparison backgrounds                                |
 
-Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject; invalid geometry, colours and sizes throw `RangeError`. Only `fonts` needs Skia; every other subpath is canvas-free. Numerical transforms use the rounding and intermediate precision specified below.
+Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject. Only `fonts` needs Skia; every other subpath is canvas-free. Numerical transforms use the rounding and intermediate precision specified below.
 
-See [API entry points](docs/api-entry-points.md) for the dependency audit and v0.28 migration map. Version 0.28 removes all 18 flat import paths: use `build/<name>`, including `build/build` for the orchestrator. Removed paths reject with `ERR_PACKAGE_PATH_NOT_EXPORTED`. The 19 canonical paths, implementations and outputs are unchanged. Immutable v0.27 artifacts and pins remain usable; migrate imports on v0.27 before adopting v0.28. Consumer owners upgrade only after migrating every import, including build configuration, tests and mocks. Publishing v0.28 does not change existing immutable pins or establish consumer adoption. Runtime APIs in the shared kit convention must not import build or test APIs, and no combined root barrel loads optional tooling.
+See [API entry points](docs/api-entry-points.md) for import dependencies, the shared kit namespace rules and the v0.28 migration map.
 
 ## Pixel frames and images
 
@@ -135,7 +137,7 @@ Font files, samples, colours, line spacing, fallback selection and PNG encoder s
 | `buildOrder(sets, selected?)`                                                        | Each set after its needs, ties in declaration order. Selected sets run with everything downstream, not their needs. Unknown needs and cycles throw `RangeError`; unknown selected names throw an error named `UsageError` |
 | `checkSets({ strictOrder?, modules? }, sets)`                                        | Startup self-checks, all off by default; every problem found is listed in one `RangeError`                                                                                                                                |
 | `runBuilds({ sets, check?, strictOrder?, modules?, log? }, selected?)`               | Runs `checkSets`, then logs `build <set>` before each and resolves to `{ changes?, order }`. A failing build throws an error named `BuildError` with `set` and `cause`                                                    |
-| `check: { paths, outputs?, static? }`                                                | SHA-256 snapshot of every file under each path before and after (symbolic links by target); any difference throws an error named `CheckError` whose `changes` holds sorted `{ added, changed, removed }`                  |
+| `check: { paths, outputs?, static? }`                                                | SHA-256 before/after snapshot under each path (symlinks by target). Changes or unclaimed files throw `CheckError` with sorted `{ added, changed, removed, unclaimed? }` lists.                                            |
 | `nodeBuild({ directory, extension?, args? }, set)`                                   | A build step running `node <directory>/<set><extension> ...args` (defaults `.ts` and `["build"]`) with `process.execPath` and inherited stdio; throws `exit <status>` or `signal <name>`                                  |
 | `buildCommand({ sets, check?, strictOrder?, modules?, usage?, log?, error? }, argv)` | `[--check] [SET...]`; resolves to 0, 1 for a failed self-check, a failing build, check differences or invalid build configuration, or 2 for a usage error followed by `usage`                                             |
 
@@ -149,9 +151,7 @@ A sole `--help` or `-h` prints `usage` (or `Usage: [--check] [SET...]` when none
 
 ### Check modes
 
-The default check compares the tree before and after the rebuild without Git, so it works in a copy with no `.git`. It ignores differences that existed before the run and includes ignored files under the check paths: run it on a clean checkout to compare the rebuild with the committed outputs. Relative paths resolve against the working directory.
-
-The Git index check has been removed. When checking is enabled, `index: true` makes `runBuilds` throw a `RangeError` and `buildCommand --check` exit with status 1.
+The snapshot check compares the tree before and after the rebuild without Git, so it works in a copy with no `.git`. It ignores differences that existed before the run and includes ignored files under the check paths: run it on a clean checkout to compare the rebuild with the committed outputs. Relative paths resolve against the working directory.
 
 `outputs: true` catches stale outputs without Git: each set lists the files and directories it writes in `outputs`, and `static` lists hand-kept files under the check paths, such as a licence. After the rebuild, every file under the check paths must equal or sit inside one of them, or the check fails with it in `unclaimed`, printed as `!\tpath`. Every set's `outputs` count, selected or not, so a partial rebuild does not flag other sets' files. A file a set stopped writing therefore fails the check even though the rebuild left it unchanged. Nothing is deleted.
 
@@ -273,7 +273,7 @@ Check, pack and provision containers have a 4 GiB memory ceiling. `scripts/provi
 | `bash scripts/provision.sh <empty-directory>`           | Downloads the pinned dependencies from `node/package.json` into `<empty-directory>/node/node_modules` |
 | `bash scripts/pack.sh <node_modules> <empty-directory>` | Builds `art-kit-<version>.tgz`, `SOURCE_COMMIT` and `SHA256SUMS` from the committed `HEAD`            |
 
-Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. CI classifies the changed paths first. A change only under `docs/` runs `make lint` and the attribution scan; any other change also runs `make check`, then provisions, packs and uploads the committed release artifacts. Game projects test their own adapters and authored output; no game build is part of the package gate.
+Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. On a branch push or pull request, CI runs `make lint` and the attribution scan. The verification job skips changes confined to `docs/` when CI can compare against the base commit. Changes outside `docs/`, including `README.md`, and events without a usable base also run `make check`, then provision, pack and upload the committed release artifacts. Game projects test their own adapters and authored output; no game build is part of the package gate.
 
 ## Version and licence
 
@@ -286,9 +286,10 @@ The package version is the `version` in `node/package.json`. Compatible fixes in
 - Sprite sheets preserve decoded RGBA and exact JSON. The shared PNG encoder can produce different
   PNG bytes, so rebuild checks against older generated sheets may need a reviewed output refresh.
 - Remove `check.index` and any use of `changes.dirty` or `changes.untracked`. Snapshot checks and
-  `outputs: true` still check for changed and stale outputs.
+  `outputs: true` still check for changed and stale outputs. With checking enabled, passing
+  `index: true` throws `RangeError` in `runBuilds` and returns status 1 from `buildCommand`.
 - Run Art-kit source checks through `make check`, `make lint`, `make test` or `make build`.
 
-The release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`. Consumers pin that URL with the tarball's SHA-256 from `SHA256SUMS`, plus the exact peers, through their own dependency integration. The tarball holds compiled ESM, `.d.ts` files, `LICENSE` and `SOURCE_COMMIT`; no source, fonts, game assets or tooling.
+The release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`. Consumers pin that URL with the tarball's SHA-256 from `SHA256SUMS`, plus the exact peers, through their own dependency integration. The tarball holds compiled ESM, `.d.ts` files, the published `package.json`, `LICENSE` and `SOURCE_COMMIT`; no source, fonts, game assets or tooling.
 
 Tag `v<version>` only after every required CI workflow has passed on the exact release commit on `main`. Publish that commit's CI-built tarball, `SHA256SUMS` and `SOURCE_COMMIT` as release assets after checking the checksums and a fresh install.

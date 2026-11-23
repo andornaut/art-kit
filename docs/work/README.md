@@ -20,13 +20,14 @@ decided or delivered, and why, in a line or two each.
 - Only `main` edits design index tables and approved scope. Approval commits the work-file stub and
   its index row on `main`, and that commit allocates the ID.
 - Workers edit only their own work file and the design prose that ships with their feature.
-  Integration sets `status: done` in the commit that lands the item; a release tag containing that
-  commit marks it deployed.
+  Integration sets `status: done` in the commit that lands the item. Published releases and
+  consumer adoption each require their own evidence.
 - A changed or reverted decision is a new work item with `supersedes`. A finished item's outcome is
   never rewritten.
 - Work files are public: no session IDs, hostnames, local home-directory paths or quoted
   conversation, only short approval references.
 - Backfilled items with no recorded approval are labelled `inferred`, when the release shows the
   approval, or `unrecorded`.
-- Docs-only changes run only the attribution and lint checks ([ak-0041](ak-0041.md)).
+- For the CI rules that apply to changes under `docs/`, see [Runtime and
+  checks](../../README.md#runtime-and-checks) and [ak-0041](ak-0041.md).
 - Design summaries and work files are not part of the release tarball.
