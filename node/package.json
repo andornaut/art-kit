@@ -8,80 +8,80 @@
   },
   "exports": {
     "./build/atlasLayout": {
-      "types": "./dist/atlasLayout.d.ts",
-      "import": "./dist/atlasLayout.js"
+      "types": "./dist/atlas/atlasLayout.d.ts",
+      "import": "./dist/atlas/atlasLayout.js"
     },
     "./build/atlasBuild": {
-      "types": "./dist/atlasBuild.d.ts",
-      "import": "./dist/atlasBuild.js"
+      "types": "./dist/atlas/atlasBuild.d.ts",
+      "import": "./dist/atlas/atlasBuild.js"
     },
     "./build/rgbaImage": {
-      "types": "./dist/rgbaImage.d.ts",
-      "import": "./dist/rgbaImage.js"
+      "types": "./dist/raster/rgbaImage.d.ts",
+      "import": "./dist/raster/rgbaImage.js"
     },
     "./build/indexedPng": {
-      "types": "./dist/indexedPng.d.ts",
-      "import": "./dist/indexedPng.js"
+      "types": "./dist/codecs/indexedPng.d.ts",
+      "import": "./dist/codecs/indexedPng.js"
     },
     "./build/png": {
-      "types": "./dist/png.d.ts",
-      "import": "./dist/png.js"
+      "types": "./dist/codecs/png.d.ts",
+      "import": "./dist/codecs/png.js"
     },
     "./build/webp": {
-      "types": "./dist/webp.d.ts",
-      "import": "./dist/webp.js"
+      "types": "./dist/codecs/webp.d.ts",
+      "import": "./dist/codecs/webp.js"
     },
     "./build/woff2": {
-      "types": "./dist/woff2.d.ts",
-      "import": "./dist/woff2.js"
+      "types": "./dist/fonts/woff2.d.ts",
+      "import": "./dist/fonts/woff2.js"
     },
     "./build/gif": {
-      "types": "./dist/gif.d.ts",
-      "import": "./dist/gif.js"
+      "types": "./dist/codecs/gif.d.ts",
+      "import": "./dist/codecs/gif.js"
     },
     "./build/ico": {
-      "types": "./dist/ico.d.ts",
-      "import": "./dist/ico.js"
+      "types": "./dist/codecs/ico.d.ts",
+      "import": "./dist/codecs/ico.js"
     },
     "./build/spriteSheet": {
-      "types": "./dist/spriteSheet.d.ts",
-      "import": "./dist/spriteSheet.js"
+      "types": "./dist/atlas/spriteSheet.d.ts",
+      "import": "./dist/atlas/spriteSheet.js"
     },
     "./build/draw": {
-      "types": "./dist/draw.d.ts",
-      "import": "./dist/draw.js"
+      "types": "./dist/raster/draw.d.ts",
+      "import": "./dist/raster/draw.js"
     },
     "./build/colour": {
-      "types": "./dist/colour.d.ts",
-      "import": "./dist/colour.js"
+      "types": "./dist/raster/colour.d.ts",
+      "import": "./dist/raster/colour.js"
     },
     "./build/fonts": {
-      "types": "./dist/fonts.d.ts",
-      "import": "./dist/fonts.js"
+      "types": "./dist/fonts/fonts.d.ts",
+      "import": "./dist/fonts/fonts.js"
     },
     "./build/bitmapFont": {
-      "types": "./dist/bitmapFont.d.ts",
-      "import": "./dist/bitmapFont.js"
+      "types": "./dist/fonts/bitmapFont.d.ts",
+      "import": "./dist/fonts/bitmapFont.js"
     },
     "./build/grid": {
-      "types": "./dist/grid.d.ts",
-      "import": "./dist/grid.js"
+      "types": "./dist/raster/grid.d.ts",
+      "import": "./dist/raster/grid.js"
     },
     "./build/raster": {
-      "types": "./dist/raster.d.ts",
-      "import": "./dist/raster.js"
+      "types": "./dist/raster/raster.d.ts",
+      "import": "./dist/raster/raster.js"
     },
     "./build/glyphAtlas": {
-      "types": "./dist/glyphAtlas.d.ts",
-      "import": "./dist/glyphAtlas.js"
+      "types": "./dist/fonts/glyphAtlas.d.ts",
+      "import": "./dist/fonts/glyphAtlas.js"
     },
     "./build/build": {
-      "types": "./dist/build.d.ts",
-      "import": "./dist/build.js"
+      "types": "./dist/build/build.d.ts",
+      "import": "./dist/build/build.js"
     },
     "./build/compareRgba": {
-      "types": "./dist/build/compareRgba.d.ts",
-      "import": "./dist/build/compareRgba.js"
+      "types": "./dist/raster/compareRgba.d.ts",
+      "import": "./dist/raster/compareRgba.js"
     }
   },
   "files": [

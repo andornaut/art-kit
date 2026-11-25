@@ -4,11 +4,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
-import { rgb } from "./colour.js";
-import type { Frame } from "./grid.js";
-import { encodeRgbaPng } from "./png.js";
-import type { Tag } from "./raster.js";
-import type { RgbaImage } from "./rgbaImage.js";
+import { encodeRgbaPng } from "../codecs/png.js";
+import { rgb } from "../raster/colour.js";
+import type { Frame } from "../raster/grid.js";
+import type { Tag } from "../raster/raster.js";
+import type { RgbaImage } from "../raster/rgbaImage.js";
 
 // Nine-slice margins in pixels from each frame edge.
 export type Margins = readonly [left: number, top: number, right: number, bottom: number];

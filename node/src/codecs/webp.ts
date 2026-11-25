@@ -11,7 +11,7 @@ import encoderFactory, {
 import { defaultOptions } from "@jsquash/webp/meta.js";
 import { initEmscriptenModule } from "@jsquash/webp/utils.js";
 
-import type { RgbaImage } from "./rgbaImage.js";
+import type { RgbaImage } from "../raster/rgbaImage.js";
 
 const require = createRequire(import.meta.url);
 

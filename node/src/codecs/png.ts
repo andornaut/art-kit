@@ -4,8 +4,8 @@ import { constants, createDeflate, type Deflate } from "node:zlib";
 
 import { PNG } from "pngjs";
 
+import type { RgbaImage } from "../raster/rgbaImage.js";
 import { pngFile, predict } from "./pngChunks.js";
-import type { RgbaImage } from "./rgbaImage.js";
 
 // A PNG's pixels, whatever its colour type, as 8-bit RGBA.
 export function decodePng(bytes: Uint8Array): RgbaImage {

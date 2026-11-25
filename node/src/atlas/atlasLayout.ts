@@ -1,4 +1,4 @@
-import type { Point } from "./geometry.js";
+import type { Point } from "../raster/geometry.js";
 
 export interface AtlasItem<T> {
   rectangles: readonly { width: number; height: number }[];

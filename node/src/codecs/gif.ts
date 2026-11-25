@@ -1,5 +1,5 @@
 // Animated GIF encoding with exact palettes and binary alpha.
-import type { RgbaImage } from "./rgbaImage.js";
+import type { RgbaImage } from "../raster/rgbaImage.js";
 
 export interface GifOptions {
   // Milliseconds, one for every frame or one per frame; stored in hundredths, truncated.

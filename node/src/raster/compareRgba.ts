@@ -1,5 +1,5 @@
-import type { Rgb } from "../raster.js";
-import type { RgbaImage } from "../rgbaImage.js";
+import type { Rgb } from "./raster.js";
+import type { RgbaImage } from "./rgbaImage.js";
 
 interface Dimensions {
   width: number;

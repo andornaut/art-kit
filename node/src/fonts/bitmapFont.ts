@@ -1,7 +1,7 @@
-import type { Point, Rect } from "./geometry.js";
+import type { Point, Rect } from "../raster/geometry.js";
+import { composite, crop, type Rgb } from "../raster/raster.js";
+import type { RgbaImage } from "../raster/rgbaImage.js";
 import type { BitmapGlyph, GlyphKerning } from "./glyphAtlas.js";
-import { composite, crop, type Rgb } from "./raster.js";
-import type { RgbaImage } from "./rgbaImage.js";
 
 /** One unpacked RGBA page. Pixels, decoding, paths and caching remain caller-owned. */
 export interface BitmapFont {

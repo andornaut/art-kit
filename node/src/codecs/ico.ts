@@ -1,6 +1,6 @@
 // ICO encoding with PNG-embedded entries.
+import type { RgbaImage } from "../raster/rgbaImage.js";
 import { encodeRgbaPng } from "./png.js";
-import type { RgbaImage } from "./rgbaImage.js";
 
 const MAX_SIDE = 256;
 const PNG_OPTIONS = { deflateLevel: 9, deflateStrategy: 3, filterType: -1 };

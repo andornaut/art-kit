@@ -1,4 +1,4 @@
-import { blankImage, blitExtruded, type RgbaImage } from "./rgbaImage.js";
+import { blankImage, blitExtruded, type RgbaImage } from "../raster/rgbaImage.js";
 
 /** A packed glyph's code point, atlas rect and metrics, as the BMFont char element writes them. */
 export interface BitmapGlyph {

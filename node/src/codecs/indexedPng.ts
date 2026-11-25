@@ -1,7 +1,7 @@
 import { deflateSync } from "node:zlib";
 
+import type { RgbaImage } from "../raster/rgbaImage.js";
 import { pngFile } from "./pngChunks.js";
-import type { RgbaImage } from "./rgbaImage.js";
 
 // An 8-bit indexed PNG holds at most this many colours, each an RGBA value: PLTE holds the RGB
 // and tRNS the alpha.
