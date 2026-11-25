@@ -80,7 +80,7 @@ test("rejects duplicate ordered kerning pairs even when their amounts differ", (
   assert.throws(
     () =>
       build({ ...options, kernings: [...kernings, { first: 106, second: 32, amount: 0 }] }, glyphs),
-    { name: "RangeError", message: /Duplicate kerning pair \(106, 32\)/ },
+    { name: "RangeError", message: /Kerning pair \(106, 32\) must be unique/ },
   );
 });
 test("supports empty glyph sets and zero padding without inventing metrics", () => {

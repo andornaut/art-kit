@@ -109,7 +109,7 @@ test("spriteSheet rejects invalid columns, margins, durations and frames", () =>
     ...[0, -1, 1.5, true, NaN].map((columns) => [
       { ...options, columns },
       tags,
-      /positive integer/,
+      /Columns must be a positive safe integer/,
     ]),
     ...[
       [0, 0, 2, 0],
@@ -117,8 +117,8 @@ test("spriteSheet rejects invalid columns, margins, durations and frames", () =>
       [-1, 0, 0, 0],
       [0.5, 0, 0, 0],
     ].map((margins) => [{ ...options, margins }, tags, /leave a centre/]),
-    [options, [["t", [frame, frame], [100]]], /one duration/],
-    [options, [["t", [frame], NaN]], /finite/],
+    [options, [["t", [frame, frame], [100]]], /Tag t must have one duration per frame/],
+    [options, [["t", [frame], NaN]], /Duration must be finite/],
     [options, [["t", [frame, [["ff0000"]]], 100]], /2x2/],
     [
       options,
@@ -126,9 +126,9 @@ test("spriteSheet rejects invalid columns, margins, durations and frames", () =>
         ["t", [frame], 100],
         ["empty", [], 100],
       ],
-      /no frames/,
+      /Tag empty must have frames/,
     ],
-    [options, [], /must have pixels/],
+    [options, [], /First frame must have pixels/],
   ];
   for (const [opts, t, error] of cases) {
     assert.throws(() => spriteSheet(opts, t), error);

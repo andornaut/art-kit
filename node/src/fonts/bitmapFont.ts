@@ -1,3 +1,4 @@
+import { integerRange } from "../raster/checks.js";
 import { composite, crop } from "../raster/pixels.js";
 import type { RgbaImage } from "../raster/rgbaImage.js";
 import type { Point, Rect, Rgb } from "../raster/types.js";
@@ -37,17 +38,22 @@ export interface DrawBitmapTextOptions extends BitmapTextOptions {
   tint: Rgb;
 }
 
-function integer(value: number, min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER) {
+function integer(
+  value: number,
+  name: string,
+  min = Number.MIN_SAFE_INTEGER,
+  max = Number.MAX_SAFE_INTEGER,
+) {
   if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new RangeError(`Expected a safe integer in ${min}..${max}`);
+    throw new RangeError(`${name} must be ${integerRange(min, max)}`);
   }
   return value;
 }
 
 function scalar(value: number) {
-  integer(value, 0, 0x10ffff);
+  integer(value, "Code point", 0, 0x10ffff);
   if (value >= 0xd800 && value <= 0xdfff) {
-    throw new RangeError("Expected a Unicode scalar");
+    throw new RangeError("Code point must be a Unicode scalar");
   }
   return value;
 }
@@ -56,7 +62,7 @@ function xmlCharacters(value: string) {
   for (const char of value) {
     const cp = scalar(char.codePointAt(0)!);
     if ((cp < 32 && cp !== 9 && cp !== 10 && cp !== 13) || cp === 0xfffe || cp === 0xffff) {
-      throw new RangeError("Invalid XML character");
+      throw new RangeError("BMFont XML must have only XML characters");
     }
   }
   return value;
@@ -74,26 +80,26 @@ function unquote(value: string) {
         name[1].toLowerCase() === "x" ? Number.parseInt(name.slice(2), 16) : Number(name.slice(1));
       return xmlCharacters(String.fromCodePoint(scalar(cp)));
     }
-    throw new RangeError("Unsupported XML entity");
+    throw new RangeError("XML entity must be predefined or a character reference");
   });
 }
 
 function numberAttribute(attrs: Record<string, string>, key: string, min?: number, max?: number) {
   if (!Object.hasOwn(attrs, key) || !/^-?\d+$/.test(attrs[key])) {
-    throw new RangeError(`Missing or invalid ${key}`);
+    throw new RangeError(`${key} attribute must be an integer`);
   }
-  return integer(Number(attrs[key]), min, max);
+  return integer(Number(attrs[key]), `${key} attribute`, min, max);
 }
 
 function glyphRect(font: Pick<BitmapFont, "width" | "height">, g: BitmapGlyph) {
   scalar(g.id);
-  integer(g.x, 0, font.width);
-  integer(g.y, 0, font.height);
-  integer(g.width, 0, font.width - g.x);
-  integer(g.height, 0, font.height - g.y);
-  integer(g.xoffset);
-  integer(g.yoffset);
-  integer(g.xadvance);
+  integer(g.x, "Glyph x", 0, font.width);
+  integer(g.y, "Glyph y", 0, font.height);
+  integer(g.width, "Glyph width", 0, font.width - g.x);
+  integer(g.height, "Glyph height", 0, font.height - g.y);
+  integer(g.xoffset, "Glyph xoffset");
+  integer(g.yoffset, "Glyph yoffset");
+  integer(g.xadvance, "Glyph xadvance");
 }
 
 /**
@@ -104,7 +110,7 @@ function glyphRect(font: Pick<BitmapFont, "width" | "height">, g: BitmapGlyph) {
  */
 export function readBitmapFont(xml: string): BitmapFont {
   if (typeof xml !== "string") {
-    throw new RangeError("Expected BMFont XML text");
+    throw new RangeError("BMFont XML must be a string");
   }
   xmlCharacters(xml);
   // Only the bounded BMFont vocabulary below is admitted; no external XML resolution occurs.
@@ -129,13 +135,13 @@ export function readBitmapFont(xml: string): BitmapFont {
       if (/^\s*$/.test(xml.slice(offset))) {
         break;
       }
-      throw new RangeError("Malformed or unsupported BMFont XML");
+      throw new RangeError("BMFont XML must use supported markup");
     }
     offset = tokens.lastIndex;
     const tag = match[1];
     if (tag.startsWith("<!--")) {
       if (tag.slice(4, -3).includes("--")) {
-        throw new RangeError("Invalid XML comment");
+        throw new RangeError("XML comment must not contain --");
       }
       continue;
     }
@@ -145,7 +151,9 @@ export function readBitmapFont(xml: string): BitmapFont {
         seen.size ||
         !/^<\?xml\s+version=(?:"1\.0"|'1\.0')(?:\s+encoding=(?:"UTF-8"|'UTF-8'))?\s*\?>$/i.test(tag)
       ) {
-        throw new RangeError("Unsupported XML declaration");
+        throw new RangeError(
+          "XML declaration must come first with version 1.0 and optional UTF-8 encoding",
+        );
       }
       declaration = true;
       continue;
@@ -153,14 +161,14 @@ export function readBitmapFont(xml: string): BitmapFont {
     const name = /^<\/?([A-Za-z0-9]+)/.exec(tag)![1];
     if (tag.startsWith("</")) {
       if (tag !== `</${name}>` || stack.pop() !== name) {
-        throw new RangeError("Mismatched BMFont element");
+        throw new RangeError("BMFont end tag must match its start tag");
       }
       continue;
     }
     const attrs: Record<string, string> = Object.create(null);
     for (const [, key, , value] of tag.matchAll(/([A-Za-z][A-Za-z0-9]*)\s*=\s*(["'])(.*?)\2/gs)) {
       if (Object.hasOwn(attrs, key)) {
-        throw new RangeError(`Duplicate XML attribute ${key}`);
+        throw new RangeError(`XML attribute ${key} must be unique`);
       }
       attrs[key] = unquote(value);
     }
@@ -180,11 +188,11 @@ export function readBitmapFont(xml: string): BitmapFont {
       ].includes(path) ||
       (leaf && !tag.endsWith("/>"))
     ) {
-      throw new RangeError("Unsupported BMFont element or layout");
+      throw new RangeError(`BMFont element ${path} must be supported`);
     }
     if (name !== "char" && name !== "kerning") {
       if (seen.has(path)) {
-        throw new RangeError(`Duplicate BMFont element ${name}`);
+        throw new RangeError(`BMFont element ${name} must be unique`);
       }
       seen.add(path);
     }
@@ -200,7 +208,7 @@ export function readBitmapFont(xml: string): BitmapFont {
     } else if (name === "page") {
       numberAttribute(attrs, "id", 0, 0);
       if (!attrs.file) {
-        throw new RangeError("Expected a page filename");
+        throw new RangeError("Page file must not be empty");
       }
       page = attrs.file;
     } else if (name === "chars") {
@@ -221,7 +229,7 @@ export function readBitmapFont(xml: string): BitmapFont {
         yoffset: numberAttribute(attrs, "yoffset"),
       };
       if (glyphs.has(g.id)) {
-        throw new RangeError("Duplicate glyph code point");
+        throw new RangeError(`Glyph code point ${g.id} must be unique`);
       }
       glyphs.set(g.id, g);
     } else if (name === "kerning") {
@@ -232,7 +240,7 @@ export function readBitmapFont(xml: string): BitmapFont {
       };
       const key = `${k.first},${k.second}`;
       if (pairs.has(key)) {
-        throw new RangeError("Duplicate kerning pair");
+        throw new RangeError(`Kerning pair (${k.first}, ${k.second}) must be unique`);
       }
       pairs.add(key);
       kernings.push(k);
@@ -248,7 +256,7 @@ export function readBitmapFont(xml: string): BitmapFont {
     charCount !== glyphs.size ||
     kerningCount !== kernings.length
   ) {
-    throw new RangeError("Incomplete BMFont XML or mismatched counts");
+    throw new RangeError("BMFont XML must be complete with matching counts");
   }
   const font: BitmapFont = {
     base: numberAttribute(common, "base"),
@@ -270,26 +278,26 @@ interface Placement extends Point {
 }
 
 function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point, text: string) {
-  integer(font.base);
-  integer(font.lineHeight, 1, 16384);
-  integer(font.width, 1, 16384);
-  integer(font.height, 1, 16384);
-  integer(lineSpacing);
-  const pitch = integer(font.lineHeight + lineSpacing, 1);
+  integer(font.base, "Font base");
+  integer(font.lineHeight, "Font line height", 1, 16384);
+  integer(font.width, "Font width", 1, 16384);
+  integer(font.height, "Font height", 1, 16384);
+  integer(lineSpacing, "Line spacing");
+  const pitch = integer(font.lineHeight + lineSpacing, "Line pitch", 1);
   if (missing !== "reject" && missing !== "skip") {
     if (!missing || typeof missing !== "object" || !["reject", "skip"].includes(missing.absent)) {
-      throw new RangeError("Expected an explicit missing-glyph policy");
+      throw new RangeError('missing must be "reject", "skip" or { fallback, absent }');
     }
     scalar(missing.fallback);
   }
   if (typeof text !== "string") {
-    throw new RangeError("Expected text");
+    throw new RangeError("Text must be a string");
   }
   const pairs = new Map<string, number>();
   for (const { amount, first, second } of font.kernings) {
     scalar(first);
     scalar(second);
-    pairs.set(`${first},${second}`, integer(amount));
+    pairs.set(`${first},${second}`, integer(amount, "Kerning amount"));
   }
   const placements: Placement[] = [];
   const lineAdvances: number[] = [];
@@ -298,8 +306,8 @@ function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point
     top = Infinity,
     bottom = -Infinity;
   for (const [row, line] of text.split("\n").entries()) {
-    const y = integer(row * pitch);
-    integer(origin.y + y);
+    const y = integer(row * pitch, "Text position");
+    integer(origin.y + y, "Text position");
     let cursor = 0;
     let previous: number | undefined;
     for (const character of line) {
@@ -309,28 +317,28 @@ function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point
         (typeof missing === "object" ? font.glyphs.get(missing.fallback) : undefined);
       if (!g) {
         if (missing === "reject" || (typeof missing === "object" && missing.absent === "reject")) {
-          throw new RangeError(`Missing glyph U+${code.toString(16).toUpperCase()}`);
+          throw new RangeError(`Glyph U+${code.toString(16).toUpperCase()} must be in the font`);
         }
         continue;
       }
       glyphRect(font, g);
       if (previous !== undefined) {
-        cursor = integer(cursor + (pairs.get(`${previous},${code}`) ?? 0));
-        integer(origin.x + cursor);
+        cursor = integer(cursor + (pairs.get(`${previous},${code}`) ?? 0), "Text position");
+        integer(origin.x + cursor, "Text position");
       }
       if (g.width && g.height) {
-        const x0 = integer(cursor + g.xoffset),
-          y0 = integer(y + g.yoffset);
-        const x1 = integer(x0 + g.width),
-          y1 = integer(y0 + g.height);
+        const x0 = integer(cursor + g.xoffset, "Text position"),
+          y0 = integer(y + g.yoffset, "Text position");
+        const x1 = integer(x0 + g.width, "Text position"),
+          y1 = integer(y0 + g.height, "Text position");
         left = Math.min(left, x0);
         right = Math.max(right, x1);
         top = Math.min(top, y0);
         bottom = Math.max(bottom, y1);
         placements.push({ glyph: g, x: x0, y: y0 });
       }
-      cursor = integer(cursor + g.xadvance);
-      integer(origin.x + cursor);
+      cursor = integer(cursor + g.xadvance, "Text position");
+      integer(origin.x + cursor, "Text position");
       previous = code;
     }
     lineAdvances.push(cursor);
@@ -340,15 +348,15 @@ function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point
       left === Infinity
         ? undefined
         : {
-            height: integer(bottom - top, 0),
-            width: integer(right - left, 0),
+            height: integer(bottom - top, "Text bounds height", 0),
+            width: integer(right - left, "Text bounds width", 0),
             x: left,
             y: top,
           },
-    height: integer((lineAdvances.length - 1) * pitch + font.lineHeight, 1),
+    height: integer((lineAdvances.length - 1) * pitch + font.lineHeight, "Text height", 1),
     lineAdvances,
   };
-  integer(origin.y + measurement.height);
+  integer(origin.y + measurement.height, "Text position");
   return { measurement, placements };
 }
 
@@ -357,14 +365,14 @@ export function measureBitmapText(options: BitmapTextOptions, text: string): Bit
   return layout(options, { x: 0, y: 0 }, text).measurement;
 }
 
-function image(value: RgbaImage) {
-  integer(value.width, 0);
-  integer(value.height, 0);
+function image(name: string, value: RgbaImage) {
+  integer(value.width, `${name} width`, 0);
+  integer(value.height, `${name} height`, 0);
   if (
     !(value.data instanceof Uint8Array) ||
-    value.data.length !== integer(value.width * value.height * 4, 0)
+    value.data.length !== integer(value.width * value.height * 4, `${name} byte length`, 0)
   ) {
-    throw new RangeError("Expected width * height * 4 RGBA bytes");
+    throw new RangeError(`${name} data must be a Uint8Array of width * height * 4 bytes`);
   }
 }
 
@@ -379,29 +387,29 @@ export function drawBitmapText(
   target: RgbaImage,
 ): void {
   const { at, atlas, font, tint } = options;
-  image(atlas);
-  image(target);
+  image("Atlas", atlas);
+  image("Target", target);
   if (
     atlas.width !== font.width ||
     atlas.height !== font.height ||
     atlas.data.buffer === target.data.buffer
   ) {
-    throw new RangeError("Expected a matching atlas separate from target");
+    throw new RangeError("Atlas must match the font size and be separate from target");
   }
-  integer(at.x);
-  integer(at.y);
+  integer(at.x, "at.x");
+  integer(at.y, "at.y");
   if (
     !Array.isArray(tint) ||
     tint.length !== 3 ||
     !Array.from(tint).every((v) => Number.isInteger(v) && v >= 0 && v <= 255)
   ) {
-    throw new RangeError("Expected three RGB tint bytes");
+    throw new RangeError("Tint must be three integers in 0..255");
   }
   const { placements } = layout(options, at, text);
   const positioned = placements.map(({ glyph, x, y }) => {
-    const point = { x: integer(at.x + x), y: integer(at.y + y) };
-    integer(point.x + glyph.width);
-    integer(point.y + glyph.height);
+    const point = { x: integer(at.x + x, "Text position"), y: integer(at.y + y, "Text position") };
+    integer(point.x + glyph.width, "Text position");
+    integer(point.y + glyph.height, "Text position");
     return { glyph, point };
   });
   for (const { glyph, point } of positioned) {

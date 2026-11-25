@@ -77,7 +77,7 @@ export function composeSheet(
   checkPositive(cellWidth, "Cell width");
   checkPositive(cellHeight, "Cell height");
   if (!images.length) {
-    throw new RangeError("Sheet requires images");
+    throw new RangeError("Sheet must have images");
   }
   images.forEach(checkImage);
   const sheet = filledImage(
@@ -125,7 +125,7 @@ export function composeContactSheet(
     return grounds.map((ground) => ({ frames, ground }));
   });
   if (!rows.length || rows.some(({ frames }) => !frames.length)) {
-    throw new RangeError("Contact sheet requires frames and grounds");
+    throw new RangeError("Contact sheet must have frames and grounds");
   }
   const ink = (name: string): Rgba => {
     const value = resolveRgb(name);

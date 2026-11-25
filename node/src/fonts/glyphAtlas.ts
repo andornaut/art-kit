@@ -1,3 +1,4 @@
+import { integerRange } from "../raster/checks.js";
 import { blankImage, blitExtruded, type RgbaImage } from "../raster/rgbaImage.js";
 
 /** A packed glyph's code point, atlas rect and metrics, as the BMFont char element writes them. */
@@ -47,6 +48,21 @@ export interface PackedGlyphAtlasOptions extends GlyphAtlasCommonOptions {
 }
 export type GlyphAtlasOptions = PaddedGlyphAtlasOptions | PackedGlyphAtlasOptions;
 export type GlyphAtlasLayout = NonNullable<GlyphAtlasOptions["layout"]>;
+/** The packed atlas image, its metadata and BMFont XML; `antialias` is set only when packed. */
+export interface GlyphAtlas {
+  image: RgbaImage;
+  metadata: {
+    antialias?: boolean;
+    base: number;
+    face: string;
+    glyphs: Map<string, BitmapGlyph>;
+    kernings: GlyphKerning[];
+    layout: GlyphAtlasLayout;
+    lineHeight: number;
+    size: number;
+  };
+  xml: string;
+}
 function integer(
   value: number,
   label: string,
@@ -54,21 +70,21 @@ function integer(
   max = Number.MAX_SAFE_INTEGER,
 ) {
   if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new RangeError(`${label} must be an integer in ${min}..${max}`);
+    throw new RangeError(`${label} must be ${integerRange(min, max)}`);
   }
   return value;
 }
 function scalar(id: number) {
   integer(id, "Code point", 0, 0x10ffff);
   if (id >= 0xd800 && id <= 0xdfff) {
-    throw new RangeError("Invalid Unicode scalar");
+    throw new RangeError("Code point must be a Unicode scalar");
   }
   return id;
 }
-function quote(value: string, singleQuotes = false) {
+function quote(name: string, singleQuotes: boolean, value: string) {
   // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ud800-\udfff\ufffe\uffff]/u.test(value)) {
-    throw new RangeError("Invalid XML attribute character");
+    throw new RangeError(`${name} must have only XML characters`);
   }
   const text = value
     .replaceAll("&", "&amp;")
@@ -91,7 +107,7 @@ function quote(value: string, singleQuotes = false) {
 export function buildBitmapFontFromGlyphs(
   options: GlyphAtlasOptions,
   supplied: ReadonlyMap<string, SuppliedBitmapGlyph>,
-) {
+): GlyphAtlas {
   const layout: GlyphAtlasLayout = options.layout ?? "padded";
   if (layout !== "padded" && layout !== "packed") {
     throw new RangeError("Layout must be padded or packed");
@@ -99,13 +115,13 @@ export function buildBitmapFontFromGlyphs(
   const packed = layout === "packed";
   const loose = options as { padding?: unknown; antialias?: unknown };
   if (packed && loose.padding !== undefined) {
-    throw new RangeError("Packed layout has fixed 1 px spacing and no padding");
+    throw new RangeError("Padding must be omitted for the packed layout");
   }
   if (!packed && loose.antialias !== undefined) {
-    throw new RangeError("antialias applies only to the packed layout");
+    throw new RangeError("antialias must be omitted for the padded layout");
   }
   if (packed && typeof loose.antialias !== "boolean") {
-    throw new RangeError("Packed layout requires a boolean antialias");
+    throw new RangeError("antialias must be a boolean for the packed layout");
   }
   const width = integer(options.atlasWidth, "Atlas width", 1, 16384);
   const limit = 16384;
@@ -115,8 +131,8 @@ export function buildBitmapFontFromGlyphs(
   const size = integer(options.size, "Size", 1, 16384);
   const base = integer(options.base, "Base");
   const lineHeight = integer(options.lineHeight, "Line height", 1, 16384);
-  const face = quote(options.face, packed),
-    page = quote(`${options.key}.png`, packed);
+  const face = quote("Face", packed, options.face),
+    page = quote("Key", packed, `${options.key}.png`);
   const glyphs = new Map<string, BitmapGlyph>();
   // Packed starts at the origin and wraps when the glyph plus its trailing spacing pixel overflows.
   const spacing = packed ? 1 : padding;
@@ -132,11 +148,11 @@ export function buildBitmapFontFromGlyphs(
     const w = image ? integer(image.width, "Glyph width", 1, 16384) : 0;
     const h = image ? integer(image.height, "Glyph height", 1, 16384) : 0;
     if (image && (!(image.data instanceof Uint8Array) || image.data.length !== w * h * 4)) {
-      throw new RangeError("Glyph data must contain exactly width * height * 4 bytes");
+      throw new RangeError("Glyph data must be a Uint8Array of width * height * 4 bytes");
     }
     if (image) {
       if (w + 2 * padding > width) {
-        throw new RangeError(`Glyph ${char} exceeds atlas width`);
+        throw new RangeError(`Glyph ${char} must fit the atlas width`);
       }
       if (x + w + spacing > width) {
         x = padding;
@@ -144,7 +160,7 @@ export function buildBitmapFontFromGlyphs(
         rowHeight = 0;
       }
       if (y + h + padding > limit) {
-        throw new RangeError("Glyph atlas exceeds maximum height");
+        throw new RangeError(`Atlas height must be at most ${limit}`);
       }
     }
     // Field order is the BMFont char attribute order.
@@ -172,7 +188,7 @@ export function buildBitmapFontFromGlyphs(
     }
   }
   if (height > limit) {
-    throw new RangeError("Glyph atlas exceeds maximum height");
+    throw new RangeError(`Atlas height must be at most ${limit}`);
   }
   const pairs = new Set<string>();
   const kernings = (options.kernings ?? []).map((k) => {
@@ -183,7 +199,7 @@ export function buildBitmapFontFromGlyphs(
     }
     const pair = `${first},${second}`;
     if (pairs.has(pair)) {
-      throw new RangeError(`Duplicate kerning pair (${first}, ${second})`);
+      throw new RangeError(`Kerning pair (${first}, ${second}) must be unique`);
     }
     pairs.add(pair);
     return { amount: integer(k.amount, "Kerning amount"), first, second };

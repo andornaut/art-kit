@@ -1,4 +1,4 @@
-// Argument checks shared by the raster operations; each throws RangeError naming the argument.
+// Argument checks shared across the package; each throws RangeError naming the argument.
 import type { RgbaImage } from "./rgbaImage.js";
 import type { Plane, Point, Rect } from "./types.js";
 
@@ -54,7 +54,14 @@ export function checkColour(length: number, value: readonly number[]): void {
   }
   for (const channel of value) {
     if (!Number.isInteger(channel) || channel < 0 || channel > 255) {
-      throw new RangeError("Colour channel must be an integer from 0 to 255");
+      throw new RangeError("Colour channel must be an integer in 0..255");
     }
   }
+}
+
+// The constraint an integer check names: a safe integer when unbounded, else its inclusive range.
+export function integerRange(min: number, max: number): string {
+  return min === Number.MIN_SAFE_INTEGER && max === Number.MAX_SAFE_INTEGER
+    ? "a safe integer"
+    : `an integer in ${min}..${max}`;
 }

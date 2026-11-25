@@ -47,7 +47,7 @@ for (const fixture of fixtures.cases) {
       // The legacy reference contains a trailing duplicate with a zero adjustment.
       assert.throws(() => build(options, glyphs), {
         name: "RangeError",
-        message: /Duplicate kerning pair \(65, 87\)/,
+        message: /Kerning pair \(65, 87\) must be unique/,
       });
       options.kernings = options.kernings.slice(0, -1);
       expectedXml = expectedXml
@@ -108,6 +108,6 @@ test("packed layout requires antialias and rejects padding; padded rejects antia
   }
   assert.throws(
     () => build({ ...base, layout: "packed", antialias: false }, glyphs),
-    /exceeds atlas width/,
+    /must fit the atlas width/,
   );
 });

@@ -47,7 +47,8 @@ development diagnostic, not a test-only or game runtime API.
 
 The ten portable import graphs in the migration map have no Node or external codec value imports. In
 particular, `atlasBuild` takes read/decode/encode callbacks; `bitmapFont` imports
-the raster pixel operations at runtime, with glyph-atlas definitions imported only as types.
+the raster pixel operations and argument checks at runtime, with glyph-atlas definitions imported
+only as types.
 This is a static portability distinction, not a browser qualification claim.
 
 The other eight modules require Node directly or transitively. `fonts` statically loads

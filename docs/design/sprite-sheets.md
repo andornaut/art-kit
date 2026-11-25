@@ -3,7 +3,8 @@
 `atlasLayout` shelf-packs items against candidate widths and size limits, with optional padding
 between cells. `atlasBuild` runs up to 16 concurrent source reads and decodes, then up to 16
 concurrent page encodes. `spriteSheet` reproduces Aseprite 1.2.30's decoded RGBA and exact json-hash
-text without Aseprite. It uses the shared RGBA PNG encoder, so PNG bytes can differ from Aseprite's exports.
+text without Aseprite. It renders frames through `raster`'s `frameToRgba` and `composeSheet` and uses the
+shared RGBA PNG encoder, so PNG bytes can differ from Aseprite's exports.
 The encoders are `png` (decoding, RGBA and opaque RGB encoding, streamed and
 byte-identical to pngjs 7.0.0), `indexedPng`, `webp` (lossless and configurable lossy encoding, plus RGBA
 decoding), `gif` (exact palettes and binary alpha) and `ico` (PNG entries). Callers choose formats,

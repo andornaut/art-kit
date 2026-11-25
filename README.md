@@ -30,13 +30,13 @@ The package ships TypeScript declarations and explicit leaf subpaths. Canonical 
 | `woff2`       | WOFF2 encoding and optional text-driven subsetting                                                                                        | TrueType bytes, strings and optional font names                          |
 | `compareRgba` | Raw and composited RGBA comparisons for asset development                                                                                 | Decoded images and comparison backgrounds                                |
 
-Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject. Only `fonts` needs Skia; every other subpath is canvas-free. Numerical transforms use the rounding and intermediate precision specified below.
+Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject. Validation errors in `raster`, `draw`, `compareRgba`, `glyphAtlas`, `bitmapFont` and `spriteSheet` read `<subject> must <constraint>`, such as `Columns must be a positive safe integer`, naming the argument, option or input. Only `fonts` needs Skia; every other subpath is canvas-free. Numerical transforms use the rounding and intermediate precision specified below.
 
 See [API entry points](docs/api-entry-points.md) for import dependencies, the shared kit namespace rules and the v0.28 migration map.
 
 ## Pixel frames and images
 
-A `Frame` is rows of hex colours (opaque) or `null` (clear). An `RgbaImage` is `{ data, width, height }` with straight (non-premultiplied) RGBA bytes; an opaque (RGB) image has alpha 255. A `Tag` is `[name, frames, milliseconds]`, with one duration for every frame or one each.
+A `Frame` is rows of hex colours (opaque) or `null` (clear). An `RgbaImage` is `{ data, width, height }` with straight (non-premultiplied) RGBA bytes; an opaque (RGB) image has alpha 255. `rgbaImage` also exports the `Point` (`{ x, y }`) and `Rect` (`{ x, y, width, height }`) types its functions take. A `Tag` is `[name, frames, milliseconds]`, with one duration for every frame or one each.
 
 ```ts
 import { Grid } from "@andornaut/art-kit/build/grid";
@@ -192,7 +192,7 @@ process.exitCode = await buildCommand(
 | `layout: "padded"` (default)                                                     | Insets and spaces glyphs by `padding` (default 1), fits the height to the last row and always writes a kernings element                                                                                                                                    |
 | `layout: "packed"`                                                               | Requires `antialias`, rejects `padding`: 1 px spacing from (0, 0), a power-of-two height, every info attribute, and no kernings element when there are none                                                                                                |
 
-Antialiasing and hinting default to true; synthesis and cross-glyph substitutions are disabled. Requiring every character in the file's cmap keeps Skia from substituting a system font. Supply each ordered kerning pair at most once. The tests compare valid output byte for byte with frozen references in `node/tests/fixtures/fonts` and `node/tests/fixtures/bmfont-packed.json` and verify that a legacy duplicate pair is rejected.
+Antialiasing and hinting default to true; synthesis and cross-glyph substitutions are disabled. Requiring every character in the file's cmap keeps Skia from substituting a system font. Supply each ordered kerning pair at most once. `glyphAtlas` exports the result type as `GlyphAtlas`. The tests compare valid output byte for byte with frozen references in `node/tests/fixtures/fonts` and `node/tests/fixtures/bmfont-packed.json` and verify that a legacy duplicate pair is rejected.
 
 ```ts
 import { writeFile } from "node:fs/promises";

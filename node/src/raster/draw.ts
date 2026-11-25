@@ -56,7 +56,7 @@ const f32 = Math.fround;
 
 function checkColour(colour: Rgba): Rgba {
   if (colour.length !== 4 || colour.some((v) => !Number.isInteger(v) || v < 0 || v > 255)) {
-    throw new RangeError(`Colour must be four integers in 0..255: ${String(colour)}`);
+    throw new RangeError("Colour must be four integers in 0..255");
   }
   return colour;
 }

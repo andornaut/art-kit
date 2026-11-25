@@ -89,10 +89,13 @@ test("bitmap font measures signed metrics, original-code-point fallback and lite
   font.glyphs.delete(63);
   assert.deepEqual(measureBitmapText({ ...opts, font }, "AΩV").lineAdvances, [4]);
   assert.deepEqual(measureBitmapText({ ...opts, missing: "skip" }, "AΩV").lineAdvances, [4]);
-  assert.throws(() => measureBitmapText({ ...opts, missing: "reject" }, "Ω"), /Missing glyph/);
+  assert.throws(
+    () => measureBitmapText({ ...opts, missing: "reject" }, "Ω"),
+    /Glyph U\+3A9 must be in the font/,
+  );
   assert.throws(
     () => measureBitmapText({ ...opts, font, missing: { fallback: 63, absent: "reject" } }, "Ω"),
-    /Missing glyph/,
+    /Glyph U\+3A9 must be in the font/,
   );
 });
 
@@ -181,5 +184,8 @@ test("bitmap font validates layout and images atomically before drawing", () => 
     assert.deepEqual(target.data, before);
   }
   const alias = { ...opts.atlas, data: opts.atlas.data.subarray() };
-  assert.throws(() => drawBitmapText(opts, "A", alias), /separate/);
+  assert.throws(
+    () => drawBitmapText(opts, "A", alias),
+    /must match the font size and be separate from target/,
+  );
 });

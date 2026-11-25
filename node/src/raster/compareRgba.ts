@@ -43,9 +43,7 @@ function validate(image: RgbaImage): void {
     !(image.data instanceof Uint8Array) ||
     image.data.length !== image.width * image.height * 4
   ) {
-    throw new RangeError(
-      "Expected positive safe dimensions and exactly width * height * 4 RGBA bytes",
-    );
+    throw new RangeError("Image must have positive dimensions and width * height * 4 bytes");
   }
 }
 
@@ -63,7 +61,7 @@ export function compareRgba(
   actual: RgbaImage,
 ): RgbaComparison {
   if (!Array.isArray(options?.backgrounds)) {
-    throw new RangeError("Expected an explicit array of RGB backgrounds");
+    throw new RangeError("Backgrounds must be an array");
   }
   const backgrounds: Rgb[] = [];
   for (const background of options.backgrounds) {
@@ -72,7 +70,7 @@ export function compareRgba(
       background.length !== 3 ||
       !Array.from(background).every((v) => Number.isInteger(v) && v >= 0 && v <= 255)
     ) {
-      throw new RangeError("Backgrounds must contain exactly three RGB bytes");
+      throw new RangeError("Background must be three integers in 0..255");
     }
     backgrounds.push([background[0], background[1], background[2]]);
   }

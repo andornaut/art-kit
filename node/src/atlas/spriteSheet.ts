@@ -5,8 +5,9 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
 import { encodeRgbaPng } from "../codecs/png.js";
+import { checkPositive } from "../raster/checks.js";
 import { rgb } from "../raster/colour.js";
-import type { Tag } from "../raster/frames.js";
+import { composeSheet, frameToRgba, type Tag } from "../raster/frames.js";
 import type { Frame } from "../raster/grid.js";
 import type { RgbaImage } from "../raster/rgbaImage.js";
 
@@ -44,7 +45,7 @@ function escape(text: string): string {
 // within 1..65535.
 function storedDuration(milliseconds: number): number {
   if (!Number.isFinite(milliseconds)) {
-    throw new RangeError("Durations must be finite");
+    throw new RangeError("Duration must be finite");
   }
   return Math.min(65535, Math.max(1, Math.trunc((milliseconds / 1000) * 1000)));
 }
@@ -66,18 +67,18 @@ function layoutOf(tags: readonly Tag[]): Layout {
   const height = first?.length ?? 0;
   const width = first?.[0]?.length ?? 0;
   if (width === 0 || height === 0) {
-    throw new RangeError("The first frame must have pixels");
+    throw new RangeError("First frame must have pixels");
   }
   const frames: Frame[] = [];
   const durations: number[] = [];
   const ranges: [string, number, number][] = [];
   for (const [name, images, ms] of tags) {
     if (images.length === 0) {
-      throw new RangeError(`Tag ${name} has no frames`);
+      throw new RangeError(`Tag ${name} must have frames`);
     }
     const times = typeof ms === "number" ? images.map(() => ms) : ms;
     if (times.length !== images.length) {
-      throw new RangeError("Each frame requires one duration");
+      throw new RangeError(`Tag ${name} must have one duration per frame`);
     }
     ranges.push([name, frames.length, frames.length + images.length - 1]);
     images.forEach((frame, i) => {
@@ -91,24 +92,13 @@ function layoutOf(tags: readonly Tag[]): Layout {
   return { durations, frames, height, ranges, width };
 }
 
+// The frames in row order, columns to a row; the sheet is never wider than its frames.
 function render(columns: number, layout: Layout): RgbaImage {
   const { frames, height, width } = layout;
-  const across = Math.min(columns, frames.length);
-  const sheetWidth = across * width;
-  const sheetHeight = Math.ceil(frames.length / columns) * height;
-  const data = new Uint8Array(sheetWidth * sheetHeight * 4);
-  frames.forEach((frame, i) => {
-    const left = (i % columns) * width;
-    const top = Math.floor(i / columns) * height;
-    frame.forEach((row, y) => {
-      row.forEach((colour, x) => {
-        if (colour) {
-          data.set([...rgb(colour), 255], ((top + y) * sheetWidth + left + x) * 4);
-        }
-      });
-    });
-  });
-  return { data, height: sheetHeight, width: sheetWidth };
+  return composeSheet(
+    { cellHeight: height, cellWidth: width, columns: Math.min(columns, frames.length) },
+    frames.map((frame) => frameToRgba({ resolveRgb: rgb }, frame)),
+  );
 }
 
 function json(
@@ -168,8 +158,8 @@ function json(
 // truncated to whole milliseconds within 1..65535, so 1001 becomes 1000.
 export function spriteSheet(options: SpriteSheetOptions, tags: readonly Tag[]): SpriteSheet {
   const { columns, margins } = options;
-  if (columns !== undefined && (!Number.isSafeInteger(columns) || columns <= 0)) {
-    throw new RangeError("columns must be a positive integer");
+  if (columns !== undefined) {
+    checkPositive(columns, "Columns");
   }
   const layout = layoutOf(tags);
   if (margins) {
