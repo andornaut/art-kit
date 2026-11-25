@@ -52,7 +52,7 @@ export type GlyphAtlasLayout = NonNullable<GlyphAtlasOptions["layout"]>;
 export interface GlyphAtlas {
   image: RgbaImage;
   metadata: {
-    antialias?: boolean;
+    antialias?: boolean | undefined;
     base: number;
     face: string;
     glyphs: Map<string, BitmapGlyph>;
