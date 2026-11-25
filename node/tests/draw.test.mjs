@@ -112,6 +112,14 @@ test("colours must be four bytes", () => {
   assert.throws(() => point([256, 0, 0, 255], [{ x: 0, y: 0 }], image), RangeError);
 });
 
+test("bounds are read before the style is checked", () => {
+  const image = { data: new Uint8Array(4), height: 1, width: 1 };
+  const style = { fill: [256, 0, 0, 255] };
+  assert.throws(() => rectangle(style, undefined, image), TypeError);
+  assert.throws(() => ellipse(style, undefined, image), TypeError);
+  assert.throws(() => arc(style, undefined, 0, 90, image), TypeError);
+});
+
 test("draw exports one function per operation", async () => {
   const draw = await import("@andornaut/art-kit/build/draw");
   assert.deepEqual(Object.keys(draw).sort(), [
