@@ -19,7 +19,7 @@ function outline(
     return out;
   }
   if (!edge) {
-    throw new Error("An outline colour rule is required");
+    throw new Error("Outline colour rule must be set");
   }
   const height = frame.length,
     width = frame[0].length;

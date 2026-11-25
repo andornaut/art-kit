@@ -2,7 +2,7 @@
 /** The bytes of a six-digit hexadecimal colour without "#"; any other string throws RangeError. */
 export function rgb(colour: string): [number, number, number] {
   if (!/^[0-9a-f]{6}$/i.test(colour)) {
-    throw new RangeError(`Invalid hexadecimal colour ${JSON.stringify(colour)}`);
+    throw new RangeError(`Colour ${JSON.stringify(colour)} must be six hexadecimal digits`);
   }
   return [0, 2, 4].map((i) => Number.parseInt(colour.slice(i, i + 2), 16)) as [
     number,
@@ -27,7 +27,7 @@ export function contrast(a: string, b: string): number {
 type Triple = readonly [number, number, number];
 function triple(values: Triple): Triple {
   if (values.length !== 3 || !values.every((v) => typeof v === "number" && Number.isFinite(v))) {
-    throw new RangeError("Expected three finite numbers");
+    throw new RangeError("Colour must be three finite numbers");
   }
   return values;
 }
@@ -52,20 +52,20 @@ export function oklabToSrgb(
   colour: Triple,
 ): [number, number, number] {
   if (options?.gamut !== "clip" && options?.gamut !== "reject") {
-    throw new RangeError("Expected gamut clip or reject");
+    throw new RangeError('Gamut must be "clip" or "reject"');
   }
   if (options?.rounding !== "half-even" && options?.rounding !== "half-up") {
-    throw new RangeError("Expected rounding half-even or half-up");
+    throw new RangeError('Rounding must be "half-even" or "half-up"');
   }
   if (!Array.isArray(colour) || colour.length !== 3 || !Array.from(colour).every(Number.isFinite)) {
-    throw new RangeError("Expected three finite numbers");
+    throw new RangeError("Colour must be three finite numbers");
   }
   const values = linearLab(colour);
   if (!values.every(Number.isFinite)) {
-    throw new RangeError("Expected finite linear RGB channels");
+    throw new RangeError("Linear RGB channels must be finite");
   }
   if (options.gamut === "reject" && values.some((v) => v < 0 || v > 1)) {
-    throw new RangeError("Colour is outside the sRGB gamut");
+    throw new RangeError("Colour must be inside the sRGB gamut");
   }
   return values.map((value) => {
     const level = encoded(value);
@@ -80,7 +80,7 @@ export function oklabToSrgb(
 export function srgbToOklab(colour: Triple): [number, number, number] {
   triple(colour);
   if (!colour.every((v) => Number.isInteger(v) && v >= 0 && v <= 255)) {
-    throw new RangeError("Expected RGB bytes in 0..255");
+    throw new RangeError("Colour must be three integers in 0..255");
   }
   const [r, g, b] = colour.map((c) => {
     const v = c / 255;

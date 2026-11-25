@@ -63,19 +63,18 @@ export interface GlyphAtlas {
   };
   xml: string;
 }
-function integer(
-  value: number,
-  label: string,
-  min = Number.MIN_SAFE_INTEGER,
-  max = Number.MAX_SAFE_INTEGER,
-) {
+const SAFE_MIN = Number.MIN_SAFE_INTEGER;
+const SAFE_MAX = Number.MAX_SAFE_INTEGER;
+
+// value, when it is a safe integer in min..max.
+function integer(name: string, min: number, max: number, value: number) {
   if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new RangeError(`${label} must be ${integerRange(min, max)}`);
+    throw new RangeError(`${name} must be ${integerRange(min, max)}`);
   }
   return value;
 }
 function scalar(id: number) {
-  integer(id, "Code point", 0, 0x10ffff);
+  integer("Code point", 0, 0x10ffff, id);
   if (id >= 0xd800 && id <= 0xdfff) {
     throw new RangeError("Code point must be a Unicode scalar");
   }
@@ -123,14 +122,14 @@ export function buildBitmapFontFromGlyphs(
   if (packed && typeof loose.antialias !== "boolean") {
     throw new RangeError("antialias must be a boolean for the packed layout");
   }
-  const width = integer(options.atlasWidth, "Atlas width", 1, 16384);
+  const width = integer("Atlas width", 1, 16384, options.atlasWidth);
   const limit = 16384;
   const padding = packed
     ? 0
-    : integer((options as PaddedGlyphAtlasOptions).padding ?? 1, "Padding", 0, 16384);
-  const size = integer(options.size, "Size", 1, 16384);
-  const base = integer(options.base, "Base");
-  const lineHeight = integer(options.lineHeight, "Line height", 1, 16384);
+    : integer("Padding", 0, 16384, (options as PaddedGlyphAtlasOptions).padding ?? 1);
+  const size = integer("Size", 1, 16384, options.size);
+  const base = integer("Base", SAFE_MIN, SAFE_MAX, options.base);
+  const lineHeight = integer("Line height", 1, 16384, options.lineHeight);
   const face = quote("Face", packed, options.face),
     page = quote("Key", packed, `${options.key}.png`);
   const glyphs = new Map<string, BitmapGlyph>();
@@ -145,8 +144,8 @@ export function buildBitmapFontFromGlyphs(
     }
     const id = scalar(char.codePointAt(0)!);
     const { image } = source;
-    const w = image ? integer(image.width, "Glyph width", 1, 16384) : 0;
-    const h = image ? integer(image.height, "Glyph height", 1, 16384) : 0;
+    const w = image ? integer("Glyph width", 1, 16384, image.width) : 0;
+    const h = image ? integer("Glyph height", 1, 16384, image.height) : 0;
     if (image && (!(image.data instanceof Uint8Array) || image.data.length !== w * h * 4)) {
       throw new RangeError("Glyph data must be a Uint8Array of width * height * 4 bytes");
     }
@@ -171,9 +170,9 @@ export function buildBitmapFontFromGlyphs(
       y: image ? y : 0,
       width: w,
       height: h,
-      xoffset: integer(source.xoffset, "xoffset"),
-      yoffset: integer(source.yoffset, "yoffset"),
-      xadvance: integer(source.xadvance, "xadvance"),
+      xoffset: integer("xoffset", SAFE_MIN, SAFE_MAX, source.xoffset),
+      yoffset: integer("yoffset", SAFE_MIN, SAFE_MAX, source.yoffset),
+      xadvance: integer("xadvance", SAFE_MIN, SAFE_MAX, source.xadvance),
     });
     /* eslint-enable sort-keys */
     if (image) {
@@ -202,7 +201,7 @@ export function buildBitmapFontFromGlyphs(
       throw new RangeError(`Kerning pair (${first}, ${second}) must be unique`);
     }
     pairs.add(pair);
-    return { amount: integer(k.amount, "Kerning amount"), first, second };
+    return { amount: integer("Kerning amount", SAFE_MIN, SAFE_MAX, k.amount), first, second };
   });
   const image = blankImage(width, height);
   for (const [char, source] of supplied) {

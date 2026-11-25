@@ -31,7 +31,7 @@ test("outline uses original neighbours in top bottom left right priority and clo
   assert.equal(out[2][1], "D");
   assert.equal(f[1][1], null);
   assert.deepEqual(g.outlined({ enabled: false }), f);
-  assert.throws(() => g.outlined(), /outline colour rule/);
+  assert.throws(() => g.outlined(), /Outline colour rule must be set/);
   // A null edge leaves the pixel clear.
   const skipped = g.outlined({ edge: (c) => (c === "a" ? null : c.toUpperCase()) });
   assert.equal(skipped[1][1], null);
@@ -143,6 +143,10 @@ test("hex channels and WCAG contrast", () => {
   for (const invalid of ["abcde", "aabbccdd", "#aabbcc", "abc", "", "gg0000", " aabbcc"]) {
     assert.throws(() => rgb(invalid), RangeError, invalid);
   }
+  assert.throws(() => rgb("abc"), {
+    name: "RangeError",
+    message: 'Colour "abc" must be six hexadecimal digits',
+  });
   assert.equal(contrast("000000", "ffffff"), 21);
 });
 

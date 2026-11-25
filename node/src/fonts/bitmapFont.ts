@@ -38,20 +38,24 @@ export interface DrawBitmapTextOptions extends BitmapTextOptions {
   tint: Rgb;
 }
 
-function integer(
-  value: number,
-  name: string,
-  min = Number.MIN_SAFE_INTEGER,
-  max = Number.MAX_SAFE_INTEGER,
-) {
+const SAFE_MIN = Number.MIN_SAFE_INTEGER;
+const SAFE_MAX = Number.MAX_SAFE_INTEGER;
+
+// value, when it is a safe integer in min..max.
+function integer(name: string, min: number, max: number, value: number) {
   if (!Number.isSafeInteger(value) || value < min || value > max) {
     throw new RangeError(`${name} must be ${integerRange(min, max)}`);
   }
   return value;
 }
 
+// value, when it is a safe integer text coordinate.
+function position(value: number) {
+  return integer("Text position", SAFE_MIN, SAFE_MAX, value);
+}
+
 function scalar(value: number) {
-  integer(value, "Code point", 0, 0x10ffff);
+  integer("Code point", 0, 0x10ffff, value);
   if (value >= 0xd800 && value <= 0xdfff) {
     throw new RangeError("Code point must be a Unicode scalar");
   }
@@ -84,22 +88,27 @@ function unquote(value: string) {
   });
 }
 
-function numberAttribute(attrs: Record<string, string>, key: string, min?: number, max?: number) {
+function numberAttribute(
+  attrs: Record<string, string>,
+  key: string,
+  min = SAFE_MIN,
+  max = SAFE_MAX,
+) {
   if (!Object.hasOwn(attrs, key) || !/^-?\d+$/.test(attrs[key])) {
     throw new RangeError(`${key} attribute must be an integer`);
   }
-  return integer(Number(attrs[key]), `${key} attribute`, min, max);
+  return integer(`${key} attribute`, min, max, Number(attrs[key]));
 }
 
 function glyphRect(font: Pick<BitmapFont, "width" | "height">, g: BitmapGlyph) {
   scalar(g.id);
-  integer(g.x, "Glyph x", 0, font.width);
-  integer(g.y, "Glyph y", 0, font.height);
-  integer(g.width, "Glyph width", 0, font.width - g.x);
-  integer(g.height, "Glyph height", 0, font.height - g.y);
-  integer(g.xoffset, "Glyph xoffset");
-  integer(g.yoffset, "Glyph yoffset");
-  integer(g.xadvance, "Glyph xadvance");
+  integer("Glyph x", 0, font.width, g.x);
+  integer("Glyph y", 0, font.height, g.y);
+  integer("Glyph width", 0, font.width - g.x, g.width);
+  integer("Glyph height", 0, font.height - g.y, g.height);
+  integer("Glyph xoffset", SAFE_MIN, SAFE_MAX, g.xoffset);
+  integer("Glyph yoffset", SAFE_MIN, SAFE_MAX, g.yoffset);
+  integer("Glyph xadvance", SAFE_MIN, SAFE_MAX, g.xadvance);
 }
 
 /**
@@ -278,12 +287,12 @@ interface Placement extends Point {
 }
 
 function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point, text: string) {
-  integer(font.base, "Font base");
-  integer(font.lineHeight, "Font line height", 1, 16384);
-  integer(font.width, "Font width", 1, 16384);
-  integer(font.height, "Font height", 1, 16384);
-  integer(lineSpacing, "Line spacing");
-  const pitch = integer(font.lineHeight + lineSpacing, "Line pitch", 1);
+  integer("Font base", SAFE_MIN, SAFE_MAX, font.base);
+  integer("Font line height", 1, 16384, font.lineHeight);
+  integer("Font width", 1, 16384, font.width);
+  integer("Font height", 1, 16384, font.height);
+  integer("Line spacing", SAFE_MIN, SAFE_MAX, lineSpacing);
+  const pitch = integer("Line pitch", 1, SAFE_MAX, font.lineHeight + lineSpacing);
   if (missing !== "reject" && missing !== "skip") {
     if (!missing || typeof missing !== "object" || !["reject", "skip"].includes(missing.absent)) {
       throw new RangeError('missing must be "reject", "skip" or { fallback, absent }');
@@ -297,7 +306,7 @@ function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point
   for (const { amount, first, second } of font.kernings) {
     scalar(first);
     scalar(second);
-    pairs.set(`${first},${second}`, integer(amount, "Kerning amount"));
+    pairs.set(`${first},${second}`, integer("Kerning amount", SAFE_MIN, SAFE_MAX, amount));
   }
   const placements: Placement[] = [];
   const lineAdvances: number[] = [];
@@ -306,8 +315,8 @@ function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point
     top = Infinity,
     bottom = -Infinity;
   for (const [row, line] of text.split("\n").entries()) {
-    const y = integer(row * pitch, "Text position");
-    integer(origin.y + y, "Text position");
+    const y = position(row * pitch);
+    position(origin.y + y);
     let cursor = 0;
     let previous: number | undefined;
     for (const character of line) {
@@ -323,22 +332,22 @@ function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point
       }
       glyphRect(font, g);
       if (previous !== undefined) {
-        cursor = integer(cursor + (pairs.get(`${previous},${code}`) ?? 0), "Text position");
-        integer(origin.x + cursor, "Text position");
+        cursor = position(cursor + (pairs.get(`${previous},${code}`) ?? 0));
+        position(origin.x + cursor);
       }
       if (g.width && g.height) {
-        const x0 = integer(cursor + g.xoffset, "Text position"),
-          y0 = integer(y + g.yoffset, "Text position");
-        const x1 = integer(x0 + g.width, "Text position"),
-          y1 = integer(y0 + g.height, "Text position");
+        const x0 = position(cursor + g.xoffset),
+          y0 = position(y + g.yoffset);
+        const x1 = position(x0 + g.width),
+          y1 = position(y0 + g.height);
         left = Math.min(left, x0);
         right = Math.max(right, x1);
         top = Math.min(top, y0);
         bottom = Math.max(bottom, y1);
         placements.push({ glyph: g, x: x0, y: y0 });
       }
-      cursor = integer(cursor + g.xadvance, "Text position");
-      integer(origin.x + cursor, "Text position");
+      cursor = position(cursor + g.xadvance);
+      position(origin.x + cursor);
       previous = code;
     }
     lineAdvances.push(cursor);
@@ -348,15 +357,20 @@ function layout({ font, lineSpacing, missing }: BitmapTextOptions, origin: Point
       left === Infinity
         ? undefined
         : {
-            height: integer(bottom - top, "Text bounds height", 0),
-            width: integer(right - left, "Text bounds width", 0),
+            height: integer("Text bounds height", 0, SAFE_MAX, bottom - top),
+            width: integer("Text bounds width", 0, SAFE_MAX, right - left),
             x: left,
             y: top,
           },
-    height: integer((lineAdvances.length - 1) * pitch + font.lineHeight, "Text height", 1),
+    height: integer(
+      "Text height",
+      1,
+      SAFE_MAX,
+      (lineAdvances.length - 1) * pitch + font.lineHeight,
+    ),
     lineAdvances,
   };
-  integer(origin.y + measurement.height, "Text position");
+  position(origin.y + measurement.height);
   return { measurement, placements };
 }
 
@@ -366,11 +380,12 @@ export function measureBitmapText(options: BitmapTextOptions, text: string): Bit
 }
 
 function image(name: string, value: RgbaImage) {
-  integer(value.width, `${name} width`, 0);
-  integer(value.height, `${name} height`, 0);
+  integer(`${name} width`, 0, SAFE_MAX, value.width);
+  integer(`${name} height`, 0, SAFE_MAX, value.height);
   if (
     !(value.data instanceof Uint8Array) ||
-    value.data.length !== integer(value.width * value.height * 4, `${name} byte length`, 0)
+    value.data.length !==
+      integer(`${name} byte length`, 0, SAFE_MAX, value.width * value.height * 4)
   ) {
     throw new RangeError(`${name} data must be a Uint8Array of width * height * 4 bytes`);
   }
@@ -396,8 +411,8 @@ export function drawBitmapText(
   ) {
     throw new RangeError("Atlas must match the font size and be separate from target");
   }
-  integer(at.x, "at.x");
-  integer(at.y, "at.y");
+  integer("at.x", SAFE_MIN, SAFE_MAX, at.x);
+  integer("at.y", SAFE_MIN, SAFE_MAX, at.y);
   if (
     !Array.isArray(tint) ||
     tint.length !== 3 ||
@@ -407,9 +422,9 @@ export function drawBitmapText(
   }
   const { placements } = layout(options, at, text);
   const positioned = placements.map(({ glyph, x, y }) => {
-    const point = { x: integer(at.x + x, "Text position"), y: integer(at.y + y, "Text position") };
-    integer(point.x + glyph.width, "Text position");
-    integer(point.y + glyph.height, "Text position");
+    const point = { x: position(at.x + x), y: position(at.y + y) };
+    position(point.x + glyph.width);
+    position(point.y + glyph.height);
     return { glyph, point };
   });
   for (const { glyph, point } of positioned) {
