@@ -34,3 +34,4 @@ dependency](../../README.md#released-dependency), [API entry points](../api-entr
 | ak-0047 | Simplify PNG filtering and package tooling                  | [ak-0047.md](../work/ak-0047.md) |
 | ak-0050 | Standardize Art-kit checks on Make                          | [ak-0050.md](../work/ak-0050.md) |
 | ak-0051 | Correct the Art-kit documentation                           | [ak-0051.md](../work/ak-0051.md) |
+| ak-0052 | Refactor the Art-kit source structure                       | [ak-0052.md](../work/ak-0052.md) |
