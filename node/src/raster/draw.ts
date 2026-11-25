@@ -1,6 +1,5 @@
-import type { Point } from "./geometry.js";
-import type { Rgba } from "./raster.js";
 import type { RgbaImage } from "./rgbaImage.js";
+import type { Point, Rgba } from "./types.js";
 
 // Pillow 13.0.0 ImageDraw.Draw(image) on an RGBA image: every operation writes its ink bytes
 // directly, without blending. Coordinates are truncated toward zero. Float arithmetic that Pillow

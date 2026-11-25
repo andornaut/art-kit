@@ -1,4 +1,4 @@
-import type { Point, Rect } from "./geometry.js";
+import type { Point, Rect } from "./types.js";
 
 // An image's pixels, 4 bytes each (red, green, blue, alpha), row by row from the top-left.
 export interface RgbaImage {

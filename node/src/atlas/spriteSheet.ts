@@ -6,8 +6,8 @@ import { basename, dirname, resolve } from "node:path";
 
 import { encodeRgbaPng } from "../codecs/png.js";
 import { rgb } from "../raster/colour.js";
+import type { Tag } from "../raster/frames.js";
 import type { Frame } from "../raster/grid.js";
-import type { Tag } from "../raster/raster.js";
 import type { RgbaImage } from "../raster/rgbaImage.js";
 
 // Nine-slice margins in pixels from each frame edge.

@@ -1,8 +1,8 @@
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 
 import { Canvas, FontLibrary } from "skia-canvas";
 
-import { readCoverage } from "./cmap.js";
+import { checkCovered, coverageOf } from "./cmap.js";
 import type { GlyphKerning, SuppliedBitmapGlyph } from "./glyphAtlas.js";
 
 export interface RasteriseOptions {
@@ -56,7 +56,7 @@ function codePoint(char: string): number {
  * for font collections, WOFF, other formats and malformed tables.
  */
 export function fontCoverage(path: string): ReadonlySet<number> {
-  return readCoverage(path);
+  return coverageOf(path, readFileSync(path));
 }
 
 /**
@@ -75,7 +75,7 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
     throw new RangeError("Kerning must be none or all");
   }
   const characters = [...new Set(options.characters)];
-  characters.forEach(codePoint);
+  const codePoints = characters.map(codePoint);
   if (kerning === "all" && characters.length > 256) {
     throw new RangeError("All kerning supports at most 256 unique characters");
   }
@@ -84,20 +84,13 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
   const path = realpathSync(options.path);
   let face = families.get(path);
   if (!face) {
-    const coverage = readCoverage(path);
+    const coverage = fontCoverage(path);
     face = { coverage, family: `art-kit-bitmap-${families.size}` };
     FontLibrary.use(face.family, path);
     families.set(path, face);
   }
   const { coverage, family } = face;
-  const missing = characters.filter((char) => !coverage.has(codePoint(char)));
-  if (missing.length) {
-    const list = missing.map((char) => {
-      const hex = codePoint(char).toString(16).toUpperCase().padStart(4, "0");
-      return `U+${hex} ${JSON.stringify(char)}`;
-    });
-    throw new RangeError(`${options.path} has no glyph for ${list.join(", ")}`);
-  }
+  checkCovered(options.path, coverage, codePoints);
   const context = (width: number, height: number) => {
     const canvas = new Canvas(width, height);
     canvas.gpu = false;

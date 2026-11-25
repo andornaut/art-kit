@@ -1,5 +1,5 @@
-import type { Point, Rect } from "../raster/geometry.js";
 import { blankImage, blitExtruded, type RgbaImage } from "../raster/rgbaImage.js";
+import type { Point, Rect } from "../raster/types.js";
 
 export interface AtlasBlit {
   source: string;

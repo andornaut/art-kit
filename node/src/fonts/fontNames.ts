@@ -1,4 +1,5 @@
 // Rewrites a TrueType name table and reassembles the SFNT with valid checksums.
+import { assembleSfnt, tablesOf } from "./sfnt.js";
 
 export interface FontNames {
   /** Family (ID 1), and typographic family (ID 16) when the font has one. */
@@ -94,66 +95,6 @@ function encode(record: NameRecord, value: string): Uint8Array {
   );
 }
 
-function checksum(bytes: Uint8Array): number {
-  const padded = new Uint8Array((bytes.length + 3) & ~3);
-  padded.set(bytes);
-  const view = new DataView(padded.buffer);
-  let sum = 0;
-  for (let i = 0; i < padded.length; i += 4) {
-    sum = (sum + view.getUint32(i)) >>> 0;
-  }
-  return sum;
-}
-
-function tables(font: Uint8Array): Map<string, Uint8Array> {
-  const view = new DataView(font.buffer, font.byteOffset, font.byteLength);
-  const result = new Map<string, Uint8Array>();
-  for (let i = 0; i < view.getUint16(4); i++) {
-    const at = 12 + 16 * i;
-    const tag = String.fromCharCode(...font.subarray(at, at + 4));
-    const offset = view.getUint32(at + 8);
-    result.set(tag, font.subarray(offset, offset + view.getUint32(at + 12)));
-  }
-  return result;
-}
-
-function assemble(version: number, tableMap: Map<string, Uint8Array>): Uint8Array {
-  const tags = [...tableMap.keys()].sort();
-  const count = tags.length;
-  let size = 12 + 16 * count;
-  const offsets = tags.map((tag) => {
-    const offset = size;
-    size += (tableMap.get(tag)!.length + 3) & ~3;
-    return offset;
-  });
-  const font = new Uint8Array(size);
-  const view = new DataView(font.buffer);
-  const selector = Math.floor(Math.log2(count));
-  view.setUint32(0, version);
-  view.setUint16(4, count);
-  view.setUint16(6, 16 * 2 ** selector);
-  view.setUint16(8, selector);
-  view.setUint16(10, 16 * count - 16 * 2 ** selector);
-  let head = -1;
-  tags.forEach((tag, i) => {
-    const bytes = new Uint8Array(tableMap.get(tag)!);
-    if (tag === "head") {
-      new DataView(bytes.buffer).setUint32(8, 0);
-      head = offsets[i];
-    }
-    font.set(bytes, offsets[i]);
-    const at = 12 + 16 * i;
-    for (let c = 0; c < 4; c++) {
-      font[at + c] = tag.charCodeAt(c);
-    }
-    view.setUint32(at + 4, checksum(bytes));
-    view.setUint32(at + 8, offsets[i]);
-    view.setUint32(at + 12, bytes.length);
-  });
-  view.setUint32(head + 8, (0xb1b0afba - checksum(font)) >>> 0);
-  return font;
-}
-
 /**
  * The font with name IDs 1, 3, 4, 6 and 16 (when present) and optionally 5 replaced in every
  * Unicode, Windows and Mac Roman record. Throws RangeError when a replaced, subfamily (2) or
@@ -164,7 +105,7 @@ export function renameFont(
   reserved: readonly string[],
   font: Uint8Array,
 ): Uint8Array {
-  const map = tables(font);
+  const map = tablesOf(font);
   const name = map.get("name");
   if (!name || name.length < 6) {
     throw new RangeError("The font has no name table");
@@ -244,5 +185,5 @@ export function renameFont(
     });
   }
   map.set("name", out);
-  return assemble(new DataView(font.buffer, font.byteOffset).getUint32(0), map);
+  return assembleSfnt(new DataView(font.buffer, font.byteOffset).getUint32(0), map);
 }

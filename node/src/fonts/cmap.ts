@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+// Unicode coverage from a font's cmap table. No I/O.
+import { tableRecords } from "./sfnt.js";
 
 // Unicode cmap subtables by platform and encoding ID, most complete first. Format 12 covers the
 // full Unicode range and format 4 the Basic Multilingual Plane.
@@ -7,23 +8,17 @@ const FORMAT_4 = ["3.1", "0.3", "0.4", "0.2", "0.1", "0.0"];
 const SFNT_VERSIONS = new Set([0x00010000, 0x74727565, 0x4f54544f]); // 1.0, "true", "OTTO"
 
 /**
- * The Unicode code points a TrueType or OpenType file's cmap maps to a glyph other than .notdef,
- * from its format 12 Unicode subtable, else its format 4 one. Font collections, WOFF and other
- * formats are rejected.
+ * The Unicode code points a TrueType or OpenType font's cmap maps to a glyph other than .notdef,
+ * from its format 12 Unicode subtable, else its format 4 one; label names the font in errors.
+ * Font collections, WOFF and other formats throw RangeError.
  */
-export function readCoverage(path: string): Set<number> {
-  return coverageOf(path, readFileSync(path));
-}
-
-/** readCoverage for font bytes already in memory; label names the font in errors. */
 export function coverageOf(label: string, font: Uint8Array): Set<number> {
-  const bytes = Buffer.from(font.buffer, font.byteOffset, font.byteLength);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const view = new DataView(font.buffer, font.byteOffset, font.byteLength);
   const fail = (reason: string): never => {
     throw new RangeError(`${label} is not a supported font: ${reason}`);
   };
   const check = (at: number, length: number, what: string): void => {
-    if (at < 0 || at + length > bytes.byteLength) {
+    if (at < 0 || at + length > font.byteLength) {
       fail(`${what} extends past the end of the file`);
     }
   };
@@ -43,24 +38,18 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
   if (!SFNT_VERSIONS.has(version)) {
     fail("expected a TrueType or OpenType sfnt");
   }
-  const tables = u16(4);
-  check(12, 16 * tables, "the table directory");
-  let cmap = -1;
-  let cmapLength = 0;
-  for (let record = 12; record < 12 + 16 * tables; record += 16) {
-    if (bytes.toString("latin1", record, record + 4) === "cmap") {
-      [cmap, cmapLength] = [u32(record + 8), u32(record + 12)];
-    }
+  check(12, 16 * u16(4), "the table directory");
+  const record = tableRecords(font).findLast(({ tag }) => tag === "cmap");
+  if (record === undefined) {
+    return fail("no cmap table");
   }
-  if (cmap < 0) {
-    fail("no cmap table");
-  }
-  check(cmap, cmapLength, "the cmap table");
+  const cmap = record.offset;
+  check(cmap, record.length, "the cmap table");
   const subtables = new Map<string, number>();
   const count = u16(cmap + 2);
-  for (let record = cmap + 4; record < cmap + 4 + 8 * count; record += 8) {
-    const at = cmap + u32(record + 4);
-    const id = `${u16(record)}.${u16(record + 2)}`;
+  for (let entry = cmap + 4; entry < cmap + 4 + 8 * count; entry += 8) {
+    const at = cmap + u32(entry + 4);
+    const id = `${u16(entry)}.${u16(entry + 2)}`;
     subtables.set(`${id}.${u16(at)}`, at);
   }
   const find = (format: number, ids: readonly string[]): number | undefined =>
@@ -116,4 +105,23 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
     }
   }
   return mapped;
+}
+
+/**
+ * Throws RangeError naming label and every code point coverage lacks, in the given order, as
+ * `U+XXXX "c"`.
+ */
+export function checkCovered(
+  label: string,
+  coverage: ReadonlySet<number>,
+  codePoints: readonly number[],
+): void {
+  const missing = codePoints.filter((codePoint) => !coverage.has(codePoint));
+  if (missing.length) {
+    const list = missing.map(
+      (codePoint) =>
+        `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")} ${JSON.stringify(String.fromCodePoint(codePoint))}`,
+    );
+    throw new RangeError(`${label} has no glyph for ${list.join(", ")}`);
+  }
 }
