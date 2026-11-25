@@ -281,14 +281,15 @@ The package version is the `version` in `node/package.json`. Compatible fixes in
 
 ## Released dependency
 
-### Upgrading to 0.33
+### Upgrading to 0.34
 
-- Sprite sheets preserve decoded RGBA and exact JSON. The shared PNG encoder can produce different
-  PNG bytes, so rebuild checks against older generated sheets may need a reviewed output refresh.
-- Remove `check.index` and any use of `changes.dirty` or `changes.untracked`. Snapshot checks and
-  `outputs: true` still check for changed and stale outputs. With checking enabled, passing
-  `index: true` throws `RangeError` in `runBuilds` and returns status 1 from `buildCommand`.
-- Run Art-kit source checks through `make check`, `make lint`, `make test` or `make build`.
+- Validation errors read `<subject> must <constraint>` across every subpath. Error types, check
+  order and `buildCommand` exit statuses are unchanged; update any test or caller that matches
+  message text.
+- `build/glyphAtlas` exports `GlyphAtlas`, the return type of `buildBitmapFontFromGlyphs`, and
+  `build/rgbaImage` exports the `Point` and `Rect` types used in public options.
+- Sprite sheets render through the shared raster frame code with identical PNG, RGBA and JSON
+  output. Import paths are unchanged after the internal source reorganization.
 
 The release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`. Consumers pin that URL with the tarball's SHA-256 from `SHA256SUMS`, plus the exact peers, through their own dependency integration. The tarball holds compiled ESM, `.d.ts` files, the published `package.json`, `LICENSE` and `SOURCE_COMMIT`; no source, fonts, game assets or tooling.
 
