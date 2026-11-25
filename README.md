@@ -1,6 +1,6 @@
 # art-kit
 
-Shared TypeScript mechanisms for scripted pixel art and atlas builds. Source lives in `node/src` and compiles to the ESM package `@andornaut/art-kit`, released as a GitHub release tarball with no registry publication.
+Shared TypeScript mechanisms for scripted pixel art and atlas builds. Source lives in `node/src`, grouped by area (`raster`, `codecs`, `atlas`, `fonts` and `build`), and compiles to the ESM package `@andornaut/art-kit`, released as a GitHub release tarball with no registry publication.
 
 Design summaries by area, with an index of their work items, are in [docs/design](docs/design/README.md); each approved task is a work file in [docs/work](docs/work/README.md).
 
