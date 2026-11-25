@@ -109,7 +109,7 @@ export async function encodeLossyWebp(
  */
 export async function decodeWebp(bytes: Uint8Array): Promise<RgbaImage> {
   if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
-    throw new RangeError("Expected nonempty WebP bytes");
+    throw new RangeError("WebP bytes must be a nonempty Uint8Array");
   }
   decoder ??= wasmModule("dec/webp_dec.wasm").then((wasm) =>
     initEmscriptenModule(decoderFactory, wasm),

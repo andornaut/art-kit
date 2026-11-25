@@ -22,11 +22,11 @@ function perFrame(durations: number | readonly number[], count: number): number[
   const list =
     typeof durations === "number" ? Array<number>(count).fill(durations) : [...durations];
   if (list.length !== count) {
-    throw new RangeError(`Expected ${count} durations, received ${list.length}`);
+    throw new RangeError(`Durations must have ${count} values, one per frame`);
   }
   for (const ms of list) {
     if (!Number.isFinite(ms) || ms < 0 || Math.trunc(ms / 10) > 0xffff) {
-      throw new RangeError(`Invalid GIF duration: ${ms}`);
+      throw new RangeError("Duration must be finite, nonnegative and below 655360 ms");
     }
   }
   return list;
@@ -43,11 +43,11 @@ function frameOf(index: number, duration: number, image: RgbaImage): Frame {
     const rgba = view.getUint32(i * 4);
     const alpha = rgba & 0xff;
     if (alpha !== 0 && alpha !== 0xff) {
-      throw new RangeError(`Frame ${index} pixel ${i} has partial alpha ${alpha}`);
+      throw new RangeError(`Frame ${index} pixel ${i} alpha must be 0 or 255`);
     }
     if (alpha === 0) {
       if (transparent !== undefined && transparent !== rgba) {
-        throw new RangeError(`Frame ${index} has more than one fully transparent RGBA value`);
+        throw new RangeError(`Frame ${index} must have at most one fully transparent RGBA value`);
       }
       transparent = rgba;
     }
@@ -55,7 +55,7 @@ function frameOf(index: number, duration: number, image: RgbaImage): Frame {
     seen.add(rgba);
   }
   if (seen.size > MAX_COLOURS) {
-    throw new RangeError(`Frame ${index} has more than ${MAX_COLOURS} colours`);
+    throw new RangeError(`Frame ${index} must have at most ${MAX_COLOURS} colours`);
   }
   return { colours: [...seen], duration, pixels, transparent };
 }
@@ -153,22 +153,20 @@ function tableBits(count: number): number {
 export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Uint8Array {
   const { loop } = options;
   if (frames.length === 0) {
-    throw new RangeError("A GIF needs at least one frame");
+    throw new RangeError("Frames must not be empty");
   }
   const { height, width } = frames[0];
   if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= 0xffff)) {
-    throw new RangeError(`Invalid GIF size ${width}x${height}`);
+    throw new RangeError("Frame dimensions must be integers in 1..65535");
   }
   if (loop !== undefined && !(Number.isInteger(loop) && loop >= 0 && loop <= 0xffff)) {
-    throw new RangeError(`Invalid GIF loop: ${loop}`);
+    throw new RangeError("Loop must be an integer in 0..65535");
   }
   const durations = perFrame(options.durations, frames.length);
   const kept: Frame[] = [];
   frames.forEach((image, index) => {
     if (image.width !== width || image.height !== height) {
-      throw new RangeError(
-        `Frame ${index} is ${image.width}x${image.height}, not ${width}x${height}`,
-      );
+      throw new RangeError(`Frame ${index} must be ${width}x${height}`);
     }
     const frame = frameOf(index, durations[index], image);
     const last = kept.at(-1);
@@ -201,7 +199,7 @@ export function encodeGif(options: GifOptions, frames: readonly RgbaImage[]): Ui
       frame.transparent === undefined ? undefined : indexOf.get(frame.transparent);
     const hundredths = Math.trunc(frame.duration / 10);
     if (hundredths > 0xffff) {
-      throw new RangeError(`Merged GIF duration exceeds the format limit: ${frame.duration}`);
+      throw new RangeError("Merged frame duration must be below 655360 ms");
     }
     // Pillow gives a later frame a spare transparency index whenever its palette has room, so
     // its control block, and a decoded duration of 0, appears even without other content.

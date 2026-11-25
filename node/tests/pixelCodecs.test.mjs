@@ -91,7 +91,7 @@ test("RGB PNG rejects any alpha other than 255", () => {
     data[4 * 4 + 3] = alpha;
     assert.throws(
       () => encodeRgbPng(rgbaOptions, { ...opaque, data }),
-      { name: "RangeError", message: `Pixel 4 has alpha ${alpha}, not 255` },
+      { name: "RangeError", message: "Pixel 4 alpha must be 255" },
       `alpha ${alpha}`,
     );
   }

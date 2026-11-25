@@ -161,24 +161,37 @@ test("GIF frames beyond 256 colours together use local colour tables", () => {
 test("GIF rejects input it cannot encode exactly", () => {
   const pixel = (...rgba) => ({ width: 1, height: 1, data: Uint8Array.from(rgba) });
   const two = (a, b) => ({ width: 2, height: 1, data: Uint8Array.from([...a, ...b]) });
+  const noise = image(reference.gif.noise.frames[0]);
   const cases = [
-    [{ durations: 10 }, [pixel(1, 2, 3, 128)], /partial alpha/],
-    [{ durations: 10 }, [two([0, 0, 0, 0], [1, 1, 1, 0])], /more than one fully transparent/],
-    [{ durations: 10 }, [image(reference.gif.noise.frames[0]), pixel(1, 1, 1, 255)], /is 1x1/],
-    [{ durations: [10] }, [pixel(1, 1, 1, 255), pixel(2, 2, 2, 255)], /Expected 2 durations/],
-    [{ durations: 10 }, [], /at least one frame/],
+    [{ durations: 10 }, [pixel(1, 2, 3, 128)], "Frame 0 pixel 0 alpha must be 0 or 255"],
+    [
+      { durations: 10 },
+      [two([0, 0, 0, 0], [1, 1, 1, 0])],
+      "Frame 0 must have at most one fully transparent RGBA value",
+    ],
+    [
+      { durations: 10 },
+      [noise, pixel(1, 1, 1, 255)],
+      `Frame 1 must be ${noise.width}x${noise.height}`,
+    ],
+    [
+      { durations: [10] },
+      [pixel(1, 1, 1, 255), pixel(2, 2, 2, 255)],
+      "Durations must have 2 values, one per frame",
+    ],
+    [{ durations: 10 }, [], "Frames must not be empty"],
   ];
   for (const [options, frames, message] of cases) {
-    assert.throws(
-      () => encodeGif(options, frames),
-      (error) => error instanceof RangeError && message.test(error.message),
-    );
+    assert.throws(() => encodeGif(options, frames), { name: "RangeError", message });
   }
   const many = { width: 257, height: 1, data: new Uint8Array(257 * 4) };
   for (let i = 0; i < 257; i++) {
     many.data.set([i & 0xff, i >> 8, 0, 255], i * 4);
   }
-  assert.throws(() => encodeGif({ durations: 10 }, [many]), RangeError);
+  assert.throws(() => encodeGif({ durations: 10 }, [many]), {
+    name: "RangeError",
+    message: "Frame 0 must have at most 256 colours",
+  });
 });
 
 test("ICO favicon and large sets hold each supplied size as an exact PNG entry", () => {
@@ -214,7 +227,13 @@ test("ICO favicon and large sets hold each supplied size as an exact PNG entry",
 
 test("ICO rejects duplicate and oversized entries", () => {
   const blank = (side) => ({ width: side, height: side, data: new Uint8Array(side * side * 4) });
-  assert.throws(() => encodeIco([blank(16), blank(16)]), /Duplicate/);
-  assert.throws(() => encodeIco([blank(257)]), /Invalid ICO entry size/);
-  assert.throws(() => encodeIco([]), RangeError);
+  assert.throws(() => encodeIco([blank(16), blank(16)]), {
+    name: "RangeError",
+    message: "Image size 16x16 must be unique",
+  });
+  assert.throws(() => encodeIco([blank(257)]), {
+    name: "RangeError",
+    message: "Image dimensions must be integers in 1..256",
+  });
+  assert.throws(() => encodeIco([]), { name: "RangeError", message: "Images must not be empty" });
 });

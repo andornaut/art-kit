@@ -27,16 +27,16 @@ export function tableRecords(font: Uint8Array): TableRecord[] {
  */
 export function checkTrueType(font: Uint8Array): void {
   if (!(font instanceof Uint8Array) || font.byteLength < 12) {
-    throw new RangeError("Expected a complete TrueType Uint8Array");
+    throw new RangeError("Font must be a Uint8Array of at least 12 bytes");
   }
   const view = new DataView(font.buffer, font.byteOffset, font.byteLength);
   if (view.getUint32(0) !== 0x00010000) {
-    throw new RangeError("Expected a single TrueType 1.0 font, not CFF, TTC or WOFF");
+    throw new RangeError("Font must be one TrueType 1.0 font, not CFF, TTC or WOFF");
   }
   const count = view.getUint16(4);
   const directoryEnd = 12 + count * 16;
   if (!count || directoryEnd > font.byteLength) {
-    throw new RangeError("Incomplete TrueType table directory");
+    throw new RangeError("Font table directory must be nonempty and complete");
   }
   const tables = new Map<string, { length: number; offset: number }>();
   for (const { length, offset, tag } of tableRecords(font)) {
@@ -47,24 +47,26 @@ export function checkTrueType(font: Uint8Array): void {
       offset < directoryEnd ||
       offset + length > font.byteLength
     ) {
-      throw new RangeError("Invalid, duplicate or out-of-bounds TrueType table");
+      throw new RangeError(
+        "Font tables must have unique printable tags and be 4-byte aligned after the directory and within the font",
+      );
     }
     tables.set(tag, { length, offset });
   }
   let end = directoryEnd;
   for (const table of [...tables.values()].sort((a, b) => a.offset - b.offset)) {
     if (table.length && table.offset < end) {
-      throw new RangeError("Overlapping TrueType tables");
+      throw new RangeError("Font tables must not overlap");
     }
     end = Math.max(end, table.offset + table.length);
   }
   if (["DSIG", "CFF ", "CFF2"].some((tag) => tables.has(tag))) {
-    throw new RangeError("Signed and CFF fonts are not supported");
+    throw new RangeError("Font must not have a DSIG, CFF or CFF2 table");
   }
   const table = (tag: string, minimum: number) => {
     const entry = tables.get(tag);
     if (!entry || entry.length < minimum) {
-      throw new RangeError(`Missing or truncated TrueType ${tag} table`);
+      throw new RangeError(`Font must have a complete ${tag} table`);
     }
     return entry;
   };
@@ -82,7 +84,7 @@ export function checkTrueType(font: Uint8Array): void {
     view.getUint32(head.offset + 12) !== 0x5f0f3cf5 ||
     view.getInt16(head.offset + 52) !== 0
   ) {
-    throw new RangeError("Invalid TrueType glyph metrics or head");
+    throw new RangeError("Font head, maxp and hhea tables must be valid and consistent");
   }
   table("hmtx", metrics * 4 + (glyphs - metrics) * 2);
   table("cmap", 4);
@@ -95,7 +97,7 @@ export function checkTrueType(font: Uint8Array): void {
     const at = loca.offset + i * step;
     const offset = format === 0 ? view.getUint16(at) * 2 : view.getUint32(at);
     if (offset < previous || offset > glyf.length) {
-      throw new RangeError("Invalid TrueType glyph offsets");
+      throw new RangeError("Font loca offsets must be nondecreasing and within the glyf table");
     }
     previous = offset;
   }

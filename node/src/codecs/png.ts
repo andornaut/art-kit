@@ -53,7 +53,7 @@ export function encodeRgbPng(options: RgbaPngOptions, image: RgbaImage): Uint8Ar
   const { data } = image;
   for (let i = 3; i < data.length; i += 4) {
     if (data[i] !== 255) {
-      throw new RangeError(`Pixel ${(i - 3) / 4} has alpha ${data[i]}, not 255`);
+      throw new RangeError(`Pixel ${(i - 3) / 4} alpha must be 255`);
     }
   }
   return (

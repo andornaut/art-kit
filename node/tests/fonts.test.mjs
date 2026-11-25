@@ -123,11 +123,14 @@ test("all kerning emits each nonzero ordered pair once, bounded to 256 character
     assert.ok(kernings.every((k) => k.amount !== 0 && Number.isInteger(k.amount)));
   }
   const tooMany = Array.from({ length: 257 }, (_, i) => String.fromCodePoint(0x100 + i));
-  assert.throws(
-    () => rasteriseGlyphs({ ...options(), kerning: "all", characters: tooMany }),
-    /256/,
-  );
-  assert.throws(() => rasteriseGlyphs({ ...options(), kerning: "unknown" }), /Kerning/);
+  assert.throws(() => rasteriseGlyphs({ ...options(), kerning: "all", characters: tooMany }), {
+    name: "RangeError",
+    message: 'Characters must have at most 256 unique entries when kerning is "all"',
+  });
+  assert.throws(() => rasteriseGlyphs({ ...options(), kerning: "unknown" }), {
+    name: "RangeError",
+    message: 'Kerning must be "none" or "all"',
+  });
 });
 
 test("rasterization rejects invalid input before rendering", () => {
@@ -145,7 +148,7 @@ test("rasterization rejects every character the font file does not map, before d
     (error) =>
       error instanceof RangeError &&
       error.message ===
-        `${font()} has no glyph for U+3042 ${JSON.stringify("あ")}, U+1F600 ${JSON.stringify("😀")}`,
+        `${font()} must have a glyph for U+3042 ${JSON.stringify("あ")}, U+1F600 ${JSON.stringify("😀")}`,
   );
 });
 
@@ -258,32 +261,34 @@ for (const [name, bytes, expected] of [
 
 const liberation = readFileSync(font());
 for (const [name, bytes, reason] of [
-  ["a font collection", Buffer.from("ttcf", "latin1"), /collections/],
-  ["a WOFF file", Buffer.from("wOFF\0\x01\0\0", "latin1"), /sfnt/],
-  ["an empty file", Buffer.alloc(0), /past the end/],
-  ["a truncated font", liberation.subarray(0, 64), /past the end/],
-  ["no cmap table", Buffer.from([...u32(0x00010000), ...u16(0, 0, 0, 0)]), /no cmap/],
+  ["a font collection", Buffer.from("ttcf", "latin1"), "must not be a font collection (ttcf)"],
+  ["a WOFF file", Buffer.from("wOFF\0\x01\0\0", "latin1"), "must be a TrueType or OpenType sfnt"],
+  ["an empty file", Buffer.alloc(0), "fields must end within the file"],
+  ["a truncated font", liberation.subarray(0, 64), "table directory must end within the file"],
+  [
+    "no cmap table",
+    Buffer.from([...u32(0x00010000), ...u16(0, 0, 0, 0)]),
+    "must have a cmap table",
+  ],
   [
     "no Unicode subtable",
     sfnt([{ platform: 1, encoding: 0, table: format4([{ start: 0x41, end: 0x41, delta: 1 }]) }]),
-    /no Unicode cmap subtable/,
+    "must have a Unicode cmap subtable in format 4 or 12",
   ],
-  ["a reversed format 12 group", sfnt([unicode12([[0x42, 0x41, 1]])]), /not a Unicode range/],
+  [
+    "a reversed format 12 group",
+    sfnt([unicode12([[0x42, 0x41, 1]])]),
+    "format 12 groups must be Unicode ranges",
+  ],
   [
     "a format 12 group past U+10FFFF",
     sfnt([unicode12([[0x41, 0x110000, 1]])]),
-    /not a Unicode range/,
+    "format 12 groups must be Unicode ranges",
   ],
 ]) {
   test(`font coverage rejects ${name}`, () => {
     const path = write(bytes);
-    assert.throws(
-      () => fontCoverage(path),
-      (error) =>
-        error instanceof RangeError &&
-        error.message.startsWith(`${path} is not a supported font: `) &&
-        reason.test(error.message),
-    );
+    assert.throws(() => fontCoverage(path), { name: "RangeError", message: `${path} ${reason}` });
     assert.throws(() => rasteriseGlyphs({ ...options(), path }), RangeError);
   });
 }

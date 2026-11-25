@@ -52,7 +52,9 @@ export function nameReplacements(names: FontNames): Map<number, string> {
   }
   const postScript = replacements.get(6)!;
   if (!POSTSCRIPT.test(postScript) || POSTSCRIPT_FORBIDDEN.test(postScript)) {
-    throw new RangeError(`PostScript name ${JSON.stringify(postScript)} is not valid`);
+    throw new RangeError(
+      "PostScript name must be 1..63 printable ASCII characters other than space and [](){}<>/%",
+    );
   }
   for (const reserved of names.reserved ?? []) {
     text(reserved, "Reserved name");
@@ -90,8 +92,9 @@ function encode(record: NameRecord, value: string): Uint8Array {
   if (record.platform === 1 && record.encoding === 0 && /^[\x20-\x7e]*$/.test(value)) {
     return Uint8Array.from(value, (char) => char.charCodeAt(0));
   }
+  const { encoding, id, platform } = record;
   throw new RangeError(
-    `Cannot write name ID ${record.id} for platform ${record.platform} encoding ${record.encoding}`,
+    `Name ID ${id} on platform ${platform} encoding ${encoding} must be Unicode, Windows or printable ASCII Mac Roman`,
   );
 }
 
@@ -108,7 +111,7 @@ export function renameFont(
   const map = tablesOf(font);
   const name = map.get("name");
   if (!name || name.length < 6) {
-    throw new RangeError("The font has no name table");
+    throw new RangeError("Font must have a complete name table");
   }
   const view = new DataView(name.buffer, name.byteOffset, name.byteLength);
   const format = view.getUint16(0),
@@ -135,7 +138,7 @@ export function renameFont(
       languageTags.push(name.slice(offset, offset + view.getUint16(at)));
     }
   } else if (format !== 0) {
-    throw new RangeError(`Unsupported name table format ${format}`);
+    throw new RangeError("Font name table format must be 0 or 1");
   }
   const lower = reserved.map((value) => value.toLowerCase());
   for (const record of records) {
@@ -150,7 +153,7 @@ export function renameFont(
     const hit = lower.find((reservedName) => value.includes(reservedName));
     if (hit !== undefined) {
       throw new RangeError(
-        `Name ID ${record.id} contains the reserved name ${JSON.stringify(hit)}`,
+        `Name ID ${record.id} must not contain the reserved name ${JSON.stringify(hit)}`,
       );
     }
   }

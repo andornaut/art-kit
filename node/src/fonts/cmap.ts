@@ -14,37 +14,37 @@ const SFNT_VERSIONS = new Set([0x00010000, 0x74727565, 0x4f54544f]); // 1.0, "tr
  */
 export function coverageOf(label: string, font: Uint8Array): Set<number> {
   const view = new DataView(font.buffer, font.byteOffset, font.byteLength);
-  const fail = (reason: string): never => {
-    throw new RangeError(`${label} is not a supported font: ${reason}`);
+  const fail = (constraint: string): never => {
+    throw new RangeError(`${label} ${constraint}`);
   };
-  const check = (at: number, length: number, what: string): void => {
+  const check = (at: number, length: number, part: string): void => {
     if (at < 0 || at + length > font.byteLength) {
-      fail(`${what} extends past the end of the file`);
+      fail(`${part} must end within the file`);
     }
   };
   const u16 = (at: number): number => {
-    check(at, 2, "a field");
+    check(at, 2, "fields");
     return view.getUint16(at);
   };
   const u32 = (at: number): number => {
-    check(at, 4, "a field");
+    check(at, 4, "fields");
     return view.getUint32(at);
   };
 
   const version = u32(0);
   if (version === 0x74746366) {
-    fail("font collections (ttcf) are not supported");
+    fail("must not be a font collection (ttcf)");
   }
   if (!SFNT_VERSIONS.has(version)) {
-    fail("expected a TrueType or OpenType sfnt");
+    fail("must be a TrueType or OpenType sfnt");
   }
-  check(12, 16 * u16(4), "the table directory");
+  check(12, 16 * u16(4), "table directory");
   const record = tableRecords(font).findLast(({ tag }) => tag === "cmap");
   if (record === undefined) {
-    return fail("no cmap table");
+    return fail("must have a cmap table");
   }
   const cmap = record.offset;
-  check(cmap, record.length, "the cmap table");
+  check(cmap, record.length, "cmap table");
   const subtables = new Map<string, number>();
   const count = u16(cmap + 2);
   for (let entry = cmap + 4; entry < cmap + 4 + 8 * count; entry += 8) {
@@ -59,11 +59,11 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
   const format12 = find(12, FORMAT_12);
   if (format12 !== undefined) {
     const groups = u32(format12 + 12);
-    check(format12 + 16, 12 * groups, "a format 12 subtable");
+    check(format12 + 16, 12 * groups, "format 12 subtable");
     for (let group = format12 + 16; group < format12 + 16 + 12 * groups; group += 12) {
       const [start, end, glyph] = [u32(group), u32(group + 4), u32(group + 8)];
       if (start > end || end > 0x10ffff) {
-        fail(`format 12 group ${start}..${end} is not a Unicode range`);
+        fail("format 12 groups must be Unicode ranges");
       }
       for (let c = start; c <= end; c++) {
         if (glyph + c - start !== 0) {
@@ -75,22 +75,22 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
   }
   const format4 = find(4, FORMAT_4);
   if (format4 === undefined) {
-    return fail("no Unicode cmap subtable in format 4 or 12");
+    return fail("must have a Unicode cmap subtable in format 4 or 12");
   }
   const segX2 = u16(format4 + 6);
   if (segX2 % 2) {
-    fail("format 4 segment count is odd");
+    fail("format 4 segment count must be even");
   }
   const ends = format4 + 14;
   const starts = ends + segX2 + 2;
   const deltas = starts + segX2;
   const rangeOffsets = deltas + segX2;
-  check(ends, 4 * segX2 + 2, "a format 4 subtable");
+  check(ends, 4 * segX2 + 2, "format 4 subtable");
   for (let s = 0; s < segX2; s += 2) {
     const [start, end, delta] = [u16(starts + s), u16(ends + s), u16(deltas + s)];
     const rangeOffset = u16(rangeOffsets + s);
     if (start > end) {
-      fail(`format 4 segment ${start}..${end} is reversed`);
+      fail("format 4 segments must start at or before their end");
     }
     // 0xFFFF is a noncharacter that only terminates the segment list.
     for (let c = start; c <= Math.min(end, 0xfffe); c++) {
@@ -122,6 +122,6 @@ export function checkCovered(
       (codePoint) =>
         `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")} ${JSON.stringify(String.fromCodePoint(codePoint))}`,
     );
-    throw new RangeError(`${label} has no glyph for ${list.join(", ")}`);
+    throw new RangeError(`${label} must have a glyph for ${list.join(", ")}`);
   }
 }

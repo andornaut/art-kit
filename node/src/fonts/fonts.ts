@@ -72,12 +72,12 @@ export function rasteriseGlyphs(options: RasteriseOptions): RasterisedGlyphs {
   const size = positive(options.size, "Font size");
   const kerning = options.kerning ?? "none";
   if (kerning !== "none" && kerning !== "all") {
-    throw new RangeError("Kerning must be none or all");
+    throw new RangeError('Kerning must be "none" or "all"');
   }
   const characters = [...new Set(options.characters)];
   const codePoints = characters.map(codePoint);
   if (kerning === "all" && characters.length > 256) {
-    throw new RangeError("All kerning supports at most 256 unique characters");
+    throw new RangeError('Characters must have at most 256 unique entries when kerning is "all"');
   }
   const antialias = options.antialias ?? true;
   const hinting = options.hinting ?? true;

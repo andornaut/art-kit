@@ -73,7 +73,7 @@ test("Subset WOFF2 names every unmapped character and ignores controls", async (
     subsetWoff2({ label: "Body", strings: ["ok\t\n", "日本", "🙂"] }, input),
     (error) =>
       error instanceof RangeError &&
-      error.message === 'Body has no glyph for U+65E5 "日", U+672C "本", U+1F642 "🙂"',
+      error.message === 'Body must have a glyph for U+65E5 "日", U+672C "本", U+1F642 "🙂"',
   );
   await assert.rejects(subsetWoff2({ strings: [42] }, input), TypeError);
   await assert.rejects(subsetWoff2({ strings: ["a"] }, input.subarray(0, 12)), RangeError);
@@ -147,10 +147,19 @@ test("Subset WOFF2 renames family, full, unique and PostScript names and keeps l
 test("Subset WOFF2 rejects reserved names and invalid PostScript names before subsetting", async () => {
   const input = readFileSync(`${root}/LiberationSans-Regular.ttf`);
   const rename = (names) => subsetWoff2({ names: { ...ada, ...names }, strings: ["a"] }, input);
-  await assert.rejects(rename({ family: "Liberation UI" }), /Name ID 1 contains the reserved name/);
-  await assert.rejects(rename({ reserved: ["regular"] }), /Name ID 2 contains the reserved name/);
-  await assert.rejects(rename({ postScriptName: "Ada UI" }), /PostScript name/);
-  await assert.rejects(rename({ postScriptName: "AdaUI(1)" }), /PostScript name/);
+  await assert.rejects(rename({ family: "Liberation UI" }), {
+    name: "RangeError",
+    message: 'Name ID 1 must not contain the reserved name "liberation"',
+  });
+  await assert.rejects(rename({ reserved: ["regular"] }), {
+    name: "RangeError",
+    message: 'Name ID 2 must not contain the reserved name "regular"',
+  });
+  const message =
+    "PostScript name must be 1..63 printable ASCII characters other than space and [](){}<>/%";
+  const postScript = { name: "RangeError", message };
+  await assert.rejects(rename({ postScriptName: "Ada UI" }), postScript);
+  await assert.rejects(rename({ postScriptName: "AdaUI(1)" }), postScript);
   await assert.rejects(rename({ fullName: "" }), RangeError);
   await assert.rejects(rename({ reserved: [""] }), RangeError);
 });

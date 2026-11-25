@@ -10,16 +10,16 @@ const PNG_OPTIONS = { deflateLevel: 9, deflateStrategy: 3, filterType: -1 };
 // distinct. Pillow 13.0.0 reads every entry back as the supplied RGBA.
 export function encodeIco(images: readonly RgbaImage[]): Uint8Array {
   if (images.length === 0) {
-    throw new RangeError("An ICO needs at least one image");
+    throw new RangeError("Images must not be empty");
   }
   const sizes = new Set<string>();
   for (const { height, width } of images) {
     if (![width, height].every((side) => Number.isInteger(side) && side >= 1 && side <= MAX_SIDE)) {
-      throw new RangeError(`Invalid ICO entry size ${width}x${height}`);
+      throw new RangeError("Image dimensions must be integers in 1..256");
     }
     const size = `${width}x${height}`;
     if (sizes.has(size)) {
-      throw new RangeError(`Duplicate ICO entry size ${size}`);
+      throw new RangeError(`Image size ${size} must be unique`);
     }
     sizes.add(size);
   }
