@@ -36,3 +36,4 @@ dependency](../../README.md#released-dependency), [API entry points](../api-entr
 | ak-0051 | Correct the Art-kit documentation                           | [ak-0051.md](../work/ak-0051.md) |
 | ak-0052 | Refactor the Art-kit source structure                       | [ak-0052.md](../work/ak-0052.md) |
 | ak-0053 | Apply the approved Art-kit interface proposals              | [ak-0053.md](../work/ak-0053.md) |
+| ak-0054 | Finish the error wording and release Art-kit 0.34.0          | [ak-0054.md](../work/ak-0054.md) |
