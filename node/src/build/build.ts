@@ -71,14 +71,13 @@ export interface BuildResult {
 
 /** A set's build threw or rejected; `cause` is the original error. */
 class BuildError extends Error {
+  readonly set: string;
   override name = "BuildError";
-  constructor(
-    readonly set: string,
-    cause: unknown,
-  ) {
+  constructor(set: string, cause: unknown) {
     super(`${set} build failed: ${cause instanceof Error ? cause.message : String(cause)}`, {
       cause,
     });
+    this.set = set;
   }
 }
 
@@ -86,8 +85,9 @@ const pathCount = (count: number): string => `${count} path${count === 1 ? "" : 
 
 /** The rebuild changed files under the check paths or left unclaimed files. */
 class CheckError extends Error {
+  readonly changes: Changes;
   override name = "CheckError";
-  constructor(readonly changes: Changes) {
+  constructor(changes: Changes) {
     const changed = changes.added.length + changes.removed.length + changes.changed.length;
     const unclaimed = changes.unclaimed?.length ?? 0;
     const parts = [
@@ -99,6 +99,7 @@ class CheckError extends Error {
         : []),
     ];
     super(parts.join("; "));
+    this.changes = changes;
   }
 }
 

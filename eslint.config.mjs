@@ -9,12 +9,37 @@ import { plugins, sourceRules, toolingRules } from "./eslint.config.base.mjs";
 
 const KIT_FILES = ["node/src/**/*.ts"];
 const TEST_FILES = ["node/tests/**/*.mjs"];
+const SCRIPT_FILES = ["scripts/**/*.mts", "tests/container/**/*.mts"];
 
 // The package loads only node: builtins, its own modules and its declared peer dependencies.
 const OUTSIDE_PACKAGE = {
   message: "node/src/ imports only node: builtins, its peers and its own modules by relative path.",
   regex: "^(?!node:|\\.{1,2}/|pngjs$|skia-canvas$|@jsquash/webp/)",
 };
+
+// The areas of node/src, lowest first, and the other areas each one may import. Type-only
+// imports follow the same layers.
+const LAYERS = {
+  raster: [],
+  codecs: ["raster"],
+  atlas: ["raster", "codecs"],
+  fonts: ["raster"],
+  build: [],
+};
+
+// A later no-restricted-imports replaces an earlier one, so each area keeps OUTSIDE_PACKAGE. A
+// relative path that leaves the area must enter an area it may import.
+const layerConfigs = Object.entries(LAYERS).map(([area, imports]) => {
+  const allowed = imports.length ? imports.join(" and ") : "no other area";
+  const otherArea = {
+    message: `node/src/${area}/ imports ${allowed}.`,
+    regex: `^\\.\\./(?!(?:${[area, ...imports].join("|")})/)`,
+  };
+  return {
+    files: [`node/src/${area}/**/*.ts`],
+    rules: { "no-restricted-imports": ["error", { patterns: [OUTSIDE_PACKAGE, otherArea] }] },
+  };
+});
 
 export default defineConfig(
   {
@@ -36,20 +61,23 @@ export default defineConfig(
       "no-restricted-syntax": ["error", "WithStatement", "ImportExpression"],
     },
   },
+  ...layerConfigs,
   // No import cycles: a module in a cycle can run before what it imports has loaded. Type-only
   // imports are erased at build time, so they never form one.
   {
-    files: KIT_FILES,
+    files: [...KIT_FILES, ...SCRIPT_FILES, ...TEST_FILES],
     plugins: { "import-x": { rules: { "no-cycle": noCycle } } },
     rules: { "import-x/no-cycle": "error" },
     settings: {
-      "import-x/extensions": [".ts"],
-      "import-x/resolver-next": [createNodeResolver({ extensions: [".ts", ".js"] })],
+      "import-x/extensions": [".ts", ".mts", ".mjs"],
+      "import-x/resolver-next": [
+        createNodeResolver({ extensions: [".ts", ".mts", ".js", ".mjs"] }),
+      ],
     },
   },
   // Tests and tooling: they verify or produce what ships rather than being it.
   {
-    files: [...TEST_FILES, "*.mjs", "scripts/**/*.mts", "tests/container/**/*.mts"],
+    files: [...TEST_FILES, "*.mjs", ...SCRIPT_FILES],
     plugins,
     rules: toolingRules,
   },

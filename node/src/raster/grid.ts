@@ -91,15 +91,21 @@ export function flipped(frame: Frame): Frame {
 }
 
 export class Grid {
+  palette: Readonly<Record<string, string>>;
+  w: number;
+  h: number;
   px: Frame;
   close = false;
   edge: Edge | null;
   constructor(
-    public palette: Readonly<Record<string, string>>,
-    public w = 32,
-    public h = 32,
+    palette: Readonly<Record<string, string>>,
+    w = 32,
+    h = 32,
     { edge = null }: { edge?: Edge | null } = {},
   ) {
+    this.palette = palette;
+    this.w = w;
+    this.h = h;
     this.edge = edge;
     this.px = Array.from({ length: h }, () => Array<Colour>(w).fill(null));
   }
