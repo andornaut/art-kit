@@ -23,7 +23,9 @@ function xy(points: readonly Point[]): XY[] {
   return points.map(({ x, y }) => [x, y] as const);
 }
 
-function boxOf({ x0, x1, y0, y1 }: Bounds): [number, number, number, number] {
+type Box = readonly [x0: number, y0: number, x1: number, y1: number];
+
+function boxOf({ x0, x1, y0, y1 }: Bounds): Box {
   return [x0, y0, x1, y1];
 }
 
@@ -72,18 +74,6 @@ function inks(style: ShapeStyle): [Rgba | undefined, Rgba | undefined] {
     style.outline === undefined ? undefined : checkColour(style.outline),
     style.fill === undefined ? undefined : checkColour(style.fill),
   ];
-}
-
-function checkBox(box: readonly number[]): void {
-  if (box.length !== 4) {
-    throw new TypeError("Box must contain exactly 4 coordinates");
-  }
-  if (box[2]! < box[0]!) {
-    throw new RangeError("x1 must be greater than or equal to x0");
-  }
-  if (box[3]! < box[1]!) {
-    throw new RangeError("y1 must be greater than or equal to y0");
-  }
 }
 
 // C round-half-away-from-zero helpers. The F variants take single-precision operands, where
@@ -799,43 +789,15 @@ function arcPrimitive(
 
 /* Pillow's C bindings: truncate coordinates and check box order */
 
-function boxInts(box: readonly number[]): [number, number, number, number] {
-  checkBox(box);
-  return [Math.trunc(box[0]!), Math.trunc(box[1]!), Math.trunc(box[2]!), Math.trunc(box[3]!)];
-}
-
-function drawRectangle(
-  image: RgbaImage,
-  box: readonly number[],
-  ink: Rgba,
-  fill: boolean,
-  width = 0,
-): void {
-  const [x0, y0, x1, y1] = boxInts(box);
-  rectanglePrimitive(image, x0, y0, x1, y1, ink, fill, width);
-}
-
-function drawEllipse(
-  image: RgbaImage,
-  box: readonly number[],
-  ink: Rgba,
-  fill: boolean,
-  width = 0,
-): void {
-  const [x0, y0, x1, y1] = boxInts(box);
-  ellipsePrimitive(image, x0, y0, x1, y1, ink, fill, width);
-}
-
-function drawArc(
-  image: RgbaImage,
-  box: readonly number[],
-  start: number,
-  end: number,
-  ink: Rgba,
-  width: number,
-): void {
-  const [x0, y0, x1, y1] = boxInts(box);
-  arcPrimitive(image, x0, y0, x1, y1, f32(start), f32(end), ink, width);
+// The box corners truncated toward zero, after checking their order.
+function corners([x0, y0, x1, y1]: Box): Box {
+  if (x1 < x0) {
+    throw new RangeError("x1 must be greater than or equal to x0");
+  }
+  if (y1 < y0) {
+    throw new RangeError("y1 must be greater than or equal to y0");
+  }
+  return [Math.trunc(x0), Math.trunc(y0), Math.trunc(x1), Math.trunc(y1)];
 }
 
 function drawPolygon(
@@ -928,10 +890,10 @@ export function ellipse(style: ShapeStyle, bounds: Bounds, image: RgbaImage): vo
   const [ink, fillInk] = inks(style);
   const width = style.width ?? 1;
   if (fillInk !== undefined) {
-    drawEllipse(image, box, fillInk, true);
+    ellipsePrimitive(image, ...corners(box), fillInk, true, 0);
   }
   if (ink !== undefined && !sameInk(ink, fillInk) && width !== 0) {
-    drawEllipse(image, box, ink, false, width);
+    ellipsePrimitive(image, ...corners(box), ink, false, width);
   }
 }
 
@@ -947,7 +909,7 @@ export function arc(
   const fill = checkColour(style.fill);
   const width = style.width ?? 1;
   if (width !== 0) {
-    drawArc(image, box, start, end, fill, width);
+    arcPrimitive(image, ...corners(box), f32(start), f32(end), fill, width);
   }
 }
 
@@ -957,9 +919,9 @@ export function rectangle(style: ShapeStyle, bounds: Bounds, image: RgbaImage): 
   const [ink, fillInk] = inks(style);
   const width = style.width ?? 1;
   if (fillInk !== undefined) {
-    drawRectangle(image, box, fillInk, true);
+    rectanglePrimitive(image, ...corners(box), fillInk, true, 0);
   }
   if (ink !== undefined && !sameInk(ink, fillInk) && width !== 0) {
-    drawRectangle(image, box, ink, false, width);
+    rectanglePrimitive(image, ...corners(box), ink, false, width);
   }
 }

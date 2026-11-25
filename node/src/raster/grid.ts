@@ -8,10 +8,11 @@ export interface OutlineOptions {
   close?: boolean;
 }
 
+// frame with each clear pixel beside a coloured one in its edge colour, unless disabled.
 function outline(
   edge: Edge | null,
+  { close = false, enabled = true }: OutlineOptions,
   frame: readonly (readonly Colour[])[],
-  { close = false, enabled = true }: OutlineOptions = {},
 ): Frame {
   const out = frame.map((row) => [...row]);
   if (!enabled) {
@@ -235,6 +236,6 @@ export class Grid {
     edge,
     enabled = true,
   }: OutlineOptions & { edge?: Edge | null } = {}): Frame {
-    return outline(edge ?? this.edge, this.px, { close, enabled });
+    return outline(edge ?? this.edge, { close, enabled }, this.px);
   }
 }

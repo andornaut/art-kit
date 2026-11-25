@@ -1,7 +1,7 @@
 import { deflateSync } from "node:zlib";
 
 import type { RgbaImage } from "../raster/rgbaImage.js";
-import { pngFile } from "./pngChunks.js";
+import { headerData, pngFile } from "./pngChunks.js";
 
 // An 8-bit indexed PNG holds at most this many colours, each an RGBA value: PLTE holds the RGB
 // and tRNS the alpha.
@@ -58,11 +58,6 @@ export function encodeIndexedPng(
     rows[y * (width + 1)] = FILTER_NONE;
     rows.set(indices.subarray(y * width, (y + 1) * width), y * (width + 1) + 1);
   }
-  const header = new Uint8Array(13);
-  const headerView = new DataView(header.buffer);
-  headerView.setUint32(0, width);
-  headerView.setUint32(4, height);
-  header.set([8, COLOUR_TYPE_INDEXED, 0, 0, 0], 8);
   const plte = new Uint8Array(
     palette.flatMap((rgba) => [rgba >>> 24, (rgba >>> 16) & 0xff, (rgba >>> 8) & 0xff]),
   );
@@ -70,7 +65,7 @@ export function encodeIndexedPng(
     palette.filter((rgba) => (rgba & 0xff) !== 0xff).map((rgba) => rgba & 0xff),
   );
   return pngFile([
-    ["IHDR", [header]],
+    ["IHDR", [headerData(COLOUR_TYPE_INDEXED, width, height)]],
     ["PLTE", [plte]],
     ...(trns.length > 0 ? [["tRNS", [trns]] as const] : []),
     ["IDAT", [deflateSync(rows, options)]],

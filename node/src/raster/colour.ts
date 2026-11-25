@@ -41,11 +41,10 @@ function linearLab([L, a, b]: Triple): [number, number, number] {
     -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
   ];
 }
-function bytes(values: Triple): [number, number, number] {
-  return values.map((value) => {
-    const v = Math.max(0, Math.min(1, value));
-    return Math.floor(255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055) + 0.5);
-  }) as [number, number, number];
+// The sRGB-encoded byte level, unrounded, of a linear channel clamped to 0..1.
+function encoded(linear: number): number {
+  const v = Math.max(0, Math.min(1, linear));
+  return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
 }
 /** Convert D65 Oklab to sRGB bytes with explicit linear gamut and byte rounding policies. */
 export function oklabToSrgb(
@@ -69,13 +68,12 @@ export function oklabToSrgb(
     throw new RangeError("Colour is outside the sRGB gamut");
   }
   return values.map((value) => {
-    const v = Math.max(0, Math.min(1, value));
-    const encoded = 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
-    const floor = Math.floor(encoded);
+    const level = encoded(value);
+    const floor = Math.floor(level);
     if (options.rounding === "half-up") {
-      return Math.floor(encoded + 0.5);
+      return Math.floor(level + 0.5);
     }
-    return encoded - floor === 0.5 ? floor + (floor % 2) : Math.round(encoded);
+    return level - floor === 0.5 ? floor + (floor % 2) : Math.round(level);
   }) as [number, number, number];
 }
 /** Convert sRGB bytes to D65 Oklab (L, a, b). */
@@ -131,5 +129,5 @@ export function oklchToSrgb(colour: Triple): [number, number, number] {
     }
     values = linear(low);
   }
-  return bytes(values);
+  return values.map((value) => Math.floor(encoded(value) + 0.5)) as [number, number, number];
 }
