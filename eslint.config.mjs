@@ -70,8 +70,12 @@ export default defineConfig(
     rules: { "import-x/no-cycle": "error" },
     settings: {
       "import-x/extensions": [".ts", ".mts", ".mjs"],
+      // Source modules name their .ts siblings with a .js extension.
       "import-x/resolver-next": [
-        createNodeResolver({ extensions: [".ts", ".mts", ".js", ".mjs"] }),
+        createNodeResolver({
+          extensionAlias: { ".js": [".ts", ".js"] },
+          extensions: [".ts", ".mts", ".js", ".mjs"],
+        }),
       ],
     },
   },
