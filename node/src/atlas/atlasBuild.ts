@@ -32,7 +32,7 @@ export function drawAtlasPage(
   for (const { at, bounds, from, source } of blits) {
     const image = images.get(source);
     if (image === undefined) {
-      throw new Error(`No atlas source for ${source}`);
+      throw new Error(`Atlas source ${source} must be in images`);
     }
     blitExtruded({ at, bounds, extrude, from }, image, page);
   }

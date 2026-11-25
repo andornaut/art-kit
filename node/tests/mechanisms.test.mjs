@@ -159,7 +159,10 @@ test("page build shares decoding, bypasses supplied images and preserves metadat
     ),
     (error) => error === failure,
   );
-  assert.throws(() => drawAtlasPage(0, new Map(), pages[0]), /No atlas source for shared/);
+  assert.throws(() => drawAtlasPage(0, new Map(), pages[0]), {
+    name: "Error",
+    message: "Atlas source shared must be in images",
+  });
 });
 
 test("packs wide strips and tall and wide rectangles once into bounded nonoverlapping extruded cells", () => {

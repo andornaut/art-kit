@@ -61,19 +61,19 @@ export function setProblems(
     const modulePath = (name: string) => join(directory, `${name}${extension}`);
     for (const name of [...found].sort(byCodeUnit)) {
       if (!own(sets, name) && !listed.has(name)) {
-        problems.push(`${modulePath(name)} is neither a set nor a listed non-set`);
+        problems.push(`Module ${modulePath(name)} must be a set or a listed non-set`);
       }
     }
     for (const name of Object.keys(sets)) {
       if (listed.has(name)) {
-        problems.push(`${name} is listed as both a set and a non-set`);
+        problems.push(`Set ${name} must not be a listed non-set`);
       } else if (!found.has(name)) {
-        problems.push(`set ${name} has no module ${modulePath(name)}`);
+        problems.push(`Set ${name} must have a module at ${modulePath(name)}`);
       }
     }
     for (const name of listed) {
       if (!own(sets, name) && !found.has(name)) {
-        problems.push(`non-set ${name} has no module ${modulePath(name)}`);
+        problems.push(`Non-set ${name} must have a module at ${modulePath(name)}`);
       }
     }
   }
@@ -82,7 +82,7 @@ export function setProblems(
     for (const [index, name] of names.entries()) {
       for (const need of sets[name].needs ?? []) {
         if (names.indexOf(need) > index) {
-          problems.push(`${name} is declared before ${need}, which it needs`);
+          problems.push(`Set ${name} must be declared after ${need}, which it needs`);
         }
       }
     }
@@ -136,7 +136,7 @@ export function buildOrder(sets: BuildSets, selected?: readonly string[]): strin
   const unknownNeeds = names.flatMap((name) =>
     (sets[name].needs ?? [])
       .filter((need) => !own(sets, need))
-      .map((need) => `${name} needs unknown set ${need}`),
+      .map((need) => `Need ${need} of set ${name} must be a set`),
   );
   if (unknownNeeds.length) {
     throw new RangeError(unknownNeeds.join("; "));
@@ -149,7 +149,7 @@ export function buildOrder(sets: BuildSets, selected?: readonly string[]): strin
     );
     if (next === undefined) {
       const cycle = findCycle(sets, new Set(names.filter((name) => !done.has(name))));
-      throw new RangeError(`build sets form a cycle: ${cycle.join(" -> ")}`);
+      throw new RangeError(`Build sets ${cycle.join(" -> ")} must not form a cycle`);
     }
     order.push(next);
     done.add(next);
@@ -159,7 +159,11 @@ export function buildOrder(sets: BuildSets, selected?: readonly string[]): strin
   }
   const unknown = [...new Set(selected.filter((name) => !own(sets, name)))];
   if (unknown.length) {
-    throw new UsageError(`unknown set ${unknown.join(", ")}`);
+    throw new UsageError(
+      unknown.length === 1
+        ? `Selected name ${unknown[0]} must be a set`
+        : `Selected names ${unknown.join(", ")} must be sets`,
+    );
   }
   const chosen = new Set(selected);
   for (const name of order) {

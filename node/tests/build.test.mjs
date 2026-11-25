@@ -99,9 +99,14 @@ const invalid = [
     name: "cycle",
     entries: [["a", ["c"]], ["b", ["a"]], ["c", ["b"]], ["d"]],
     error: "RangeError",
-    message: /cycle: a -> c -> b -> a$/,
+    message: /^Build sets a -> c -> b -> a must not form a cycle$/,
   },
-  { name: "self need", entries: [["a", ["a"]]], error: "RangeError", message: /cycle: a -> a$/ },
+  {
+    name: "self need",
+    entries: [["a", ["a"]]],
+    error: "RangeError",
+    message: /^Build sets a -> a must not form a cycle$/,
+  },
   {
     name: "unknown need",
     entries: [
@@ -109,21 +114,21 @@ const invalid = [
       ["b", ["phantom"]],
     ],
     error: "RangeError",
-    message: /^a needs unknown set ghost; b needs unknown set phantom$/,
+    message: /^Need ghost of set a must be a set; Need phantom of set b must be a set$/,
   },
   {
     name: "unknown selection",
     entries: [["a"]],
     selected: ["b", "a", "c", "b"],
     error: "UsageError",
-    message: /^unknown set b, c$/,
+    message: /^Selected names b, c must be sets$/,
   },
   {
     name: "inherited name is unknown",
     entries: [["a"]],
     selected: ["toString"],
     error: "UsageError",
-    message: /^unknown set toString$/,
+    message: /^Selected name toString must be a set$/,
   },
 ];
 
@@ -260,7 +265,7 @@ const commands = [
     argv: ["b", "nope"],
     status: 2,
     ran: [],
-    errors: ["unknown set nope", "USAGE"],
+    errors: ["Selected name nope must be a set", "USAGE"],
   },
   {
     name: "unknown option is a usage error",
@@ -360,7 +365,7 @@ test("buildCommand exits 1 on a cycle", async () => {
     await buildCommand({ sets, log: () => {}, error: (line) => errors.push(line) }, []),
     1,
   );
-  assert.deepEqual(errors, ["build sets form a cycle: a -> b -> a"]);
+  assert.deepEqual(errors, ["Build sets a -> b -> a must not form a cycle"]);
 });
 
 // A module directory holding each named file, empty.
@@ -385,11 +390,11 @@ const selfChecks = [
     entries: [["a"], ["ghost"], ["both"]],
     checks: { modules: { nonSets: ["gone", "both"] } },
     problems: (dir) => [
-      `${join(dir, "m-stray.ts")} is neither a set nor a listed non-set`,
-      `${join(dir, "z-stray.ts")} is neither a set nor a listed non-set`,
-      `set ghost has no module ${join(dir, "ghost.ts")}`,
-      "both is listed as both a set and a non-set",
-      `non-set gone has no module ${join(dir, "gone.ts")}`,
+      `Module ${join(dir, "m-stray.ts")} must be a set or a listed non-set`,
+      `Module ${join(dir, "z-stray.ts")} must be a set or a listed non-set`,
+      `Set ghost must have a module at ${join(dir, "ghost.ts")}`,
+      "Set both must not be a listed non-set",
+      `Non-set gone must have a module at ${join(dir, "gone.ts")}`,
     ],
   },
   {
@@ -397,7 +402,7 @@ const selfChecks = [
     files: ["a.mjs", "b.ts", "c.mjs"],
     entries: [["a"]],
     checks: { modules: { extension: ".mjs", nonSets: [] } },
-    problems: (dir) => [`${join(dir, "c.mjs")} is neither a set nor a listed non-set`],
+    problems: (dir) => [`Module ${join(dir, "c.mjs")} must be a set or a listed non-set`],
   },
   {
     name: "a declared order that meets every need passes strictOrder",
@@ -412,9 +417,9 @@ const selfChecks = [
     entries: [["top", ["base", "mid"]], ["mid", ["base"]], ["base"]],
     checks: { strictOrder: true },
     problems: () => [
-      "top is declared before base, which it needs",
-      "top is declared before mid, which it needs",
-      "mid is declared before base, which it needs",
+      "Set top must be declared after base, which it needs",
+      "Set top must be declared after mid, which it needs",
+      "Set mid must be declared after base, which it needs",
     ],
   },
   {
@@ -430,8 +435,8 @@ const selfChecks = [
     entries: [["b", ["a"]], ["a"]],
     checks: { modules: { nonSets: [] }, strictOrder: true },
     problems: (dir) => [
-      `${join(dir, "x.ts")} is neither a set nor a listed non-set`,
-      "b is declared before a, which it needs",
+      `Module ${join(dir, "x.ts")} must be a set or a listed non-set`,
+      "Set b must be declared after a, which it needs",
     ],
   },
 ];
@@ -463,7 +468,7 @@ test("runBuilds runs the self-checks before any build", async (t) => {
     modules: { directory: dir, nonSets: [] },
     sets: table([["a"], ["b"]], ran),
   };
-  await assert.rejects(runBuilds(options), /^RangeError: set b has no module /);
+  await assert.rejects(runBuilds(options), /^RangeError: Set b must have a module at /);
   assert.deepEqual(ran, []);
 });
 
@@ -509,7 +514,7 @@ const helps = [
     usage: "USAGE",
     strictOrder: true,
     status: 1,
-    errors: ["b is declared before a, which it needs"],
+    errors: ["Set b must be declared after a, which it needs"],
   },
   {
     name: "a failed self-check outranks an unknown set",
@@ -517,7 +522,7 @@ const helps = [
     usage: "USAGE",
     strictOrder: true,
     status: 1,
-    errors: ["b is declared before a, which it needs"],
+    errors: ["Set b must be declared after a, which it needs"],
   },
 ];
 
