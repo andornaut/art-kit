@@ -2,7 +2,7 @@
 
 Shared TypeScript mechanisms for scripted pixel art and atlas builds. Source lives in `node/src`, grouped by area (`raster`, `codecs`, `atlas`, `fonts` and `build`), and compiles to the ESM package `@andornaut/art-kit`, released as a GitHub release tarball with no registry publication.
 
-Design summaries by area, with an index of their work items, are in [docs/design](docs/design/README.md); each approved task is a work file in [docs/work](docs/work/README.md).
+Design summaries by area, with an index of their work items, are in [docs/design](docs/design/README.md); each user request has a work file in [docs/work](docs/work/README.md).
 
 ## Boundaries
 
@@ -83,6 +83,8 @@ const image = frameToRgba(grid.palette, grid.outlined());
 | `colour.rgb(hex)`                                                       | Bytes of exactly six hex digits without `#`; any other string throws                                                                                                    |
 | `colour.contrast`, `srgbToOklab`, `srgbToOklch`, `oklchToSrgb`          | WCAG contrast ratio and colour-space conversion; `oklchToSrgb` reduces chroma at fixed lightness and hue to reach the gamut                                             |
 
+`paste` and `composite` read the original source bytes when the source and target byte ranges overlap.
+
 Drawing throws `RangeError` before changing the image if any bounds coordinate or stroke width is nonfinite. The Pillow fixtures in `node/tests/fixtures` cover the raster and drawing operations, including partial alpha. Separate frozen synthetic references cover the smooth filters and inverse Oklab.
 
 `resizeLanczos3` filters horizontally then vertically after premultiplying encoded RGB into Float32. It clips and renormalizes support at image edges, clamps alpha, and uses the unrounded alpha to unpremultiply before byte rounding. It preserves nonzero RGB when a positive alpha rounds to zero; same-size filtering does not copy hidden RGB under originally clear pixels. Use `resizeNearest` for exact RGBA sampling and binary-alpha masks.
@@ -159,7 +161,7 @@ Font files, samples, colours, line spacing, fallback selection and PNG encoder s
 
 ### Self-checks
 
-`strictOrder: true` requires the declared order to meet every need and throws `Set <set> must be declared after <need>, which it needs` instead of reordering; a table that passes runs in declaration order. `modules: { directory, nonSets, extension? }` reconciles a directory of one module per set (`.ts` by default) with the table: it lists each module that is neither a set nor in `nonSets`, each set or non-set without a module, and each name listed as both. Both are off by default so tables built in process, without modules or with a dependent declared first, keep working. `buildCommand` runs them after `--help` and before parsing the sets, so a failed self-check exits 1 even when the arguments also hold an unknown set.
+`strictOrder: true` requires the declared order to meet every need and throws `Set <set> must be declared after <need>, which it needs` instead of reordering; a table that passes runs in declaration order. `modules: { directory, nonSets, extension? }` reconciles a directory of one module per set (`.ts` by default) with the table. It counts regular files and symlinks to regular files matching the extension. The check lists each module that is neither a set nor in `nonSets`, each set or non-set without a module, and each name listed as both. Both are off by default so tables built in process, without modules or with a dependent declared first, keep working. `buildCommand` runs them after `--help` and before parsing the sets, so a failed self-check exits 1 even when the arguments also hold an unknown set.
 
 ### Command line
 
@@ -208,6 +210,8 @@ process.exitCode = await buildCommand(
 | `layout: "padded"` (default)                                                     | Insets and spaces glyphs by `padding` (default 1), fits the height to the last row and always writes a kernings element                                                                                                                                    |
 | `layout: "packed"`                                                               | Requires `antialias`, rejects `padding`: 1 px spacing from (0, 0), a power-of-two height, every info attribute, and no kernings element when there are none                                                                                                |
 
+Font coverage reads stay within the declared cmap and selected subtable lengths.
+
 Antialiasing and hinting default to true; synthesis and cross-glyph substitutions are disabled. Requiring every character in the file's cmap keeps Skia from substituting a system font. Supply each ordered kerning pair at most once. `glyphAtlas` exports the result type as `GlyphAtlas`. The tests compare valid output byte for byte with frozen references in `node/tests/fixtures/fonts` and `node/tests/fixtures/bmfont-packed.json` and verify that a legacy duplicate pair is rejected.
 
 ```ts
@@ -246,7 +250,7 @@ WOFF2 retains font content but may normalize SFNT serialization, including table
 
 ### Subsetting
 
-`subsetWoff2({ strings, label? }, font): Promise<Uint8Array>` also needs the optional exact peer `harfbuzzjs@1.6.4`. It keeps only the code points of `strings`, subsets through HarfBuzz hb-subset defaults and encodes the result like `encodeWoff2`. HarfBuzz keeps the glyphs those characters reach through composites and default GSUB features, their GPOS adjustments, hinting, every variation axis and named instance, and name records 0 to 25 (including copyright, licence and licence URL). HarfBuzz drops the legacy `kern` table (and `FFTM`), so kerning survives only where GPOS carries it, as in Liberation Sans. C0 and C1 controls such as newline are ignored.
+`subsetWoff2({ strings, label?, names? }, font): Promise<Uint8Array>` also needs the optional exact peer `harfbuzzjs@1.6.4`. It keeps only the code points of `strings`, subsets through HarfBuzz hb-subset defaults and encodes the result like `encodeWoff2`. HarfBuzz keeps the glyphs those characters reach through composites and default GSUB features, their GPOS adjustments, hinting, every variation axis and named instance, and name records 0 to 25 (including copyright, licence and licence URL). HarfBuzz drops the legacy `kern` table (and `FFTM`), so kerning survives only where GPOS carries it, as in Liberation Sans. C0 and C1 controls such as newline are ignored.
 
 Before subsetting it throws `RangeError` naming every other character the font's cmap does not map, as `<label> must have a glyph for U+XXXX "c", ...` (`label` defaults to `Font`). Passing every player-visible string therefore fails the build instead of letting the browser fall back to another font. Tests check that a Liberation Sans subset maps exactly the requested characters and renders the same glyph pixels, metrics and kerning as the full font through `rasteriseGlyphs`, and that a Tiny5 subset keeps `fvar`, `gvar`, `HVAR`, its five axes and nine instances. A subset is a modified font: callers check their font licence before shipping one.
 
@@ -289,7 +293,7 @@ Check, pack and provision containers have a 4 GiB memory ceiling. `scripts/provi
 | `bash scripts/provision.sh <empty-directory>`           | Downloads the pinned dependencies from `node/package.json` into `<empty-directory>/node/node_modules` |
 | `bash scripts/pack.sh <node_modules> <empty-directory>` | Builds `art-kit-<version>.tgz`, `SOURCE_COMMIT` and `SHA256SUMS` from the committed `HEAD`            |
 
-Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. ESLint layers the `node/src` areas, lowest first: `raster` imports no other area, `codecs` and `fonts` import `raster`, `atlas` imports `raster` and `codecs`, and `build` imports no other area. Type-only imports follow the same layers. `import-x/no-cycle` rejects runtime import cycles in `node/src`, `scripts`, `tests/container` and `node/tests`, and TypeScript `erasableSyntaxOnly` rejects parameter properties, enums and namespaces. On a branch push or pull request, CI runs `make lint` and the attribution scan. The verification job skips changes confined to `docs/` when CI can compare against the base commit. Changes outside `docs/`, including `README.md`, and events without a usable base also run `make check`, then provision, pack and upload the committed release artifacts. Game projects test their own adapters and authored output; no game build is part of the package gate.
+Formatting follows `.prettierrc`; `node/tests/fixtures` is excluded because the tests compare it byte for byte. Lint rules are in `eslint.config.mjs` and the shared `eslint.config.base.mjs`. ESLint layers the `node/src` areas, lowest first: `raster` imports no other area, `codecs` and `fonts` import `raster`, `atlas` imports `raster` and `codecs`, and `build` imports no other area. Type-only imports follow the same layers. In TypeScript sources, scripts and container checks, an import with only type specifiers must use `import type` so it does not load the module at runtime. `import-x/no-cycle` rejects runtime import cycles in `node/src`, `scripts`, `tests/container` and `node/tests`, and TypeScript `erasableSyntaxOnly` rejects parameter properties, enums and namespaces. On a branch push or pull request, CI runs `make lint` and the attribution scan. The verification job skips changes confined to `docs/` when CI can compare against the base commit. Changes outside `docs/`, including `README.md`, and events without a usable base also run `make check`, then provision, pack and upload the committed release artifacts. Game projects test their own adapters and authored output; no game build is part of the package gate.
 
 ## Version and licence
 
