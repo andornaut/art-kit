@@ -309,4 +309,4 @@ The package version is the `version` in `node/package.json`. Compatible fixes in
 
 The release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`. Consumers pin that URL with the tarball's SHA-256 from `SHA256SUMS`, plus the exact peers, through their own dependency integration. The tarball holds compiled ESM, `.d.ts` files, the published `package.json`, `LICENSE` and `SOURCE_COMMIT`; no source, fonts, game assets or tooling.
 
-Tag `v<version>` only after every required CI workflow has passed on the exact release commit on `main`. Publish that commit's CI-built tarball, `SHA256SUMS` and `SOURCE_COMMIT` as release assets after [verifying the archive and a fresh install](#try-a-released-build).
+Tag `v<version>` only after every required CI workflow has passed on the exact release commit on `main`. Use that commit's CI-built tarball, `SHA256SUMS` and `SOURCE_COMMIT` to run the [checksum and fresh-install commands](#try-a-released-build) before publishing the three files as release assets.
