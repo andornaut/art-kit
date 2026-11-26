@@ -63,7 +63,13 @@ export default defineConfig(
   },
   ...layerConfigs,
   // No import cycles: a module in a cycle can run before what it imports has loaded. Type-only
-  // imports are erased at build time, so they never form one.
+  // imports are erased at build time, so they never form one. An import whose specifiers are all
+  // inline `type` still loads its module under type stripping, so it must be written as
+  // `import type`.
+  {
+    files: [...KIT_FILES, ...SCRIPT_FILES],
+    rules: { "@typescript-eslint/no-import-type-side-effects": "error" },
+  },
   {
     files: [...KIT_FILES, ...SCRIPT_FILES, ...TEST_FILES],
     plugins: { "import-x": { rules: { "no-cycle": noCycle } } },
