@@ -26,7 +26,11 @@ function xy(points: readonly Point[]): XY[] {
 type Box = readonly [x0: number, y0: number, x1: number, y1: number];
 
 function boxOf({ x0, x1, y0, y1 }: Bounds): Box {
-  return [x0, y0, x1, y1];
+  const box: Box = [x0, y0, x1, y1];
+  if (!box.every(Number.isFinite)) {
+    throw new RangeError("Bounds must be finite");
+  }
+  return box;
 }
 
 export interface ShapeStyle {
@@ -59,6 +63,13 @@ function checkColour(colour: Rgba): Rgba {
     throw new RangeError("Colour must be four integers in 0..255");
   }
   return colour;
+}
+
+function checkWidth(width: number): number {
+  if (!Number.isFinite(width)) {
+    throw new RangeError("Stroke width must be finite");
+  }
+  return width;
 }
 
 function sameInk(a: Rgba | undefined, b: Rgba | undefined): boolean {
@@ -850,7 +861,7 @@ export function point(fill: Rgba, points: readonly Point[], image: RgbaImage): v
 // Pillow ImageDraw.line: a polyline; width 1 includes the final point.
 export function line(style: LineStyle, points: readonly Point[], image: RgbaImage): void {
   const fill = checkColour(style.fill);
-  const width = style.width ?? 1;
+  const width = checkWidth(style.width ?? 1);
   if (width === 0) {
     return;
   }
@@ -860,7 +871,7 @@ export function line(style: LineStyle, points: readonly Point[], image: RgbaImag
 export function polygon(style: ShapeStyle, vertices: readonly Point[], image: RgbaImage): void {
   const points = xy(vertices);
   const [ink, fillInk] = inks(style);
-  const width = style.width ?? 1;
+  const width = checkWidth(style.width ?? 1);
   if (fillInk !== undefined) {
     drawPolygon(image, points, fillInk, true);
   }
@@ -888,7 +899,7 @@ export function polygon(style: ShapeStyle, vertices: readonly Point[], image: Rg
 export function ellipse(style: ShapeStyle, bounds: Bounds, image: RgbaImage): void {
   const box = boxOf(bounds);
   const [ink, fillInk] = inks(style);
-  const width = style.width ?? 1;
+  const width = checkWidth(style.width ?? 1);
   if (fillInk !== undefined) {
     ellipsePrimitive(image, ...corners(box), fillInk, true, 0);
   }
@@ -907,7 +918,7 @@ export function arc(
 ): void {
   const box = boxOf(bounds);
   const fill = checkColour(style.fill);
-  const width = style.width ?? 1;
+  const width = checkWidth(style.width ?? 1);
   if (width !== 0) {
     arcPrimitive(image, ...corners(box), f32(start), f32(end), fill, width);
   }
@@ -917,7 +928,7 @@ export function arc(
 export function rectangle(style: ShapeStyle, bounds: Bounds, image: RgbaImage): void {
   const box = boxOf(bounds);
   const [ink, fillInk] = inks(style);
-  const width = style.width ?? 1;
+  const width = checkWidth(style.width ?? 1);
   if (fillInk !== undefined) {
     rectanglePrimitive(image, ...corners(box), fillInk, true, 0);
   }

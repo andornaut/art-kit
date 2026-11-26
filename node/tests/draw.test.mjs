@@ -120,6 +120,43 @@ test("bounds are read before the style is checked", () => {
   assert.throws(() => arc(style, undefined, 0, 90, image), TypeError);
 });
 
+test("boxed operations reject nonfinite bounds even at zero width", () => {
+  const bounds = { x0: 0, x1: 2, y0: 0, y1: 2 };
+  const style = { width: 0 };
+  const arcStyle = { fill: [1, 2, 3, 4], width: 0 };
+  const image = background(3, 3);
+  const original = image.data.slice();
+  for (const coordinate of Object.keys(bounds)) {
+    for (const value of [NaN, Infinity, -Infinity]) {
+      const invalid = { ...bounds, [coordinate]: value };
+      assert.throws(() => ellipse(style, invalid, image), RangeError);
+      assert.throws(() => arc(arcStyle, invalid, 0, 90, image), RangeError);
+      assert.throws(() => rectangle(style, invalid, image), RangeError);
+    }
+  }
+  assert.deepEqual(image.data, original);
+});
+
+test("stroke operations reject nonfinite widths before writing any pixels", () => {
+  const bounds = { x0: 0, x1: 2, y0: 0, y1: 2 };
+  const points = [
+    { x: 0, y: 0 },
+    { x: 2, y: 0 },
+    { x: 1, y: 2 },
+  ];
+  const image = background(3, 3);
+  const original = image.data.slice();
+  for (const width of [NaN, Infinity, -Infinity]) {
+    const style = { fill: [1, 2, 3, 4], width };
+    assert.throws(() => line(style, points, image), RangeError);
+    assert.throws(() => arc(style, bounds, 0, 90, image), RangeError);
+    assert.throws(() => ellipse(style, bounds, image), RangeError);
+    assert.throws(() => polygon(style, points, image), RangeError);
+    assert.throws(() => rectangle(style, bounds, image), RangeError);
+    assert.deepEqual(image.data, original);
+  }
+});
+
 test("draw exports one function per operation", async () => {
   const draw = await import("@andornaut/art-kit/build/draw");
   assert.deepEqual(Object.keys(draw).sort(), [
