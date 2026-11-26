@@ -21,6 +21,18 @@ function clip(
   return w > 0 && h > 0 ? { dx, dy, h, sx, sy, w } : undefined;
 }
 
+function snapshotIfOverlapping(source: Uint8Array, target: Uint8Array): Uint8Array {
+  if (
+    source.buffer === target.buffer &&
+    source.byteOffset < target.byteOffset + target.byteLength &&
+    target.byteOffset < source.byteOffset + source.byteLength
+  ) {
+    // The typed array constructor copies the bytes, including when source is a Node Buffer.
+    return new Uint8Array(source);
+  }
+  return source;
+}
+
 // Pillow ImagingUtils.h: DIV255 rounds a 16-bit product to the nearest multiple of 1/255.
 function div255(value: number): number {
   const tmp = value + 128;
@@ -112,11 +124,11 @@ export function paste(
   if (mask !== undefined && mask !== "alpha") {
     throw new RangeError('Mask must be "alpha"');
   }
-  const data = source === target ? source.data.slice() : source.data;
   const c = clip(at, source.width, source.height, target);
   if (!c) {
     return;
   }
+  const data = snapshotIfOverlapping(source.data, target.data);
   const channels = keepAlpha ? 3 : 4;
   for (let y = 0; y < c.h; y++) {
     if (!mask && !keepAlpha) {
@@ -147,7 +159,7 @@ export function composite(at: Point, source: RgbaImage, target: RgbaImage): void
   if (!c) {
     return;
   }
-  const data = source === target ? source.data.slice() : source.data;
+  const data = snapshotIfOverlapping(source.data, target.data);
   for (let y = 0; y < c.h; y++) {
     for (let x = 0; x < c.w; x++) {
       const s = ((c.sy + y) * source.width + c.sx + x) * 4,

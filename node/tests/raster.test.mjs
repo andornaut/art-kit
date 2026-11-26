@@ -87,6 +87,33 @@ test("raster output is byte-equal to Pillow 13.0.0 references, including partial
   });
 });
 
+const at = { x: 0, y: 0 };
+for (const [name, draw] of [
+  ["paste", (source, target) => raster.paste({ at }, source, target)],
+  [
+    "paste keeping alpha",
+    (source, target) => raster.paste({ at, keepAlpha: true }, source, target),
+  ],
+  ["masked paste", (source, target) => raster.paste({ at, mask: "alpha" }, source, target)],
+  [
+    "masked paste keeping alpha",
+    (source, target) => raster.paste({ at, keepAlpha: true, mask: "alpha" }, source, target),
+  ],
+  ["composite", (source, target) => raster.composite(at, source, target)],
+]) {
+  test(`${name} reads original source pixels from overlapping byte views`, () => {
+    const pixels = [10, 20, 30, 128, 40, 50, 60, 200, 70, 80, 90, 64, 100, 110, 120, 255, 140];
+    for (const backing of [Uint8Array.from(pixels), Buffer.from(pixels)]) {
+      const source = { data: backing.subarray(0, 16), height: 2, width: 2 };
+      const target = { data: backing.subarray(1), height: 2, width: 2 };
+      const expected = { ...target, data: new Uint8Array(target.data) };
+      draw({ ...source, data: new Uint8Array(source.data) }, expected);
+      draw(source, target);
+      assert.deepEqual([...backing], [pixels[0], ...expected.data], backing.constructor.name);
+    }
+  });
+}
+
 test("nearest resize matches Pillow 13.0.0 sample indices for non-integer ratios", () => {
   // Pillow 13.0.0 resize(NEAREST) of an image whose pixels hold their own index.
   const cases = [
