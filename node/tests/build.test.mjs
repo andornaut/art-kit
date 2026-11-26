@@ -460,6 +460,25 @@ for (const { checks, entries, files, name, problems } of selfChecks) {
   });
 }
 
+test("checkSets counts regular files and symlinks to files as modules", async (t) => {
+  const dir = await moduleDir(t, ["a.ts", "target.txt"]);
+  await mkdir(join(dir, "folder.ts"));
+  await symlink("target.txt", join(dir, "linked.ts"));
+  await symlink("folder.ts", join(dir, "folder-link.ts"));
+  await symlink("absent", join(dir, "dangling.ts"));
+  await symlink("loop.ts", join(dir, "loop.ts"));
+  const checks = { modules: { directory: dir, nonSets: [] } };
+  checkSets(checks, table([["a"], ["linked"]]));
+  assert.throws(() => checkSets(checks, table([["a"], ["linked"], ["folder"]])), {
+    name: "RangeError",
+    message: `Set folder must have a module at ${join(dir, "folder.ts")}`,
+  });
+  assert.throws(
+    () => checkSets({ modules: { ...checks.modules, directory: join(dir, "absent") } }, {}),
+    { code: "ENOENT" },
+  );
+});
+
 test("runBuilds runs the self-checks before any build", async (t) => {
   const dir = await moduleDir(t, ["a.ts"]);
   const ran = [];

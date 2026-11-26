@@ -45,22 +45,50 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
   }
   const cmap = record.offset;
   check(cmap, record.length, "cmap table");
+  const cmapEnd = cmap + record.length;
+  const checkCmap = (at: number, length: number, part: string): void => {
+    if (at + length > cmapEnd) {
+      fail(`${part} must end within the cmap table`);
+    }
+  };
   const subtables = new Map<string, number>();
+  checkCmap(cmap, 4, "cmap header");
   const count = u16(cmap + 2);
-  for (let entry = cmap + 4; entry < cmap + 4 + 8 * count; entry += 8) {
+  const directoryEnd = cmap + 4 + 8 * count;
+  checkCmap(cmap + 4, 8 * count, "cmap encoding records");
+  for (let entry = cmap + 4; entry < directoryEnd; entry += 8) {
     const at = cmap + u32(entry + 4);
+    if (at < directoryEnd) {
+      fail("cmap subtables must start after the encoding records");
+    }
+    checkCmap(at, 2, "cmap subtable format");
     const id = `${u16(entry)}.${u16(entry + 2)}`;
     subtables.set(`${id}.${u16(at)}`, at);
   }
   const find = (format: number, ids: readonly string[]): number | undefined =>
     ids.map((id) => subtables.get(`${id}.${format}`)).find((at) => at !== undefined);
+  const subtableEnd = (at: number, format: 4 | 12): number => {
+    const headerLength = format === 4 ? 14 : 16;
+    const part = `format ${format} subtable`;
+    checkCmap(at, headerLength, part);
+    const length = format === 4 ? u16(at + 2) : u32(at + 4);
+    if (length < headerLength) {
+      fail(`${part} must contain its header`);
+    }
+    checkCmap(at, length, part);
+    return at + length;
+  };
 
   const mapped = new Set<number>();
   const format12 = find(12, FORMAT_12);
   if (format12 !== undefined) {
+    const endOfSubtable = subtableEnd(format12, 12);
     const groups = u32(format12 + 12);
-    check(format12 + 16, 12 * groups, "format 12 subtable");
-    for (let group = format12 + 16; group < format12 + 16 + 12 * groups; group += 12) {
+    const groupsEnd = format12 + 16 + 12 * groups;
+    if (groupsEnd > endOfSubtable) {
+      fail("format 12 groups must end within the subtable");
+    }
+    for (let group = format12 + 16; group < groupsEnd; group += 12) {
       const [start, end, glyph] = [u32(group), u32(group + 4), u32(group + 8)];
       if (start > end || end > 0x10ffff) {
         fail("format 12 groups must be Unicode ranges");
@@ -77,6 +105,7 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
   if (format4 === undefined) {
     return fail("must have a Unicode cmap subtable in format 4 or 12");
   }
+  const endOfSubtable = subtableEnd(format4, 4);
   const segX2 = u16(format4 + 6);
   if (segX2 % 2) {
     fail("format 4 segment count must be even");
@@ -85,7 +114,10 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
   const starts = ends + segX2 + 2;
   const deltas = starts + segX2;
   const rangeOffsets = deltas + segX2;
-  check(ends, 4 * segX2 + 2, "format 4 subtable");
+  const glyphIds = rangeOffsets + segX2;
+  if (glyphIds > endOfSubtable) {
+    fail("format 4 segment arrays must end within the subtable");
+  }
   for (let s = 0; s < segX2; s += 2) {
     const [start, end, delta] = [u16(starts + s), u16(ends + s), u16(deltas + s)];
     const rangeOffset = u16(rangeOffsets + s);
@@ -93,10 +125,19 @@ export function coverageOf(label: string, font: Uint8Array): Set<number> {
       fail("format 4 segments must start at or before their end");
     }
     // 0xFFFF is a noncharacter that only terminates the segment list.
-    for (let c = start; c <= Math.min(end, 0xfffe); c++) {
+    const last = Math.min(end, 0xfffe);
+    const glyphOffset = rangeOffsets + s + rangeOffset;
+    if (
+      rangeOffset &&
+      start <= last &&
+      (glyphOffset < glyphIds || glyphOffset + 2 * (last - start + 1) > endOfSubtable)
+    ) {
+      fail("format 4 glyph indices must fit within the subtable glyph array");
+    }
+    for (let c = start; c <= last; c++) {
       let glyph = (c + delta) & 0xffff;
       if (rangeOffset) {
-        const index = u16(rangeOffsets + s + rangeOffset + 2 * (c - start));
+        const index = u16(glyphOffset + 2 * (c - start));
         glyph = index === 0 ? 0 : (index + delta) & 0xffff;
       }
       if (glyph !== 0) {

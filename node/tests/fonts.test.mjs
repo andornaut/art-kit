@@ -209,6 +209,13 @@ function write(bytes) {
 }
 const unicode4 = (segments) => ({ platform: 3, encoding: 1, table: format4(segments) });
 const unicode12 = (groups) => ({ platform: 3, encoding: 10, table: format12(groups) });
+const cmapStart = 28;
+const subtableStart = cmapStart + 12;
+function withField(subtable, offset, field) {
+  const bytes = sfnt([subtable]);
+  bytes.set(field, offset);
+  return bytes;
+}
 
 for (const [name, bytes, expected] of [
   [
@@ -260,6 +267,9 @@ for (const [name, bytes, expected] of [
 }
 
 const liberation = readFileSync(font());
+const deltaSubtable = unicode4([{ start: 0x41, end: 0x41, delta: 1 }]);
+const indexedSubtable = unicode4([{ start: 0x41, end: 0x42, glyphs: [1, 2] }]);
+const groupedSubtable = unicode12([[0x41, 0x42, 1]]);
 for (const [name, bytes, reason] of [
   ["a font collection", Buffer.from("ttcf", "latin1"), "must not be a font collection (ttcf)"],
   ["a WOFF file", Buffer.from("wOFF\0\x01\0\0", "latin1"), "must be a TrueType or OpenType sfnt"],
@@ -274,6 +284,51 @@ for (const [name, bytes, reason] of [
     "no Unicode subtable",
     sfnt([{ platform: 1, encoding: 0, table: format4([{ start: 0x41, end: 0x41, delta: 1 }]) }]),
     "must have a Unicode cmap subtable in format 4 or 12",
+  ],
+  [
+    "a cmap header outside its table",
+    withField(deltaSubtable, 24, u32(3)),
+    "cmap header must end within the cmap table",
+  ],
+  [
+    "an encoding record outside the cmap table",
+    withField(deltaSubtable, 24, u32(11)),
+    "cmap encoding records must end within the cmap table",
+  ],
+  [
+    "a subtable format outside the cmap table",
+    withField(deltaSubtable, 24, u32(13)),
+    "cmap subtable format must end within the cmap table",
+  ],
+  [
+    "a subtable offset into the encoding directory",
+    withField(deltaSubtable, cmapStart + 8, u32(6)),
+    "cmap subtables must start after the encoding records",
+  ],
+  [
+    "a format 4 header larger than its declared length",
+    withField(deltaSubtable, subtableStart + 2, u16(13)),
+    "format 4 subtable must contain its header",
+  ],
+  [
+    "format 4 segment arrays outside the subtable",
+    withField(deltaSubtable, subtableStart + 2, u16(deltaSubtable.table.length - 1)),
+    "format 4 segment arrays must end within the subtable",
+  ],
+  [
+    "format 4 glyph indices outside the subtable",
+    withField(indexedSubtable, subtableStart + 2, u16(indexedSubtable.table.length - 2)),
+    "format 4 glyph indices must fit within the subtable glyph array",
+  ],
+  [
+    "a format 12 subtable extending past the cmap table",
+    withField(groupedSubtable, subtableStart + 4, u32(groupedSubtable.table.length + 1)),
+    "format 12 subtable must end within the cmap table",
+  ],
+  [
+    "format 12 groups outside the subtable",
+    withField(groupedSubtable, subtableStart + 4, u32(16)),
+    "format 12 groups must end within the subtable",
   ],
   [
     "a reversed format 12 group",

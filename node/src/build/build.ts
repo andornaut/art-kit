@@ -1,7 +1,7 @@
 // Sequential art build runner: dependency order, downstream selection, set table self-checks and a
 // byte-snapshot check. Node built-ins only. Only `nodeBuild` spawns a process.
 import { spawnSync } from "node:child_process";
-import { readdirSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -105,11 +105,29 @@ class CheckError extends Error {
 
 // The names, without the extension, of the files in directory that end with it.
 function moduleNames({ directory, extension = ".ts" }: ModuleDirectory): Set<string> {
-  return new Set(
-    readdirSync(directory)
-      .filter((file) => file.endsWith(extension) && file.length > extension.length)
-      .map((file) => file.slice(0, -extension.length)),
-  );
+  const names = new Set<string>();
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const { name } = entry;
+    if (!name.endsWith(extension) || name.length <= extension.length) {
+      continue;
+    }
+    if (entry.isFile() || (entry.isSymbolicLink() && linksToFile(join(directory, name)))) {
+      names.add(name.slice(0, -extension.length));
+    }
+  }
+  return names;
+}
+
+function linksToFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch (error) {
+    const { code } = error as NodeJS.ErrnoException;
+    if (code === "ENOENT" || code === "ENOTDIR" || code === "ELOOP") {
+      return false;
+    }
+    throw error;
+  }
 }
 
 /**
