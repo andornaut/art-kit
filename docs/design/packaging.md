@@ -41,3 +41,4 @@ dependency](../../README.md#released-dependency), [API entry points](../api-entr
 | ak-0056 | Reject inline type-only imports that load a module          | [ak-0056.md](../work/ak-0056.md) |
 | ak-0057 | Apply the straightforward Art-kit review fixes              | [ak-0057.md](../work/ak-0057.md) |
 | ak-0060 | Align Art-kit docs with current source                      | [ak-0060.md](../work/ak-0060.md) |
+| ak-0061 | Add Art-kit Dependabot coverage                             | [ak-0061.md](../work/ak-0061.md) |
