@@ -83,7 +83,7 @@ const image = frameToRgba(grid.palette, grid.outlined());
 | `colour.rgb(hex)`                                                       | Bytes of exactly six hex digits without `#`; any other string throws                                                                                                    |
 | `colour.contrast`, `srgbToOklab`, `srgbToOklch`, `oklchToSrgb`          | WCAG contrast ratio and colour-space conversion; `oklchToSrgb` reduces chroma at fixed lightness and hue to reach the gamut                                             |
 
-The Pillow fixtures in `node/tests/fixtures` cover the existing raster and drawing operations, including partial alpha. Separate frozen synthetic references cover the smooth filters and inverse Oklab.
+Drawing throws `RangeError` before changing the image if any bounds coordinate or stroke width is nonfinite. The Pillow fixtures in `node/tests/fixtures` cover the raster and drawing operations, including partial alpha. Separate frozen synthetic references cover the smooth filters and inverse Oklab.
 
 `resizeLanczos3` filters horizontally then vertically after premultiplying encoded RGB into Float32. It clips and renormalizes support at image edges, clamps alpha, and uses the unrounded alpha to unpremultiply before byte rounding. It preserves nonzero RGB when a positive alpha rounds to zero; same-size filtering does not copy hidden RGB under originally clear pixels. Use `resizeNearest` for exact RGBA sampling and binary-alpha masks.
 
