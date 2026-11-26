@@ -15,25 +15,34 @@ const FILTER_NONE = 0;
 // come first, so tRNS can end at the last of them, then the most used.
 function paletteOf(image: RgbaImage): { indices: Uint8Array; palette: number[] } | undefined {
   const view = new DataView(image.data.buffer, image.data.byteOffset, image.data.byteLength);
-  const pixels = new Uint32Array(image.width * image.height);
-  const counts = new Map<number, number>();
-  for (let i = 0; i < pixels.length; i++) {
+  const indices = new Uint8Array(image.width * image.height);
+  const entries = new Map<number, { count: number; index: number }>();
+  // Store first-seen indices until the palette order is known.
+  for (let i = 0; i < indices.length; i++) {
     const rgba = view.getUint32(i * 4);
-    pixels[i] = rgba;
-    counts.set(rgba, (counts.get(rgba) ?? 0) + 1);
-    if (counts.size > MAX_PALETTE) {
-      return undefined;
+    let entry = entries.get(rgba);
+    if (entry === undefined) {
+      if (entries.size === MAX_PALETTE) {
+        return undefined;
+      }
+      entry = { count: 0, index: entries.size };
+      entries.set(rgba, entry);
     }
+    entry.count++;
+    indices[i] = entry.index;
   }
   const opaque = (rgba: number) => Number((rgba & 0xff) === 0xff);
-  const palette = [...counts.keys()].sort(
-    (a, b) => opaque(a) - opaque(b) || (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || a - b,
+  const sorted = [...entries].sort(
+    ([a, left], [b, right]) => opaque(a) - opaque(b) || right.count - left.count || a - b,
   );
-  const indexOf = new Map(palette.map((rgba, index) => [rgba, index]));
-  const indices = new Uint8Array(pixels.length);
-  pixels.forEach((rgba, i) => {
-    indices[i] = indexOf.get(rgba) ?? 0;
+  const remap = new Uint8Array(sorted.length);
+  const palette = sorted.map(([rgba, entry], index) => {
+    remap[entry.index] = index;
+    return rgba;
   });
+  for (let i = 0; i < indices.length; i++) {
+    indices[i] = remap[indices[i]];
+  }
   return { indices, palette };
 }
 
