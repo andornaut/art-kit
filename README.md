@@ -34,6 +34,22 @@ Geometry and image types are local structural types; the package has no `game-ki
 
 See [API entry points](docs/api-entry-points.md) for import dependencies, the shared kit namespace rules and the v0.28 migration map.
 
+## Try a released build
+
+Use Node 24.22.2 or newer. Choose a version from [GitHub Releases](https://github.com/andornaut/art-kit/releases)
+and download its tarball, `SOURCE_COMMIT` and `SHA256SUMS` into a scratch directory. Run the following
+there, replacing the example version with the one you downloaded.
+
+```sh
+version=0.34.0
+sha256sum -c SHA256SUMS &&
+  npm install "./art-kit-$version.tgz" pngjs@7.0.0 @jsquash/webp@1.5.0 &&
+  node --input-type=module -e 'import { Grid } from "@andornaut/art-kit/build/grid"; console.log(typeof Grid)'
+```
+
+The smoke check prints `function`. In a consumer project, [pin the public release URL](#released-dependency)
+and commit its lockfile. Install the [optional peers](#runtime-and-checks) only for the APIs you use.
+
 ## Pixel frames and images
 
 A `Frame` is rows of hex colours (opaque) or `null` (clear). An `RgbaImage` is `{ data, width, height }` with straight (non-premultiplied) RGBA bytes; an opaque (RGB) image has alpha 255. `rgbaImage` also exports the `Point` (`{ x, y }`) and `Rect` (`{ x, y, width, height }`) types its functions take. A `Tag` is `[name, frames, milliseconds]`, with one duration for every frame or one each.
@@ -293,4 +309,4 @@ The package version is the `version` in `node/package.json`. Compatible fixes in
 
 The release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`. Consumers pin that URL with the tarball's SHA-256 from `SHA256SUMS`, plus the exact peers, through their own dependency integration. The tarball holds compiled ESM, `.d.ts` files, the published `package.json`, `LICENSE` and `SOURCE_COMMIT`; no source, fonts, game assets or tooling.
 
-Tag `v<version>` only after every required CI workflow has passed on the exact release commit on `main`. Publish that commit's CI-built tarball, `SHA256SUMS` and `SOURCE_COMMIT` as release assets after checking the checksums and a fresh install.
+Tag `v<version>` only after every required CI workflow has passed on the exact release commit on `main`. Publish that commit's CI-built tarball, `SHA256SUMS` and `SOURCE_COMMIT` as release assets after [verifying the archive and a fresh install](#try-a-released-build).
