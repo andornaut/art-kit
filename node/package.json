@@ -109,7 +109,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "@types/pngjs": "6.0.5",
     "eslint": "10.14.0",
     "eslint-plugin-import-x": "4.17.1",
