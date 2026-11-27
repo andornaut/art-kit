@@ -43,3 +43,4 @@ dependency](../../README.md#released-dependency), [API entry points](../api-entr
 | ak-0060 | Align Art-kit docs with current source                      | [ak-0060.md](../work/ak-0060.md) |
 | ak-0061 | Add Art-kit Dependabot coverage                             | [ak-0061.md](../work/ak-0061.md) |
 | ak-0063 | Add Dependabot coverage for Markdown lint tooling           | [ak-0063.md](../work/ak-0063.md) |
+| ak-0064 | Group cohesive Art-kit internals                            | [ak-0064.md](../work/ak-0064.md) |
