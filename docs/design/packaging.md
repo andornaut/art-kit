@@ -42,3 +42,4 @@ Reference: [Boundaries](../api-reference.md#boundaries), [Runtime and checks](..
 | ak-0063 | Add Dependabot coverage for Markdown lint tooling           | [ak-0063.md](../work/ak-0063.md) |
 | ak-0064 | Group cohesive Art-kit internals                            | [ak-0064.md](../work/ak-0064.md) |
 | ak-0065 | Organize Art-kit documentation for navigation               | [ak-0065.md](../work/ak-0065.md) |
+| ak-0066 | Group Art-kit documentation by purpose                      | [ak-0066.md](../work/ak-0066.md) |
