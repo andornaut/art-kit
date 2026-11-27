@@ -14,9 +14,4 @@ and maintain work items.
 | [build](build.md)                 | The build runner, its self-checks and check modes, and declared outputs                                  | [builds](../reference/build-runner.md#builds)                                                                                                                                                                                |
 | [packaging](packaging.md)         | Package exports, peers, stock container checks, CI and releases                                          | [boundaries](../reference/api-reference.md#boundaries), [checks](../guides/development-checks.md#runtime-and-checks), [API entry points](../reference/api-entry-points.md)                                                   |
 
-## Historical design records
-
-- [Consumer API recommendations](history/consumer-api-recommendations.md) records the Art-owner
-  consultation before the numerical and bitmap-font APIs shipped.
-- [Shared raster and colour API proposal](history/shared-raster-colour-proposal.md) records the
-  approved design that shipped in v0.23.0.
+The [design history](history/README.md) preserves past proposals and consultations.
