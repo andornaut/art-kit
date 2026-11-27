@@ -9,8 +9,7 @@ layout. `bitmapFont` reads that XML, measures text and composes tinted glyphs wi
 uncovered characters and can rename the subset for a Reserved Font Name. Font files, licences, glyph
 policy and browser readiness stay with the games.
 
-Reference: [Fonts](../../README.md#fonts), [Bitmap text](../../README.md#bitmap-text), [WOFF2
-fonts](../../README.md#woff2-fonts), [implementation notes](../implementation-comparison.md).
+Reference: [Fonts](../api-reference.md#fonts), [Bitmap text](../api-reference.md#bitmap-text), [WOFF2 fonts](../api-reference.md#woff2-fonts), [implementation notes](../implementation-comparison.md).
 
 ## Work items
 

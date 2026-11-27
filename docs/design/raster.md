@@ -12,11 +12,7 @@ resolution and argument handling. The private `draw/` modules hold pixel and seg
 spans and arc clipping (`ellipse.ts`). Both shape engines use the same half-away-from-zero
 rounding helper in `rounding.ts`.
 
-Reference: [Pixel frames and images](../../README.md#pixel-frames-and-images), [Development image
-comparison](../../README.md#development-image-comparison), [implementation
-notes](../implementation-comparison.md), [shared raster and colour
-proposal](../shared-raster-colour-proposal.md), [consumer API
-recommendations](../consumer-api-recommendations.md).
+Reference: [Pixel frames and images](../api-reference.md#pixel-frames-and-images), [Development image comparison](../api-reference.md#development-image-comparison), [implementation notes](../implementation-comparison.md), [shared raster and colour proposal](../shared-raster-colour-proposal.md), [consumer API recommendations](../consumer-api-recommendations.md).
 
 ## Work items
 

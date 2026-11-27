@@ -7,7 +7,7 @@ The `--check` flag compares a snapshot of the check paths before and after the r
 With `outputs: true`, the check also fails on any file under the check paths that no set's
 `outputs` or `check.static` claims. The check never deletes files.
 
-Reference: [Builds](../../README.md#builds).
+Reference: [Builds](../builds-and-checks.md#builds).
 
 ## Work items
 

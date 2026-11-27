@@ -1,6 +1,6 @@
 # Shared raster and colour API proposal
 
-This proposal records the design approved in [ak-0028](work/ak-0028.md). The three functions shipped in v0.23.0. See [Pixel frames and images](../README.md#pixel-frames-and-images) for the current contracts and import paths. The original design request was item 6 of `call_a78f829d3d7e440890dcb3d9fc99f779`. Package publication, consumer migration and generated game outputs remain separate decisions.
+This proposal records the design approved in [ak-0028](work/ak-0028.md). The three functions shipped in v0.23.0. See [Pixel frames and images](api-reference.md#pixel-frames-and-images) for the current contracts and import paths. The original design request was item 6 of `call_a78f829d3d7e440890dcb3d9fc99f779`. Package publication, consumer migration and generated game outputs remain separate decisions.
 
 ## Recommendation
 

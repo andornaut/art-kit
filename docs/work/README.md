@@ -1,8 +1,20 @@
 # Work items
 
 Every user request is one file, `docs/work/<id>.md`, approved or not. It records scope and milestones; live progress
-(claims, blocks, receipts and acceptance) stays in the work protocol state root. The [design
-index](../design/README.md) lists the work items of each area.
+(claims, blocks, receipts and acceptance) stays in the work protocol state root.
+
+## Browse work by design area
+
+The [design index](../design/README.md) describes the areas. Each area has its own work table.
+For reference and guides, see the [documentation index](../README.md).
+
+- [Raster](../design/raster.md#work-items)
+- [Fonts](../design/fonts.md#work-items)
+- [Sprite sheets](../design/sprite-sheets.md#work-items)
+- [Build](../design/build.md#work-items)
+- [Packaging](../design/packaging.md#work-items)
+
+## Work-file format
 
 | Front matter | Content                                                                                                                 |
 | ------------ | ----------------------------------------------------------------------------------------------------------------------- |
@@ -28,6 +40,5 @@ decided or delivered, and why, in a line or two each.
   conversation, only short approval references.
 - Backfilled items with no recorded approval are labelled `inferred`, when the release shows the
   approval, or `unrecorded`.
-- For the CI rules that apply to changes under `docs/`, see [Runtime and
-  checks](../../README.md#runtime-and-checks) and [ak-0041](ak-0041.md).
+- For the CI rules that apply to changes under `docs/`, see [Runtime and checks](../builds-and-checks.md#runtime-and-checks) and [ak-0041](ak-0041.md).
 - Design summaries and work files are not part of the release tarball.

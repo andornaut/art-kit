@@ -1,6 +1,6 @@
 # Consumer API recommendations
 
-This consultation records the Ada the Navigator, Archie and Chibi Art-owner findings from before the numerical and bitmap-font APIs shipped. The consultation granted no additional implementation, deletion, migration or publication approval. For the supported contracts, see [Pixel frames and images](../README.md#pixel-frames-and-images) and [Bitmap text](../README.md#bitmap-text).
+This consultation records the Ada the Navigator, Archie and Chibi Art-owner findings from before the numerical and bitmap-font APIs shipped. The consultation granted no additional implementation, deletion, migration or publication approval. For the supported contracts, see [Pixel frames and images](api-reference.md#pixel-frames-and-images) and [Bitmap text](api-reference.md#bitmap-text).
 
 ## Ranked recommendations
 
