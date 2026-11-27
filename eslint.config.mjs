@@ -62,6 +62,23 @@ export default defineConfig(
     },
   },
   ...layerConfigs,
+  {
+    files: ["node/src/raster/draw/*.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            OUTSIDE_PACKAGE,
+            {
+              message: "Drawing primitives import only rgbaImage and types from the parent area.",
+              regex: "^\\.\\./(?!(?:rgbaImage|types)\\.js$)",
+            },
+          ],
+        },
+      ],
+    },
+  },
   // No import cycles: a module in a cycle can run before what it imports has loaded. Type-only
   // imports are erased at build time, so they never form one. An import whose specifiers are all
   // inline `type` still loads its module under type stripping, so it must be written as

@@ -6,6 +6,12 @@ references cover the Float32 smooth filters and inverse Oklab, which takes expli
 rounding policies. `build/compareRgba` reports raw and composite differences between decoded
 images for callers to evaluate.
 
+`build/draw` enters through `node/src/raster/draw.ts`, which owns the public types, style
+resolution and argument handling. The private `draw/` modules hold pixel and segment writes
+(`pixels.ts`), polygon and rectangle scan conversion plus wide lines (`linear.ts`), and ellipse
+spans and arc clipping (`ellipse.ts`). Both shape engines use the same half-away-from-zero
+rounding helper in `rounding.ts`.
+
 Reference: [Pixel frames and images](../../README.md#pixel-frames-and-images), [Development image
 comparison](../../README.md#development-image-comparison), [implementation
 notes](../implementation-comparison.md), [shared raster and colour
