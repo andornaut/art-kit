@@ -4,7 +4,7 @@ Art-kit ships an ESM package with declarations and explicit build subpaths. Sour
 container-backed Make targets. Release packaging uses committed source and produces a GitHub
 release tarball.
 
-Reference: [Boundaries](../api-reference.md#boundaries), [Runtime and checks](../builds-and-checks.md#runtime-and-checks), [Version and licence](../installation-and-releases.md#version-and-licence), [Released dependency](../installation-and-releases.md#released-dependency), [API entry points](../api-entry-points.md),
+Reference: [Boundaries](../reference/api-reference.md#boundaries), [Runtime and checks](../guides/development-checks.md#runtime-and-checks), [Version and licence](../reference/package.md#version-and-licence), [Released dependency](../guides/installation-and-releases.md#released-dependency), [API entry points](../reference/api-entry-points.md),
 [container tooling](../../tests/container/README.md).
 
 ## Work items

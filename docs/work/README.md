@@ -40,5 +40,5 @@ decided or delivered, and why, in a line or two each.
   conversation, only short approval references.
 - Backfilled items with no recorded approval are labelled `inferred`, when the release shows the
   approval, or `unrecorded`.
-- For the CI rules that apply to changes under `docs/`, see [Runtime and checks](../builds-and-checks.md#runtime-and-checks) and [ak-0041](ak-0041.md).
+- For the CI rules that apply to changes under `docs/`, see [Runtime and checks](../guides/development-checks.md#runtime-and-checks) and [ak-0041](ak-0041.md).
 - Design summaries and work files are not part of the release tarball.

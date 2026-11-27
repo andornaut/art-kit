@@ -29,6 +29,7 @@ The package ships TypeScript declarations and explicit leaf subpaths. Canonical 
 Geometry and image types are local structural types; the package has no `game-kit` dependency. Clients own palettes and ramps, sprite definitions, font files and glyph policy, camera and depth geometry, manifests, tile sizes, frame tags, grouping, ordering, paths, filenames and Vite asset emission. No module imports a game or discovers its repository from the working directory. Options and context come before the subject. Validation errors read `<subject> must <constraint>`, such as `Columns must be a positive safe integer`, naming the argument, option or input; an identifying key, such as a frame index, font label, set name or cycle path, may lead the subject, and ranges are inclusive `min..max`. libwebp and HarfBuzz failures throw `Error` naming the engine. The `build` runner keeps its command-line and process messages: `unknown option <option>`, `--check needs check paths`, `check.index has been removed`, `exit <status>`, `signal <name>`, `<set> build failed: <cause>` and the `CheckError` summary. Only `fonts` needs Skia; every other subpath is canvas-free. Numerical transforms use the rounding and intermediate precision specified below.
 
 See [API entry points](api-entry-points.md) for import dependencies, the shared kit namespace rules and the v0.28 migration map.
+See the [build runner reference](build-runner.md) for the build API, command line and check modes.
 
 ## Pixel frames and images
 
@@ -167,7 +168,7 @@ await writeFile(
 await writeFile("body.fnt", font.xml);
 ```
 
-[Implementation notes](implementation-comparison.md) cover font output quality and the rendering split.
+[Implementation notes](../design/implementation-comparison.md) cover font output quality and the rendering split.
 
 ## WOFF2 fonts
 

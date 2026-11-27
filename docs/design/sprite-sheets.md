@@ -10,7 +10,7 @@ byte-identical to pngjs 7.0.0), `indexedPng`, `webp` (lossless and configurable 
 decoding), `gif` (exact palettes and binary alpha) and `ico` (PNG entries). Callers choose formats,
 fallback order, paths and metadata.
 
-Reference: [Encoders and atlases](../api-reference.md#encoders-and-atlases).
+Reference: [Encoders and atlases](../reference/api-reference.md#encoders-and-atlases).
 
 ## Work items
 

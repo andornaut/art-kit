@@ -14,11 +14,7 @@ sha256sum -c SHA256SUMS &&
 ```
 
 The smoke check prints `function`. In a consumer project, [pin the public release URL](#released-dependency)
-and commit its lockfile. Install the [optional peers](builds-and-checks.md#runtime-and-checks) only for the APIs you use.
-
-## Version and licence
-
-The package version is the `version` in `node/package.json`. Compatible fixes increment the patch version and additive features the minor version. An incompatible public API change needs a coordinated bump and release notes before consumers migrate: the minor version before 1.0.0, the major version after. The exact Git revision identifies each payload. Helper code here is MIT licensed; test fonts keep their SIL OFL licence and are excluded from release artifacts. Generated assets, fonts and client code keep their own licences.
+and commit its lockfile. Install the [optional peers](../reference/package.md#runtime-and-peers) only for the APIs you use.
 
 ## Released dependency
 
@@ -32,6 +28,7 @@ The package version is the `version` in `node/package.json`. Compatible fixes in
 - Sprite sheets render through the shared raster frame code with identical PNG, RGBA and JSON
   output. Import paths are unchanged after the internal source reorganization.
 
-The release asset is `https://github.com/andornaut/art-kit/releases/download/v<version>/art-kit-<version>.tgz`. Consumers pin that URL with the tarball's SHA-256 from `SHA256SUMS`, plus the exact peers, through their own dependency integration. The tarball holds compiled ESM, `.d.ts` files, the published `package.json`, `LICENSE` and `SOURCE_COMMIT`; no source, fonts, game assets or tooling.
+Use the [release asset URL and checksum](../reference/package.md#release-asset) to pin the version
+and its exact peers in the consumer project.
 
 Tag `v<version>` only after every required CI workflow has passed on the exact release commit on `main`. Use that commit's CI-built tarball, `SHA256SUMS` and `SOURCE_COMMIT` to run the [checksum and fresh-install commands](#try-a-released-build) before publishing the three files as release assets.
